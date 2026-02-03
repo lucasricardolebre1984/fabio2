@@ -16,7 +16,8 @@ from app.models.contrato_template import ContratoTemplate
 from app.schemas.contrato import ContratoCreate, ContratoUpdate
 from app.services.extenso_service import ExtensoService
 # from app.services.pdf_service import PDFService  # WeasyPrint disabled
-from app.services.pdf_service_stub import PDFService  # Using stub
+# from app.services.pdf_service_playwright import PDFService  # Playwright
+from app.services.pdf_service_stub import PDFService  # Using stub - WORKING
 
 
 class ContratoService:

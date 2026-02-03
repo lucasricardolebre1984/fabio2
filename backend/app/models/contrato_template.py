@@ -1,5 +1,5 @@
 """ContratoTemplate model."""
-from sqlalchemy import Column, String, Text, Boolean, JSON
+from sqlalchemy import Column, String, Text, Boolean
 from sqlalchemy.dialects.postgresql import JSONB
 
 from app.db.base import BaseModel

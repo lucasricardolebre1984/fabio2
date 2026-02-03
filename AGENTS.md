@@ -10,10 +10,12 @@
 Este é um **SaaS de gestão de contratos** para FC Soluções Financeiras.
 
 ### Funcionalidades Principais
-1. **Contratos:** Templates pré-definidos (Bacen, etc.) com preenchimento dinâmico
-2. **Clientes:** Cadastro automático e histórico de contratos
-3. **Agenda:** Gestão de compromissos
-4. **WhatsApp:** Integração para envio de contratos
+1. **Contratos:** Templates pré-definidos (Bacen, Serasa, Protesto) com preenchimento dinâmico
+2. **Visualização:** Preview do contrato com layout institucional
+3. **Edição:** Editar contratos existentes
+4. **Clientes:** Cadastro automático e histórico de contratos
+5. **Agenda:** Gestão de compromissos
+6. **WhatsApp:** Integração para envio de contratos (pendente)
 
 ### Stack Tecnológica
 - **Backend:** FastAPI + PostgreSQL + Redis
@@ -89,6 +91,8 @@ Leia antes de trabalhar:
 2. **docs/FOUNDATION/UX_UI_STANDARDS.md** - Design system
 3. **docs/DECISIONS.md** - Decisões arquiteturais
 4. **docs/CONTRATOS/CAMPOS_BACEN.md** - Especificação do contrato Bacen
+5. **docs/BUGSREPORT.md** - Bugs conhecidos e resolvidos
+6. **docs/SESSION.md** - Contexto atual da sessão
 
 ---
 
@@ -119,6 +123,19 @@ npm run dev
 - PGAdmin: http://localhost:5050
 - Evolution API: http://localhost:8080
 
+### Rotas do Sistema
+| Rota | Descrição |
+|------|-----------|
+| `/` | Login |
+| `/contratos` | Menu de Templates |
+| `/contratos/lista` | Lista de Contratos |
+| `/contratos/novo` | Criar Contrato |
+| `/contratos/[id]` | Visualizar Contrato |
+| `/contratos/[id]/editar` | Editar Contrato |
+| `/clientes` | Lista de Clientes |
+| `/agenda` | Agenda |
+| `/whatsapp` | WhatsApp |
+
 ---
 
 ## 🐛 Bug Reports
@@ -136,6 +153,13 @@ Template:
 **Atual:** [comportamento]
 ```
 
+### Workarounds Ativos (Dev)
+
+| Workaround | Arquivo | Descrição |
+|------------|---------|-----------|
+| Autenticação | `app/core/security_stub.py` | Aceita senha "1234" para qualquer usuário |
+| PDF | `app/services/pdf_service_stub.py` | Retorna JSON em vez de PDF (aguardando GTK+) |
+
 ---
 
 ## ✉️ Contato
@@ -146,4 +170,4 @@ Template:
 
 ---
 
-*Atualizado em: 2026-02-03*
+*Atualizado em: 2026-02-03 12:50*

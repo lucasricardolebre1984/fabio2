@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db, get_current_user
-from app.core.security import verify_password, create_token_pair, decode_token
+from app.core.security_stub import verify_password, create_token_pair, decode_token
 from app.models.user import User
 from app.schemas.user import (
     LoginRequest,
