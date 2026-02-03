@@ -1,21 +1,25 @@
-"""Script para criar usuário admin."""
+"""Script simples para criar usuário admin."""
 import asyncio
+import sys
+
+sys.path.insert(0, '.')
+
 from app.db.session import AsyncSessionLocal
 from app.models.user import User
 from app.core.security import get_password_hash
+from sqlalchemy import select
 
 async def create_user():
     async with AsyncSessionLocal() as db:
         # Verificar se usuário já existe
-        from sqlalchemy import select
-        from app.models.user import User as UserModel
         result = await db.execute(
-            select(UserModel).where(UserModel.email == "fabio@fcsolucoes.com")
+            select(User).where(User.email == "fabio@fcsolucoes.com")
         )
         existing = result.scalar_one_or_none()
         
         if existing:
-            print("Usuário já existe!")
+            print("⚠️  Usuário já existe!")
+            print("   📧 fabio@fcsolucoes.com")
             return
         
         user = User(
@@ -27,9 +31,9 @@ async def create_user():
         )
         db.add(user)
         await db.commit()
-        print("Usuário criado com sucesso!")
-        print("Email: fabio@fcsolucoes.com")
-        print("Senha: 1234")
+        print("✅ Usuário criado!")
+        print("   📧 Email: fabio@fcsolucoes.com")
+        print("   🔑 Senha: 1234")
 
 if __name__ == "__main__":
     asyncio.run(create_user())

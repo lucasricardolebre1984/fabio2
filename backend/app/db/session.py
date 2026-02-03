@@ -4,9 +4,12 @@ from sqlalchemy.orm import sessionmaker
 
 from app.config import settings
 
+# Export DATABASE_URL for scripts
+DATABASE_URL = settings.DATABASE_URL
+
 # Create async engine
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    DATABASE_URL,
     echo=settings.DEBUG,
     future=True,
 )
