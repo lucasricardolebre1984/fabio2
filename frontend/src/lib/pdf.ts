@@ -21,8 +21,8 @@ export function generateContractPDF(contractData: any) {
       <title>Contrato ${contractData.numero}</title>
       <style>
         @page { size: A4; margin: 15mm; }
+        * { font-family: 'Times New Roman', Times, serif !important; }
         body { 
-          font-family: 'Times New Roman', serif; 
           font-size: 11pt; 
           line-height: 1.4;
           max-width: 210mm;

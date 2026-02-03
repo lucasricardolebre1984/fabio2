@@ -121,7 +121,7 @@ export default function VisualizarContratoPage() {
   // Layout institucional conforme modelo
   const renderContratoPreview = () => {
     return (
-      <div className="bg-white p-8 min-h-[1100px] shadow-sm" style={{ fontFamily: 'Times New Roman, serif' }}>
+      <div className="bg-white p-8 min-h-[1100px] shadow-sm [font-family:'Times_New_Roman',Times,serif_!important]">
         
         {/* Logo e Cabeçalho Institucional */}
         <div className="flex items-start justify-between mb-6 border-b-2 border-gray-800 pb-4">
