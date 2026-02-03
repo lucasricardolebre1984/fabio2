@@ -29,10 +29,6 @@ export function generateContractPDF(contractData: any) {
           margin: 0 auto;
           padding: 20px;
         }
-        .header { display: flex; align-items: flex-start; gap: 15px; border-bottom: 2px solid #000; padding-bottom: 15px; margin-bottom: 20px; }
-        .logo { width: 70px; height: 70px; background: #627d98; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 28px; font-weight: bold; }
-        .company-info h1 { font-size: 16pt; margin: 0 0 5px 0; }
-        .company-info p { margin: 2px 0; font-size: 9pt; }
         .title { text-align: center; margin-bottom: 20px; }
         .title h2 { font-size: 14pt; border-bottom: 2px solid #000; display: inline-block; padding-bottom: 5px; margin: 0; }
         .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
@@ -50,16 +46,25 @@ export function generateContractPDF(contractData: any) {
       </style>
     </head>
     <body>
-      <div class="header">
-        <div class="logo">FC</div>
-        <div class="company-info">
-          <h1>FC SOLUÇÕES FINANCEIRAS</h1>
-          <p>CNPJ: 57.815.628/0001-62</p>
-          <p>Rua Maria das Graças de Negreiros Bonilha, nº 30, sala 3</p>
-          <p>Jardim Nova Aliança Sul - Ribeirão Preto/SP - CEP 14022-100</p>
-          <p>contato@fcsolucoesfinanceiras.com</p>
+      <!-- Cabeçalho Institucional - Faixa Azul com Logo -->
+      <div style="background: #1e3a5f; color: white; padding: 15px 20px; margin: -20px -20px 20px -20px; display: flex; align-items: center; gap: 15px;">
+        <!-- Logo Institucional -->
+        <div style="flex-shrink: 0;">
+          <svg width="50" height="50" viewBox="0 0 100 100" style="display: block;">
+            <circle cx="50" cy="50" r="45" stroke="white" stroke-width="3" fill="none"/>
+            <line x1="50" y1="15" x2="50" y2="85" stroke="white" stroke-width="3"/>
+            <line x1="25" y1="35" x2="75" y2="35" stroke="white" stroke-width="2"/>
+            <line x1="15" y1="35" x2="35" y2="35" stroke="white" stroke-width="2"/>
+            <line x1="65" y1="35" x2="85" y2="35" stroke="white" stroke-width="2"/>
+            <line x1="25" y1="35" x2="20" y2="50" stroke="white" stroke-width="2"/>
+            <line x1="75" y1="35" x2="80" y2="50" stroke="white" stroke-width="2"/>
+            <text x="42" y="58" fill="white" font-size="24" font-weight="bold" font-family="serif">F</text>
+            <text x="54" y="58" fill="white" font-size="24" font-weight="bold" font-family="serif">C</text>
+          </svg>
         </div>
-        <div style="margin-left: auto; font-size: 10pt; font-weight: bold;">Tel: (16) 99301-7396</div>
+        <div style="flex: 1;">
+          <h1 style="font-size: 20pt; font-weight: bold; margin: 0; color: white;">F C Soluções Financeiras</h1>
+        </div>
       </div>
 
       <div class="title">

@@ -123,25 +123,29 @@ export default function VisualizarContratoPage() {
     return (
       <div className="bg-white p-8 min-h-[1100px] shadow-sm [font-family:'Times_New_Roman',Times,serif_!important]">
         
-        {/* Logo e Cabeçalho Institucional */}
-        <div className="flex items-start justify-between mb-6 border-b-2 border-gray-800 pb-4">
+        {/* Cabeçalho Institucional - Faixa Azul com Logo */}
+        <div className="bg-[#1e3a5f] text-white py-4 px-6 mb-6 -mx-8 -mt-8">
           <div className="flex items-center gap-4">
-            {/* Logo Placeholder */}
-            <div className="w-20 h-20 bg-[#627d98] rounded-full flex items-center justify-center text-white font-bold text-2xl">
-              FC
+            {/* Logo Institucional */}
+            <div className="flex-shrink-0">
+              <svg width="60" height="60" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                {/* Balança */}
+                <circle cx="50" cy="50" r="45" stroke="white" strokeWidth="3" fill="none"/>
+                <line x1="50" y1="15" x2="50" y2="85" stroke="white" strokeWidth="3"/>
+                <line x1="25" y1="35" x2="75" y2="35" stroke="white" strokeWidth="2"/>
+                <line x1="15" y1="35" x2="35" y2="35" stroke="white" strokeWidth="2"/>
+                <line x1="65" y1="35" x2="85" y2="35" stroke="white" strokeWidth="2"/>
+                <line x1="25" y1="35" x2="20" y2="50" stroke="white" strokeWidth="2"/>
+                <line x1="75" y1="35" x2="80" y2="50" stroke="white" strokeWidth="2"/>
+                <text x="42" y="58" fill="white" fontSize="24" fontWeight="bold" fontFamily="serif">F</text>
+                <text x="54" y="58" fill="white" fontSize="24" fontWeight="bold" fontFamily="serif">C</text>
+              </svg>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 tracking-wide">
-                FC SOLUÇÕES FINANCEIRAS
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold tracking-wide">
+                F C Soluções Financeiras
               </h1>
-              <p className="text-sm text-gray-600">CNPJ: 57.815.628/0001-62</p>
-              <p className="text-sm text-gray-600">Rua Maria das Graças de Negreiros Bonilha, nº 30, sala 3</p>
-              <p className="text-sm text-gray-600">Jardim Nova Aliança Sul - Ribeirão Preto/SP - CEP 14022-100</p>
-              <p className="text-sm text-gray-600">contato@fcsolucoesfinanceiras.com</p>
             </div>
-          </div>
-          <div className="text-right">
-            <p className="text-sm font-bold text-gray-800">Tel: (16) 99301-7396</p>
           </div>
         </div>
 
