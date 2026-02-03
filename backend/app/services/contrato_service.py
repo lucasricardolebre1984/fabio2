@@ -52,14 +52,9 @@ class ContratoService:
     
     async def get_template(self, template_id: str) -> Optional[Dict[str, Any]]:
         """Get template by ID."""
-        # First try database
+        # Try database first
         result = await self.db.execute(
-            select(ContratoTemplate).where(
-                and_(
-                    ContratoTemplate.tipo == template_id,
-                    ContratoTemplate.ativo == True
-                )
-            )
+            select(ContratoTemplate).where(ContratoTemplate.tipo == template_id)
         )
         template = result.scalar_one_or_none()
         
@@ -76,15 +71,20 @@ class ContratoService:
                 "clausulas": template.clausulas,
                 "assinaturas": template.assinaturas,
                 "layout": template.layout,
+                "contratada_nome": template.contratada_nome,
+                "contratada_cnpj": template.contratada_cnpj,
+                "contratada_email": template.contratada_email,
+                "contratada_endereco": template.contratada_endereco,
+                "contratada_telefone": template.contratada_telefone,
                 "created_at": template.created_at,
                 "updated_at": template.updated_at
             }
         
-        # Fallback to JSON file - try multiple paths
+        # Fallback to JSON file
         possible_paths = [
-            Path.cwd() / "contratos" / "templates" / f"{template_id}.json",
-            Path.cwd().parent / "contratos" / "templates" / f"{template_id}.json",
-            Path("c:/projetos/fabio2/contratos/templates") / f"{template_id}.json",
+            Path(__file__).parent.parent.parent / "contratos" / "templates" / f"{template_id}.json",
+            Path("C:/projetos/fabio2/contratos/templates") / f"{template_id}.json",
+            Path("C:/projetos/fabio2/backend/contratos/templates") / f"{template_id}.json"
         ]
         
         for template_path in possible_paths:
@@ -94,22 +94,8 @@ class ContratoService:
         
         return None
     
-    async def generate_numero(self) -> str:
-        """Generate contract number (CNT-YYYY-XXXX)."""
-        year = datetime.now().year
-        
-        # Count contracts this year
-        result = await self.db.execute(
-            select(func.count(Contrato.id)).where(
-                func.extract('year', Contrato.created_at) == year
-            )
-        )
-        count = result.scalar() + 1
-        
-        return f"CNT-{year}-{count:04d}"
-    
     async def create(self, data: ContratoCreate, user_id: UUID) -> Contrato:
-        """Create a new contract and auto-create client if needed."""
+        """Create a new contract."""
         # Get template
         template = await self.get_template(data.template_id)
         if not template:
@@ -141,53 +127,45 @@ class ContratoService:
             data.prazo_2_extenso = self.extenso.numero_por_extenso(data.prazo_2)
         
         # Find or create client
-        cliente_result = await self.db.execute(
+        result = await self.db.execute(
             select(Cliente).where(Cliente.documento == data.contratante_documento)
         )
-        cliente = cliente_result.scalar_one_or_none()
+        cliente = result.scalar_one_or_none()
         
         if not cliente:
             # Create new client
             cliente = Cliente(
                 nome=data.contratante_nome,
-                tipo_pessoa="fisica" if len(data.contratante_documento) <= 14 else "juridica",
+                tipo_pessoa="fisica" if len(data.contratante_documento) == 11 else "juridica",
                 documento=data.contratante_documento,
                 email=data.contratante_email,
                 telefone=data.contratante_telefone,
-                endereco=data.contratante_endereco,
-                primeiro_contrato_em=datetime.now(),
-                ultimo_contrato_em=datetime.now(),
-                total_contratos=1
+                endereco=data.contratante_endereco
             )
             self.db.add(cliente)
             await self.db.flush()
         else:
-            # Update client
+            # Update client info
             cliente.nome = data.contratante_nome
             cliente.email = data.contratante_email
             cliente.telefone = data.contratante_telefone
             cliente.endereco = data.contratante_endereco
-            cliente.ultimo_contrato_em = datetime.now()
-            cliente.total_contratos += 1
+        
+        # Generate contract number
+        numero = await self._generate_numero()
         
         # Create contract
         contrato = Contrato(
-            numero=await self.generate_numero(),
-            template_id=data.template_id,
-            template_nome=template["nome"],
+            numero=numero,
             status=ContratoStatus.RASCUNHO,
-            
-            # Cliente
+            template_id=data.template_id,
+            template_nome=template.get("nome", data.template_id),
             cliente_id=cliente.id,
-            
-            # Contratante
             contratante_nome=data.contratante_nome,
             contratante_documento=data.contratante_documento,
             contratante_email=data.contratante_email,
             contratante_telefone=data.contratante_telefone,
             contratante_endereco=data.contratante_endereco,
-            
-            # Valores
             valor_total=data.valor_total,
             valor_total_extenso=data.valor_total_extenso,
             valor_entrada=data.valor_entrada,
@@ -200,15 +178,9 @@ class ContratoService:
             prazo_1_extenso=data.prazo_1_extenso,
             prazo_2=data.prazo_2,
             prazo_2_extenso=data.prazo_2_extenso,
-            
-            # Assinatura
             local_assinatura=data.local_assinatura,
             data_assinatura=data.data_assinatura,
-            
-            # Extras
             dados_extras=data.dados_extras,
-            
-            # User
             created_by=user_id
         )
         
@@ -217,6 +189,20 @@ class ContratoService:
         await self.db.refresh(contrato)
         
         return contrato
+    
+    async def _generate_numero(self) -> str:
+        """Generate contract number: CNT-YYYY-XXXX"""
+        year = datetime.now().year
+        
+        # Count contracts this year
+        result = await self.db.execute(
+            select(func.count(Contrato.id)).where(
+                func.extract('year', Contrato.created_at) == year
+            )
+        )
+        count = result.scalar() + 1
+        
+        return f"CNT-{year}-{count:04d}"
     
     async def list(
         self,
@@ -232,16 +218,18 @@ class ContratoService:
             query = query.where(Contrato.status == status)
         
         if search:
-            query = query.where(
-                or_(
-                    Contrato.numero.ilike(f"%{search}%"),
-                    Contrato.contratante_nome.ilike(f"%{search}%")
-                )
+            search_filter = or_(
+                Contrato.contratante_nome.ilike(f"%{search}%"),
+                Contrato.numero.ilike(f"%{search}%"),
+                Contrato.contratante_documento.ilike(f"%{search}%")
             )
+            query = query.where(search_filter)
         
         # Count total
         count_result = await self.db.execute(
-            select(func.count(Contrato.id)).select_from(query.subquery())
+            select(func.count(Contrato.id)).where(
+                and_(True, search_filter) if search else True
+            )
         )
         total = count_result.scalar()
         
@@ -274,12 +262,10 @@ class ContratoService:
         if not contrato:
             return None
         
-        if data.status:
-            contrato.status = data.status
-        if data.pdf_url:
-            contrato.pdf_url = data.pdf_url
-        if data.dados_extras:
-            contrato.dados_extras = data.dados_extras
+        # Update fields
+        update_data = data.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(contrato, field, value)
         
         await self.db.commit()
         await self.db.refresh(contrato)
@@ -339,3 +325,11 @@ class ContratoService:
         await self.update(contrato_id, ContratoUpdate(pdf_url=relative_path))
         
         return relative_path
+    
+    async def generate_pdf_bytes(self, contrato_id: UUID) -> Optional[bytes]:
+        """Generate PDF bytes for contract using Playwright."""
+        from app.services.pdf_service_playwright import PDFService as PlaywrightPDFService
+        
+        pdf_service = PlaywrightPDFService(self.db)
+        pdf_bytes = await pdf_service.generate_contrato_pdf(contrato_id)
+        return pdf_bytes

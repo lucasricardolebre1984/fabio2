@@ -66,13 +66,9 @@ export default function VisualizarContratoPage() {
 
   const handlePrint = async () => {
     try {
-      const id = params.id as string
-      const blob = await contratosApi.generatePDF(id)
-      
-      const url = window.URL.createObjectURL(blob)
-      window.open(url, '_blank')
-      
-      toast.success('PDF gerado com sucesso!')
+      const { generateContractPDF } = await import('@/lib/pdf')
+      generateContractPDF(contrato)
+      toast.success('PDF aberto para visualização!')
     } catch (error) {
       toast.error('Erro ao gerar PDF')
     }
@@ -80,21 +76,11 @@ export default function VisualizarContratoPage() {
 
   const handleDownload = async () => {
     try {
-      const id = params.id as string
-      const blob = await contratosApi.generatePDF(id)
-      
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `contrato-${contrato?.numero}.pdf`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
-      
-      toast.success('Download iniciado!')
+      const { generateContractPDF } = await import('@/lib/pdf')
+      generateContractPDF(contrato)
+      toast.success('PDF aberto para download!')
     } catch (error) {
-      toast.error('Erro ao fazer download')
+      toast.error('Erro ao gerar PDF')
     }
   }
 

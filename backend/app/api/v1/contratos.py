@@ -1,8 +1,10 @@
 """Contratos routes."""
 from typing import List, Optional
 from uuid import UUID
+from io import BytesIO
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -137,23 +139,35 @@ async def delete_contrato(
         )
 
 
-@router.post("/{contrato_id}/pdf")
+@router.get("/{contrato_id}/pdf")
 async def generate_pdf(
     contrato_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operador)
 ):
     """Generate PDF for contract."""
-    service = ContratoService(db)
-    pdf_url = await service.generate_pdf(contrato_id)
+    from fastapi.responses import Response
     
-    if not pdf_url:
+    service = ContratoService(db)
+    pdf_bytes = await service.generate_pdf_bytes(contrato_id)
+    
+    if not pdf_bytes:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Erro ao gerar PDF"
         )
     
-    return {"pdf_url": pdf_url}
+    # Return PDF with CORS headers
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=contrato-{contrato_id}.pdf",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "*"
+        }
+    )
 
 
 @router.post("/{contrato_id}/enviar")

@@ -19,38 +19,53 @@ class PDFService:
     
     async def generate_contrato_pdf(self, contrato_id: UUID) -> Optional[bytes]:
         """Generate PDF for a contract using Playwright."""
-        # Get contract data directly to avoid circular import
-        result = await self.db.execute(select(Contrato).where(Contrato.id == contrato_id))
-        contrato = result.scalar_one_or_none()
+        import traceback
         
-        if not contrato:
+        try:
+            # Get contract data directly to avoid circular import
+            result = await self.db.execute(select(Contrato).where(Contrato.id == contrato_id))
+            contrato = result.scalar_one_or_none()
+            
+            if not contrato:
+                print(f"Contrato {contrato_id} não encontrado")
+                return None
+            
+            # Generate HTML content
+            html_content = self._generate_html(contrato)
+            print(f"HTML gerado: {len(html_content)} caracteres")
+            
+            # Generate PDF using Playwright
+            async with async_playwright() as p:
+                print("Iniciando Playwright...")
+                browser = await p.chromium.launch(headless=True)
+                print("Browser iniciado")
+                page = await browser.new_page()
+                print("Página criada")
+                
+                # Set content
+                await page.set_content(html_content)
+                print("Conteúdo definido")
+                
+                # Generate PDF
+                pdf_bytes = await page.pdf(
+                    format='A4',
+                    print_background=True,
+                    margin={
+                        'top': '20mm',
+                        'right': '15mm',
+                        'bottom': '20mm',
+                        'left': '15mm'
+                    }
+                )
+                print(f"PDF gerado: {len(pdf_bytes)} bytes")
+                
+                await browser.close()
+                return pdf_bytes
+                
+        except Exception as e:
+            print(f"ERRO ao gerar PDF: {e}")
+            traceback.print_exc()
             return None
-        
-        # Generate HTML content
-        html_content = self._generate_html(contrato)
-        
-        # Generate PDF using Playwright
-        async with async_playwright() as p:
-            browser = await p.chromium.launch()
-            page = await browser.new_page()
-            
-            # Set content
-            await page.set_content(html_content)
-            
-            # Generate PDF
-            pdf_bytes = await page.pdf(
-                format='A4',
-                print_background=True,
-                margin={
-                    'top': '20mm',
-                    'right': '15mm',
-                    'bottom': '20mm',
-                    'left': '15mm'
-                }
-            )
-            
-            await browser.close()
-            return pdf_bytes
     
     def _generate_html(self, contrato: Contrato) -> str:
         """Generate HTML for contract."""
