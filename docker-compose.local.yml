@@ -1,0 +1,47 @@
+# Docker Compose para desenvolvimento local
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: fabio2-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fabio2_user
+      POSTGRES_PASSWORD: fabio2_pass
+      POSTGRES_DB: fabio2
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fabio2_user -d fabio2"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: fabio2-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  evolution-api:
+    image: atendai/evolution-api:latest
+    container_name: fabio2-evolution
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_URL=http://localhost:8080
+      - AUTHENTICATION_API_KEY=dev_evolution_key
+    volumes:
+      - evolution_data:/evolution/instances
+
+volumes:
+  postgres_data:
+  redis_data:
+  evolution_data:
