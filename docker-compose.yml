@@ -1,0 +1,164 @@
+version: '3.8'
+
+services:
+  # ==================================================================
+  # PostgreSQL
+  # ==================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: fabio2-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fabio2_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fabio2_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-fabio2}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fabio2_user} -d ${POSTGRES_DB:-fabio2}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fabio2-network
+
+  # ==================================================================
+  # Redis
+  # ==================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: fabio2-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fabio2-network
+
+  # ==================================================================
+  # Evolution API (WhatsApp)
+  # ==================================================================
+  evolution-api:
+    image: atendai/evolution-api:latest
+    container_name: fabio2-evolution
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_URL=http://localhost:8080
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY:-default_key_change_in_production}
+      - AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
+      - CONFIG_SESSION_PHONE_VERSION=2.3000.1015901307
+    volumes:
+      - evolution_data:/evolution/instances
+    networks:
+      - fabio2-network
+    depends_on:
+      - redis
+
+  # ==================================================================
+  # Backend (FastAPI) - Desenvolvimento
+  # ==================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fabio2-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-fabio2_user}:${POSTGRES_PASSWORD:-fabio2_pass}@postgres:5432/${POSTGRES_DB:-fabio2}
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-dev_secret_key_change_in_production}
+      - EVOLUTION_API_URL=http://evolution-api:8080
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-default_key_change_in_production}
+      - CORS_ORIGINS=http://localhost:3000,http://frontend:3000
+      - STORAGE_MODE=local
+      - STORAGE_LOCAL_PATH=/app/storage
+    volumes:
+      - ./backend:/app
+      - backend_storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      evolution-api:
+        condition: service_started
+    networks:
+      - fabio2-network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # ==================================================================
+  # Frontend (Next.js) - Desenvolvimento
+  # ==================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: fabio2-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=https://api.automaniaai.com.br/api/v1
+      - API_URL=http://backend:8000/api/v1
+      - NEXT_PUBLIC_APP_URL=https://www.automaniaai.com.br/fabio
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - fabio2-network
+    command: npm run dev
+
+  # ==================================================================
+  # PGAdmin (Opcional - Desenvolvimento)
+  # ==================================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: fabio2-pgadmin
+    restart: unless-stopped
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@local.dev}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - fabio2-network
+    profiles:
+      - dev
+
+# ==================================================================
+# Volumes
+# ==================================================================
+volumes:
+  postgres_data:
+  redis_data:
+  evolution_data:
+  backend_storage:
+  pgadmin_data:
+
+# ==================================================================
+# Networks
+# ==================================================================
+networks:
+  fabio2-network:
+    driver: bridge

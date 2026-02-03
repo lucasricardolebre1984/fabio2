@@ -1,0 +1,437 @@
+{
+  "id": "bacen-v1",
+  "nome": "Bacen - Remoção SCR",
+  "tipo": "bacen",
+  "descricao": "Contrato de Prestação de Serviços para remoção de apontamentos de prejuízo no Sistema de Informações de Crédito (SCR) do Banco Central",
+  "versao": "1.0.0",
+  "ativo": true,
+  "contratada": {
+    "nome": "FC SERVIÇOS E SOLUÇÕES ADMINISTRATIVAS LTDA",
+    "cnpj": "57.815.628/0001-62",
+    "email": "contato@fcsolucoesfinanceiras.com",
+    "endereco": "Rua Maria das Graças de Negreiros Bonilha, nº 30, sala 3, Jardim Nova Aliança Sul, Ribeirão Preto/SP, CEP 14022-100",
+    "telefone": "(16) 99301-7396"
+  },
+  "campos": [
+    {
+      "nome": "contratante_nome",
+      "label": "Nome Completo",
+      "tipo": "texto",
+      "obrigatorio": true,
+      "placeholder": "João da Silva",
+      "mascara": null,
+      "secao": "dados_contratante",
+      "ordem": 1
+    },
+    {
+      "nome": "contratante_documento",
+      "label": "CPF/CNPJ",
+      "tipo": "cpf_cnpj",
+      "obrigatorio": true,
+      "placeholder": "000.000.000-00",
+      "mascara": "auto",
+      "secao": "dados_contratante",
+      "ordem": 2,
+      "validacao": "cpf_cnpj"
+    },
+    {
+      "nome": "contratante_email",
+      "label": "E-mail",
+      "tipo": "email",
+      "obrigatorio": true,
+      "placeholder": "joao@email.com",
+      "mascara": null,
+      "secao": "dados_contratante",
+      "ordem": 3,
+      "validacao": "email"
+    },
+    {
+      "nome": "contratante_telefone",
+      "label": "Telefone",
+      "tipo": "telefone",
+      "obrigatorio": false,
+      "placeholder": "(16) 99999-9999",
+      "mascara": "(00) 00000-0000",
+      "secao": "dados_contratante",
+      "ordem": 4
+    },
+    {
+      "nome": "contratante_endereco",
+      "label": "Endereço Completo",
+      "tipo": "texto",
+      "obrigatorio": true,
+      "placeholder": "Rua das Flores, 123 - Centro - Ribeirão Preto/SP",
+      "mascara": null,
+      "secao": "dados_contratante",
+      "ordem": 5
+    },
+    {
+      "nome": "valor_total",
+      "label": "Valor Total do Contrato",
+      "tipo": "moeda",
+      "obrigatorio": true,
+      "placeholder": "R$ 0,00",
+      "mascara": "R$ #.##0,00",
+      "secao": "valores",
+      "ordem": 1,
+      "validacao": {
+        "min": 0.01,
+        "max": 999999.99
+      },
+      "extenso": {
+        "ativo": true,
+        "campo_saida": "valor_total_extenso"
+      }
+    },
+    {
+      "nome": "valor_total_extenso",
+      "label": "Valor Total por Extenso",
+      "tipo": "extenso",
+      "obrigatorio": false,
+      "placeholder": "Preenchimento automático",
+      "mascara": null,
+      "secao": "valores",
+      "ordem": 2,
+      "readonly": true,
+      "fonte": "valor_total"
+    },
+    {
+      "nome": "valor_entrada",
+      "label": "Valor da Entrada",
+      "tipo": "moeda",
+      "obrigatorio": true,
+      "placeholder": "R$ 0,00",
+      "mascara": "R$ #.##0,00",
+      "secao": "valores",
+      "ordem": 3,
+      "validacao": {
+        "min": 0,
+        "max_campo": "valor_total"
+      },
+      "extenso": {
+        "ativo": true,
+        "campo_saida": "valor_entrada_extenso"
+      }
+    },
+    {
+      "nome": "valor_entrada_extenso",
+      "label": "Valor da Entrada por Extenso",
+      "tipo": "extenso",
+      "obrigatorio": false,
+      "placeholder": "Preenchimento automático",
+      "mascara": null,
+      "secao": "valores",
+      "ordem": 4,
+      "readonly": true,
+      "fonte": "valor_entrada"
+    },
+    {
+      "nome": "qtd_parcelas",
+      "label": "Quantidade de Parcelas",
+      "tipo": "numero",
+      "obrigatorio": true,
+      "placeholder": "0",
+      "mascara": "0",
+      "secao": "valores",
+      "ordem": 5,
+      "validacao": {
+        "min": 1,
+        "max": 99
+      },
+      "extenso": {
+        "ativo": true,
+        "campo_saida": "qtd_parcelas_extenso"
+      }
+    },
+    {
+      "nome": "qtd_parcelas_extenso",
+      "label": "Quantidade de Parcelas por Extenso",
+      "tipo": "extenso",
+      "obrigatorio": false,
+      "placeholder": "Preenchimento automático",
+      "mascara": null,
+      "secao": "valores",
+      "ordem": 6,
+      "readonly": true,
+      "fonte": "qtd_parcelas"
+    },
+    {
+      "nome": "valor_parcela",
+      "label": "Valor da Parcela",
+      "tipo": "moeda",
+      "obrigatorio": true,
+      "placeholder": "R$ 0,00",
+      "mascara": "R$ #.##0,00",
+      "secao": "valores",
+      "ordem": 7,
+      "formula": "(valor_total - valor_entrada) / qtd_parcelas",
+      "extenso": {
+        "ativo": true,
+        "campo_saida": "valor_parcela_extenso"
+      }
+    },
+    {
+      "nome": "valor_parcela_extenso",
+      "label": "Valor da Parcela por Extenso",
+      "tipo": "extenso",
+      "obrigatorio": false,
+      "placeholder": "Preenchimento automático",
+      "mascara": null,
+      "secao": "valores",
+      "ordem": 8,
+      "readonly": true,
+      "fonte": "valor_parcela"
+    },
+    {
+      "nome": "prazo_1",
+      "label": "Prazo 1 (dias)",
+      "tipo": "numero",
+      "obrigatorio": true,
+      "placeholder": "30",
+      "mascara": "0",
+      "secao": "valores",
+      "ordem": 9,
+      "validacao": {
+        "min": 1,
+        "max": 999
+      },
+      "extenso": {
+        "ativo": true,
+        "campo_saida": "prazo_1_extenso"
+      }
+    },
+    {
+      "nome": "prazo_1_extenso",
+      "label": "Prazo 1 por Extenso",
+      "tipo": "extenso",
+      "obrigatorio": false,
+      "placeholder": "Preenchimento automático",
+      "mascara": null,
+      "secao": "valores",
+      "ordem": 10,
+      "readonly": true,
+      "fonte": "prazo_1"
+    },
+    {
+      "nome": "prazo_2",
+      "label": "Prazo 2 (dias)",
+      "tipo": "numero",
+      "obrigatorio": true,
+      "placeholder": "60",
+      "mascara": "0",
+      "secao": "valores",
+      "ordem": 11,
+      "validacao": {
+        "min": 1,
+        "max": 999,
+        "gt_campo": "prazo_1"
+      },
+      "extenso": {
+        "ativo": true,
+        "campo_saida": "prazo_2_extenso"
+      }
+    },
+    {
+      "nome": "prazo_2_extenso",
+      "label": "Prazo 2 por Extenso",
+      "tipo": "extenso",
+      "obrigatorio": false,
+      "placeholder": "Preenchimento automático",
+      "mascara": null,
+      "secao": "valores",
+      "ordem": 12,
+      "readonly": true,
+      "fonte": "prazo_2"
+    },
+    {
+      "nome": "local_assinatura",
+      "label": "Local de Assinatura",
+      "tipo": "texto",
+      "obrigatorio": true,
+      "placeholder": "Ribeirão Preto/SP",
+      "mascara": null,
+      "secao": "assinatura",
+      "ordem": 1,
+      "default": "Ribeirão Preto/SP"
+    },
+    {
+      "nome": "data_assinatura",
+      "label": "Data da Assinatura",
+      "tipo": "data",
+      "obrigatorio": true,
+      "placeholder": null,
+      "mascara": "00/00/0000",
+      "secao": "assinatura",
+      "ordem": 2,
+      "default": "hoje"
+    }
+  ],
+  "secoes": [
+    {
+      "id": "dados_contratante",
+      "titulo": "Dados do Contratante",
+      "ordem": 1,
+      "icone": "User"
+    },
+    {
+      "id": "valores",
+      "titulo": "Valores do Contrato",
+      "ordem": 2,
+      "icone": "DollarSign"
+    },
+    {
+      "id": "assinatura",
+      "titulo": "Dados da Assinatura",
+      "ordem": 3,
+      "icone": "PenTool"
+    }
+  ],
+  "clausulas": [
+    {
+      "numero": "PRIMEIRA",
+      "titulo": "DO OBJETO",
+      "ordem": 1,
+      "paragrafos": [
+        "O presente contrato tem como objeto a prestação de serviços de consultoria e intermediação administrativa pela CONTRATADA em favor do(a) CONTRATANTE, visando a adoção de procedimentos administrativos para a regularização de apontamentos de prejuízo registrados no Sistema de Informações de Crédito (SCR) do Banco Central do Brasil, vinculados ao CPF/CNPJ do(a) CONTRATANTE.",
+        "O serviço consiste na análise do caso, elaboração de requerimentos e acompanhamento do processo administrativo junto às instituições financeiras credoras, buscando a baixa dos referidos apontamentos, nos termos da regulamentação vigente.",
+        "Fica claro entre as partes que este serviço não se trata de quitação ou pagamento de dívidas, mas sim de um procedimento administrativo para a regularização dos registros no SCR."
+      ]
+    },
+    {
+      "numero": "SEGUNDA",
+      "titulo": "DAS OBRIGAÇÕES DA CONTRATADA",
+      "ordem": 2,
+      "paragrafos": [
+        "A CONTRATADA se compromete a:",
+        "a) Realizar uma análise detalhada da situação do(a) CONTRATANTE junto ao SCR;",
+        "b) Elaborar e protocolar os requerimentos administrativos necessários junto às instituições financeiras pertinentes;",
+        "c) Acompanhar o andamento dos procedimentos, empregando seus melhores esforços técnicos para a obtenção do resultado almejado;",
+        "d) Manter o(a) CONTRATANTE informado sobre as etapas e o andamento do processo;",
+        "e) Prestar o serviço dentro do mais alto padrão de ética e profissionalismo."
+      ]
+    },
+    {
+      "numero": "TERCEIRA",
+      "titulo": "DAS OBRIGAÇÕES DO(A) CONTRATANTE",
+      "ordem": 3,
+      "paragrafos": [
+        "O(A) CONTRATANTE se compromete a:",
+        "a) Fornecer à CONTRATADA todos os documentos e informações solicitados, de forma completa e verdadeira, para a correta execução dos serviços;",
+        "b) Efetuar o pagamento dos honorários nas datas e valores acordados neste instrumento;",
+        "c) Não tratar diretamente com as instituições financeiras sobre o objeto deste contrato sem o prévio conhecimento e anuência da CONTRATADA."
+      ]
+    },
+    {
+      "numero": "QUARTA",
+      "titulo": "DO VALOR E DA FORMA DE PAGAMENTO",
+      "ordem": 4,
+      "paragrafos": [
+        "Pelos serviços prestados, o(a) CONTRATANTE pagará à CONTRATADA o valor total de R$ [valor_total] ([valor_total_extenso]), a ser pago da seguinte forma:",
+        "Entrada: R$ [valor_entrada] ([valor_entrada_extenso]), a ser paga no ato da assinatura deste contrato.",
+        "Parcelas: [qtd_parcelas] ([qtd_parcelas_extenso]) parcelas de R$ [valor_parcela] ([valor_parcela_extenso]), com vencimento em [prazo_1] ([prazo_1_extenso]) e [prazo_2] ([prazo_2_extenso]) dias, respectivamente, a contar da data de assinatura."
+      ]
+    },
+    {
+      "numero": "QUINTA",
+      "titulo": "DO PRAZO DE EXECUÇÃO",
+      "ordem": 5,
+      "paragrafos": [
+        "O prazo estimado para a conclusão dos serviços é de 45 (quarenta e cinco) a 60 (sessenta) dias úteis, contados a partir da data de assinatura deste instrumento e da confirmação do pagamento da entrada."
+      ]
+    },
+    {
+      "numero": "SEXTA",
+      "titulo": "DA GARANTIA DE RESULTADO E POLÍTICA DE REEMBOLSO",
+      "ordem": 6,
+      "paragrafos": [
+        "O serviço objeto deste contrato é de resultado, vinculado à efetiva baixa e atualização dos apontamentos de prejuízo no Sistema de Informações de Crédito (SCR) do Banco Central, conforme o escopo definido na Cláusula Primeira.",
+        "Caso a CONTRATADA não comprove a conclusão do serviço no prazo máximo de 60 (sessenta) dias úteis, o presente contrato será considerado automaticamente rescindido por inadimplemento da CONTRATADA.",
+        "Na hipótese de rescisão por descumprimento do prazo, a CONTRATADA deverá realizar a devolução integral dos valores já pagos pelo(a) CONTRATANTE, no prazo de até 30 (trinta) dias úteis após o término do prazo contratual, por meio de transferência bancária ou PIX para a conta de titularidade do(a) CONTRATANTE.",
+        "O atraso no reembolso além do prazo estipulado no parágrafo anterior sujeitará a CONTRATADA a multa de 10% (dez por cento) sobre o valor a ser devolvido, acrescido de juros de mora de 1% (um por cento) ao mês, calculados pro rata die (por dia de atraso)."
+      ]
+    },
+    {
+      "numero": "SÉTIMA",
+      "titulo": "DO INADIMPLEMENTO DO(A) CONTRATANTE",
+      "ordem": 7,
+      "paragrafos": [
+        "Em caso de atraso no pagamento de qualquer parcela, o valor devido será acrescido de:",
+        "a) Multa de 10% (dez por cento) sobre o valor da parcela em atraso;",
+        "b) Juros de mora de 1% (um por cento) ao mês, calculados pro rata die;",
+        "c) Correção monetária pelo índice IPCA/IBGE, ou outro que venha a substituí-lo.",
+        "O atraso superior a 30 (trinta) dias no pagamento de qualquer parcela poderá ensejar a suspensão dos serviços e, a critério da CONTRATADA, a rescisão do presente contrato, sem prejuízo da cobrança dos valores devidos e da multa estipulada."
+      ]
+    },
+    {
+      "numero": "OITAVA",
+      "titulo": "DA ALOCAÇÃO DE RECURSOS E DA IRREVERSIBILIDADE DOS CUSTOS",
+      "ordem": 8,
+      "paragrafos": [
+        "O(A) CONTRATANTE declara estar ciente de que o processo de contratação foi dividido em duas fases distintas: (I) a fase de análise e onboarding, de caráter gratuito e sem compromisso, na qual foram coletados e validados todos os documentos e informações; e (II) a fase de execução do serviço, que se inicia imediatamente após a assinatura deste instrumento e a confirmação do pagamento inicial.",
+        "Ao assinar este contrato, o(a) CONTRATANTE autoriza e a CONTRATADA se compromete a alocar, de forma imediata e irreversível, os recursos humanos e materiais necessários para o protocolo e acompanhamento do procedimento administrativo. Tais custos são comprometidos integralmente no ato da contratação.",
+        "Em razão do exposto, o(a) CONTRATANTE manifesta seu pleno acordo e ciência de que, após a assinatura deste instrumento, não haverá, sob nenhuma hipótese, a devolução dos valores pagos em caso de desistência ou arrependimento unilateral, ressalvadas as hipóteses de inadimplemento da CONTRATADA previstas na Cláusula Sexta."
+      ]
+    },
+    {
+      "numero": "NONA",
+      "titulo": "DA CONFIDENCIALIDADE",
+      "ordem": 9,
+      "paragrafos": [
+        "As partes se comprometem a manter em sigilo todas as informações e documentos a que tiverem acesso em decorrência deste contrato, não podendo divulgá-los a terceiros sem a prévia autorização da outra parte."
+      ]
+    },
+    {
+      "numero": "DÉCIMA",
+      "titulo": "DO FORO",
+      "ordem": 10,
+      "paragrafos": [
+        "Para dirimir quaisquer controvérsias oriundas do CONTRATO, as partes elegem o foro da Comarca de São Paulo/SP.",
+        "E, por estarem assim justos e contratados, firmam o presente instrumento em 2 (duas) vias de igual teor e forma.",
+        "[local_assinatura], [data_assinatura]."
+      ]
+    },
+    {
+      "numero": "DÉCIMA PRIMEIRA",
+      "titulo": "DOS ANEXOS",
+      "ordem": 11,
+      "paragrafos": [
+        "É parte integrante e indissociável do presente contrato o ANEXO I - TERMO DE CIÊNCIA E CONSENTIMENTO EXPRESSO, que deverá ser assinado em conjunto com este instrumento."
+      ]
+    }
+  ],
+  "assinaturas": {
+    "contratante": {
+      "label": "CONTRATANTE",
+      "campo_nome": "contratante_nome"
+    },
+    "contratada": {
+      "label": "CONTRATADA",
+      "nome": "FC SERVIÇOS E SOLUÇÕES ADMINISTRATIVAS LTDA"
+    },
+    "data_campo": "data_assinatura",
+    "local_campo": "local_assinatura",
+    "testemunhas": {
+      "quantidade": 2,
+      "obrigatorias": false,
+      "campos": ["nome", "cpf"]
+    }
+  },
+  "layout": {
+    "orientacao": "portrait",
+    "tamanho_pagina": "A4",
+    "margem": {
+      "topo": "2cm",
+      "direita": "2cm",
+      "fundo": "2cm",
+      "esquerda": "2cm"
+    },
+    "cabecalho": {
+      "logo": "/assets/logo-fc.png",
+      "altura": "2cm"
+    },
+    "rodape": {
+      "texto": "FC Soluções Financeiras | (16) 99301-7396 | contato@fcsolucoesfinanceiras.com",
+      "altura": "1cm"
+    }
+  }
+}

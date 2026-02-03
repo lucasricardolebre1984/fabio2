@@ -1,0 +1,149 @@
+# AGENTS.md - Instruções para Agentes AI
+
+> **Projeto:** FC Soluções Financeiras SaaS  
+> **Repositório:** https://github.com/lucasricardolebre1984/fabio2  
+
+---
+
+## 📋 Visão Geral
+
+Este é um **SaaS de gestão de contratos** para FC Soluções Financeiras.
+
+### Funcionalidades Principais
+1. **Contratos:** Templates pré-definidos (Bacen, etc.) com preenchimento dinâmico
+2. **Clientes:** Cadastro automático e histórico de contratos
+3. **Agenda:** Gestão de compromissos
+4. **WhatsApp:** Integração para envio de contratos
+
+### Stack Tecnológica
+- **Backend:** FastAPI + PostgreSQL + Redis
+- **Frontend:** Next.js 14 + Tailwind CSS + shadcn/ui
+- **PDF:** WeasyPrint
+- **WhatsApp:** Evolution API
+
+---
+
+## 🏗️ Arquitetura
+
+### Estrutura de Pastas
+```
+.
+├── backend/          # FastAPI
+│   ├── app/
+│   │   ├── api/      # Rotas
+│   │   ├── core/     # Segurança
+│   │   ├── db/       # Database
+│   │   ├── models/   # SQLAlchemy
+│   │   ├── schemas/  # Pydantic
+│   │   └── services/ # Business logic
+│   └── tests/
+├── frontend/         # Next.js
+│   └── src/
+│       ├── app/      # App Router
+│       ├── components/
+│       ├── hooks/
+│       ├── lib/
+│       └── stores/
+├── contratos/        # Templates JSON
+│   └── templates/
+└── docs/             # Documentação GODMOD
+    ├── PROMPTS/
+    ├── ARCHITECTURE/
+    ├── FOUNDATION/
+    ├── VAULT/
+    └── CONTRATOS/
+```
+
+### Design System
+- **Cores:** Azul metálico (#627d98) + Cinza neutro
+- **Tipografia:** Inter
+- **Componentes:** shadcn/ui
+
+---
+
+## 🔐 Segurança
+
+### Gates Operacionais
+| Ação | Requer |
+|------|--------|
+| Leitura | - |
+| Testes | - |
+| Write local | - (com disciplina) |
+| Write servidor | **AUTORIZO WRITE** |
+| Push/Deploy | **APROVADO** |
+| Destrutivo | **APROVADO FORCE** |
+
+### Convenções
+- Nunca commitar `.env`
+- Nunca expor secrets em logs
+- Sempre validar inputs
+- Usar prepared statements (SQL)
+
+---
+
+## 📚 Documentação Importante
+
+Leia antes de trabalhar:
+
+1. **docs/ARCHITECTURE/OVERVIEW.md** - Arquitetura completa
+2. **docs/FOUNDATION/UX_UI_STANDARDS.md** - Design system
+3. **docs/DECISIONS.md** - Decisões arquiteturais
+4. **docs/CONTRATOS/CAMPOS_BACEN.md** - Especificação do contrato Bacen
+
+---
+
+## 🚀 Comandos Úteis
+
+### Desenvolvimento Local
+```powershell
+# Tudo com Docker
+docker-compose up -d
+
+# Backend apenas
+cd backend
+python -m venv venv
+.\venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+
+# Frontend apenas
+cd frontend
+npm install
+npm run dev
+```
+
+### URLs Locais
+- Frontend: http://localhost:3000
+- Backend: http://localhost:8000
+- Docs API: http://localhost:8000/docs
+- PGAdmin: http://localhost:5050
+- Evolution API: http://localhost:8080
+
+---
+
+## 🐛 Bug Reports
+
+Registrar em `docs/BUGSREPORT.md` antes de corrigir.
+
+Template:
+```markdown
+### BUG-XXX: [Título]
+**Data:** YYYY-MM-DD
+**Severidade:** Alta/Média/Baixa
+**Descrição:** [descrição]
+**Passos:** 1... 2... 3...
+**Esperado:** [comportamento]
+**Atual:** [comportamento]
+```
+
+---
+
+## ✉️ Contato
+
+- **Empresa:** Automania-AI
+- **Responsável:** Lucas Lebre
+- **Projeto para:** FC Soluções Financeiras (Fábio)
+
+---
+
+*Atualizado em: 2026-02-03*
