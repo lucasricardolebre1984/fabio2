@@ -2,13 +2,12 @@
 import asyncio
 import sys
 
-# Add app to path
 sys.path.insert(0, '.')
 
 from app.db.session import DATABASE_URL, AsyncSessionLocal, engine
 from app.db.base import Base
 from app.models.user import User
-from app.core.security import get_password_hash
+from passlib.hash import bcrypt
 
 async def init_database():
     """Criar todas as tabelas."""
@@ -25,9 +24,12 @@ async def create_admin_user():
     print("👤 Criando usuário admin...")
     
     async with AsyncSessionLocal() as db:
+        # Criar hash da senha manualmente
+        hashed = bcrypt.hash("1234")
+        
         user = User(
             email="fabio@fcsolucoes.com",
-            hashed_password=get_password_hash("1234"),
+            hashed_password=hashed,
             nome="Fabio",
             role="admin",
             ativo=True
