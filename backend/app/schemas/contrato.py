@@ -35,13 +35,13 @@ class ContratoBase(BaseModel):
 
 class ContratoCreate(ContratoBase):
     """Contrato creation schema."""
-    # Valores por extenso (calculados automaticamente)
-    valor_total_extenso: str
-    valor_entrada_extenso: str
-    qtd_parcelas_extenso: str
-    valor_parcela_extenso: str
-    prazo_1_extenso: str
-    prazo_2_extenso: str
+    # Valores por extenso (calculados automaticamente pelo backend)
+    valor_total_extenso: Optional[str] = None
+    valor_entrada_extenso: Optional[str] = None
+    qtd_parcelas_extenso: Optional[str] = None
+    valor_parcela_extenso: Optional[str] = None
+    prazo_1_extenso: Optional[str] = None
+    prazo_2_extenso: Optional[str] = None
     
     # Dados extras do template
     dados_extras: Optional[Dict[str, Any]] = None

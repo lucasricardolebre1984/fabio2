@@ -1,29 +1,27 @@
-"""
-STUB temporário para security - bcrypt com problemas no Windows
-Usar apenas para desenvolvimento local!
-"""
+"""Security utilities."""
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
-from jose import JWTError, jwt
+
+from jose import jwt, JWTError
+from passlib.context import CryptContext
+
 from app.config import settings
 
-# Stub simples para desenvolvimento
-# Em produção, usar bcrypt real
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify password - DEV MODE: comparação direta para teste"""
-    # MODO DESENVOLVIMENTO: aceita senha "1234" para qualquer hash
-    DEV_PASSWORD = "1234"
-    
-    if plain_password == DEV_PASSWORD:
-        return True
-    return False
+    """Verify a password against a hash."""
+    return pwd_context.verify(plain_password, hashed_password)
+
 
 def get_password_hash(password: str) -> str:
-    """Hash password - DEV MODE: retorna hash fixo"""
-    # Retorna hash pré-computado de "1234"
-    return "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW"
+    """Hash a password."""
+    return pwd_context.hash(password, rounds=settings.BCRYPT_ROUNDS)
 
+
+# JWT Token functions
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create a JWT access token."""
     to_encode = data.copy()
@@ -37,6 +35,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
+
 
 def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create a JWT refresh token."""
@@ -52,6 +51,7 @@ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) 
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
+
 def decode_token(token: str) -> Optional[dict]:
     """Decode and validate a JWT token."""
     try:
@@ -59,6 +59,7 @@ def decode_token(token: str) -> Optional[dict]:
         return payload
     except JWTError:
         return None
+
 
 def create_token_pair(user_id: str) -> Tuple[str, str, int]:
     """Create both access and refresh tokens."""

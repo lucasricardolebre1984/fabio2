@@ -2,6 +2,7 @@
 import json
 import os
 from datetime import datetime
+from pathlib import Path
 from decimal import Decimal
 from typing import List, Optional, Dict, Any
 from uuid import UUID
@@ -14,7 +15,8 @@ from app.models.cliente import Cliente
 from app.models.contrato_template import ContratoTemplate
 from app.schemas.contrato import ContratoCreate, ContratoUpdate
 from app.services.extenso_service import ExtensoService
-from app.services.pdf_service import PDFService
+# from app.services.pdf_service import PDFService  # WeasyPrint disabled
+from app.services.pdf_service_stub import PDFService  # Using stub
 
 
 class ContratoService:
@@ -77,11 +79,17 @@ class ContratoService:
                 "updated_at": template.updated_at
             }
         
-        # Fallback to JSON file
-        template_path = f"contratos/templates/{template_id}.json"
-        if os.path.exists(template_path):
-            with open(template_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+        # Fallback to JSON file - try multiple paths
+        possible_paths = [
+            Path.cwd() / "contratos" / "templates" / f"{template_id}.json",
+            Path.cwd().parent / "contratos" / "templates" / f"{template_id}.json",
+            Path("c:/projetos/fabio2/contratos/templates") / f"{template_id}.json",
+        ]
+        
+        for template_path in possible_paths:
+            if template_path.exists():
+                with open(template_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
         
         return None
     

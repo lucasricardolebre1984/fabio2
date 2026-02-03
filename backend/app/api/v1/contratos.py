@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db, get_current_user, require_operador
+from app.api.deps import get_db, get_current_user, require_operador, require_admin
 from app.models.user import User
 from app.models.contrato import Contrato, ContratoStatus
 from app.models.cliente import Cliente
