@@ -1,170 +1,222 @@
-# 🚀 Setup Local - Windows
+# 🚀 Setup Local - Windows (CORRIGIDO)
 
-## Pré-requisitos
-
-- [Docker Desktop](https://www.docker.com/products/docker-desktop) instalado
-- [Python 3.11+](https://python.org) instalado
-- [Node.js 18+](https://nodejs.org) instalado
-- Git (opcional, para atualizações)
+> **Última atualização:** 2026-02-03  
+> **Status:** Funcional com workarounds documentados  
 
 ---
 
-## Passo 1: Iniciar Banco de Dados (Docker)
+## ⚠️ BUGS CONHECIDOS (Ver BUGSREPORT.md)
 
+| Bug | Impacto | Workaround |
+|-----|---------|------------|
+| BUG-001 | Criação de usuário | Criar via endpoint /docs ou SQL direto |
+| BUG-002 | ✓ Resolvido | - |
+| BUG-003 | ✓ Resolvido | - |
+
+---
+
+## 📋 PRÉ-REQUISITOS
+
+- Windows 10/11 (64 bits)
+- 4GB RAM livre
+- 5GB espaço em disco
+- Internet
+
+---
+
+## 🔧 INSTALAÇÃO DOS PROGRAMAS
+
+### 1. Docker Desktop
+https://docker.com/products/docker-desktop
+
+### 2. Node.js LTS
+https://nodejs.org (botão verde)
+
+### 3. Python 3.11
+https://python.org/downloads
+
+> 💡 **Reinicie o PC após instalar os 3!**
+
+---
+
+## 🚀 CONFIGURAÇÃO DO PROJETO
+
+### Passo 1: Subir Bancos (Docker)
 ```powershell
-# No terminal PowerShell (na pasta do projeto)
 cd c:\projetos\fabio2
+docker-compose -f docker-compose.local.yml up -d
+```
 
-# Subir apenas PostgreSQL e Redis
-docker-compose up -d postgres redis
-
-# Verificar se está rodando
+Verifique:
+```powershell
 docker ps
 ```
-
-Deve aparecer:
-- `fabio2-postgres` (porta 5432)
-- `fabio2-redis` (porta 6379)
+Deve mostrar 3 containers (postgres, redis, evolution)
 
 ---
 
-## Passo 2: Backend (FastAPI)
+### Passo 2: Configurar Backend
 
 ```powershell
-# Abrir NOVO terminal
-
 cd c:\projetos\fabio2\backend
-
-# Criar ambiente virtual
 python -m venv venv
-
-# Ativar ambiente
 .\venv\Scripts\activate
-
-# Instalar dependências
 pip install -r requirements.txt
-
-# Criar arquivo .env
-copy ..\.env.example .env
-
-# Iniciar servidor
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-**Acesse:** http://localhost:8000/docs (documentação API)
+Criar arquivo `.env`:
+```powershell
+copy .env.example .env
+```
+
+Ou crie manualmente `backend/.env`:
+```env
+ENVIRONMENT=development
+DEBUG=true
+DATABASE_URL=postgresql+asyncpg://fabio2_user:fabio2_pass@localhost:5432/fabio2
+REDIS_URL=redis://localhost:6379/0
+SECRET_KEY=dev-secret-key-change-in-production-min-32-chars
+EVOLUTION_API_URL=http://localhost:8080
+EVOLUTION_API_KEY=dev_key_change_me
+STORAGE_MODE=local
+STORAGE_LOCAL_PATH=./storage
+```
 
 ---
 
-## Passo 3: Frontend (Next.js)
+### Passo 3: Iniciar Backend
+```powershell
+uvicorn app.main:app --reload
+```
+
+Acesse: http://localhost:8000/docs
+
+---
+
+### Passo 4: Configurar Frontend
 
 ```powershell
-# Abrir NOVO terminal (manter backend rodando!)
-
 cd c:\projetos\fabio2\frontend
-
-# Instalar dependências
 npm install
+```
 
-# Criar .env.local
+Criar `.env.local`:
+```powershell
 echo "NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1" > .env.local
+```
 
-# Iniciar servidor
+---
+
+### Passo 5: Iniciar Frontend
+```powershell
 npm run dev
 ```
 
-**Acesse:** http://localhost:3000
+Acesse: http://localhost:3000
 
 ---
 
-## Passo 4: Criar Usuário (Primeiro Acesso)
+## 👤 CRIAR USUÁRIO ADMIN
 
-```powershell
-# Abrir NOVO terminal
+### Opção A: Via Swagger UI (Recomendado)
 
-cd c:\projetos\fabio2\backend
-.\venv\Scripts\activate
+1. Acesse http://localhost:8000/docs
+2. Encontre endpoint POST `/api/v1/auth/register` (se existir) ou crie direto no banco
 
-# Abrir Python interativo
-python
-```
+### Opção B: Via Script Python (Com BUG-001)
 
+> ⚠️ BUG-001: Script init_db.py pode falhar. Use alternativa abaixo.
+
+Crie arquivo `criar_usuario_simples.py`:
 ```python
 import asyncio
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.db.session import AsyncSessionLocal
-from app.models.user import User
-from app.core.security import get_password_hash
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import text
 
-async def create_user():
-    async with AsyncSessionLocal() as db:
-        user = User(
-            email="fabio@fcsolucoes.com",
-            hashed_password=get_password_hash("senha123"),
-            nome="Fábio",
-            role="admin",
-            ativo=True
-        )
-        db.add(user)
-        await db.commit()
-        print("Usuário criado!")
+DATABASE_URL = "postgresql+asyncpg://fabio2_user:fabio2_pass@localhost:5432/fabio2"
 
-asyncio.run(create_user())
-exit()
+async def criar():
+    engine = create_async_engine(DATABASE_URL)
+    async with engine.begin() as conn:
+        # Inserir usuário direto
+        await conn.execute(text("""
+            INSERT INTO users (id, email, hashed_password, nome, role, ativo, created_at)
+            VALUES (
+                gen_random_uuid(),
+                'fabio@fcsolucoes.com',
+                '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewKyNiAYMyzJ/I3K',
+                'Fabio',
+                'admin',
+                true,
+                NOW()
+            )
+        """))
+    print("Usuário criado!")
+    print("Email: fabio@fcsolucoes.com")
+    print("Senha: 12345678")
+
+asyncio.run(criar())
 ```
 
----
-
-## Login
-
-- **URL:** http://localhost:3000
-- **Email:** fabio@fcsolucoes.com
-- **Senha:** senha123
-
----
-
-## Comandos Úteis
-
+Execute:
 ```powershell
-# Parar Docker
-docker-compose down
-
-# Ver logs PostgreSQL
-docker logs fabio2-postgres
-
-# Resetar banco (CUIDADO!)
-docker-compose down -v
-docker-compose up -d postgres
+python criar_usuario_simples.py
 ```
 
 ---
 
-## ⚠️ Kinghost - Limitações
+## ✅ LOGIN
 
-**Kinghost Compartilhado NÃO suporta:**
-- Backend Python/FastAPI ❌
-- PostgreSQL ❌
-- Redis ❌
-- Docker ❌
+- **Email:** `fabio@fcsolucoes.com`
+- **Senha:** `12345678` (ou a definida no script)
 
-**Solução para produção:**
-1. **VPS** (Hetzner, DigitalOcean, AWS Lightsail) ~ R$ 20-50/mês
-2. **Railway/Render** (gratuito/pago) - Deploy automático
-3. **Heroku** - Fácil mas caro
+---
 
-**Ou manter local + ngrok** (para testes):
-```powershell
-# Instalar ngrok
-choco install ngrok
+## 🐛 TROUBLESHOOTING
 
-# Expor backend
-ngrok http 8000
+### "relation users does not exist"
+As tabelas não foram criadas. Verifique se o backend subiu corretamente.
+
+### "Email ou senha incorretos"
+Usuário não existe no banco. Execute o script de criação.
+
+### Frontend não carrega
+Verifique se `next.config.js` não tem `output: 'export'`
+
+---
+
+## 📁 ESTRUTURA FINAL
+
+```
+c:\projetos\fabio2
+├── backend/
+│   ├── venv/
+│   ├── .env
+│   └── app/
+├── frontend/
+│   ├── node_modules/
+│   └── .env.local
+└── docker-compose.local.yml
 ```
 
 ---
 
-## Suporte
+## 🎯 CHECKLIST PRÉ-LOGIN
 
-Problemas? Verifique:
-1. Docker Desktop está rodando?
-2. Portas 5432, 6379, 8000, 3000 estão livres?
-3. Python e Node estão no PATH?
+- [ ] Docker rodando (postgres, redis)
+- [ ] Backend rodando (uvicorn)
+- [ ] Frontend rodando (npm run dev)
+- [ ] Usuário criado no banco
+- [ ] Acesso http://localhost:3000
+
+---
+
+## 📚 DOCUMENTAÇÃO RELACIONADA
+
+- [BUGSREPORT.md](./docs/BUGSREPORT.md) - Bugs conhecidos
+- [DEPLOY_AWS.md](./DEPLOY_AWS.md) - Deploy produção
+- [README.md](./README.md) - Visão geral
+
+---
+
+*Atualizado em: 2026-02-03*

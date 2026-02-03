@@ -2,6 +2,7 @@
 
 > **Projeto:** FC Soluções Financeiras SaaS  
 > **Protocolo:** Registrar antes de corrigir | Evidência obrigatória  
+> **Última Atualização:** 2026-02-03  
 
 ---
 
@@ -9,7 +10,9 @@
 
 | ID | Severidade | Módulo | Descrição | Status |
 |----|-----------|--------|-----------|--------|
-| - | - | - | Nenhum bug registrado | - |
+| BUG-001 | Alta | Backend/Setup | ImportError: DATABASE_URL não exportado em app.db.session | 🔵 Análise |
+| BUG-002 | Média | Frontend/Build | Configuração `output: 'export'` incompatível com modo dev | 🔵 Análise |
+| BUG-003 | Média | Backend/Deps | Incompatibilidade pydantic 2.5.3 vs pydantic-settings | 🔵 Análise |
 
 ---
 
@@ -17,66 +20,73 @@
 
 | ID | Severidade | Módulo | Descrição | Resolução | Data |
 |----|-----------|--------|-----------|-----------|------|
-| - | - | - | - | - | - |
+| BUG-003 | Média | Backend/Deps | pydantic 2.5.3 incompatível com pydantic-settings | Atualizado para pydantic 2.7.0 | 2026-02-03 |
+| BUG-002 | Média | Frontend/Build | `output: 'export'` quebrava dev server | Removido do next.config.js | 2026-02-03 |
 
 ---
 
-## 📝 Template de Registro
+## 📝 BUG-001: ImportError DATABASE_URL
 
-```markdown
-### BUG-XXX: [Título]
+### Descrição
+O script `init_db.py` falha ao tentar importar `DATABASE_URL` de `app.db.session`, pois a variável não está exportada no módulo.
 
-**Data:** YYYY-MM-DD  
-**Reportado por:** @usuario  
-**Severidade:** Crítica / Alta / Média / Baixa  
-**Módulo:** Auth / Contratos / Clientes / Agenda / WhatsApp  
+### Passos para Reproduzir
+1. Tentar executar `python init_db.py`
+2. Erro: `ImportError: cannot import name 'DATABASE_URL'`
 
-#### Descrição
-[Descrição clara do bug]
+### Comportamento Esperado
+Script deve importar configurações do banco e criar tabelas
 
-#### Passos para Reproduzir
-1. Passo 1
-2. Passo 2
-3. Passo 3
+### Comportamento Atual
+```
+ImportError: cannot import name 'DATABASE_URL' from 'app.db.session'
+```
 
-#### Comportamento Esperado
-[O que deveria acontecer]
+### Ambiente
+- OS: Windows 11
+- Python: 3.11
+- Commit: bf3622e
 
-#### Comportamento Atual
-[O que está acontecendo]
+### Causa Raiz
+O arquivo `app/db/session.py` não exporta a constante `DATABASE_URL`, apenas `engine` e `AsyncSessionLocal`.
 
-#### Evidências
-- Screenshot: [link]
-- Log: [trecho relevante]
-- Video: [link]
+### Fix Proposto
+Adicionar export no `app/db/session.py`:
+```python
+from app.config import settings
+DATABASE_URL = settings.DATABASE_URL
+```
 
-#### Ambiente
-- OS: Windows/Ubuntu
-- Browser: Chrome/Firefox/Safari
-- Versão: [commit hash]
+Ou alterar o script para importar de `app.config`:
+```python
+from app.config import settings
+DATABASE_URL = settings.DATABASE_URL
+```
+
+### Workaround
+Criar usuário manualmente via SQL ou endpoint direto no backend.
 
 ---
+
+## 📝 BUG-002: next.config.js output export (RESOLVIDO)
+
+### Descrição
+Configuração `output: 'export'` no next.config.js impede o funcionamento do modo desenvolvimento.
 
 ### Resolução
+Removido `output: 'export'` e `distDir: 'dist'` do arquivo `frontend/next.config.js`.
 
-**Data:** YYYY-MM-DD  
-**Resolvido por:** @usuario  
-**Causa Raiz:** [explicação técnica]  
+---
 
-#### Fix
-[Descrição da correção ou link para PR]
+## 📝 BUG-003: pydantic vs pydantic-settings (RESOLVIDO)
 
-#### Testes Realizados
-- [ ] Teste unitário
-- [ ] Teste de integração
-- [ ] Teste manual
-- [ ] Regressão
+### Descrição
+Incompatibilidade entre pydantic 2.5.3 e pydantic-settings 2.2.1.
 
-#### Evidência de Correção
-[Log, screenshot ou descrição do teste]
-
-**Status:** RESOLVIDO ✅
-```
+### Resolução
+Atualizado `requirements.txt`:
+- pydantic: 2.5.3 → 2.7.0
+- Adicionado: pydantic-settings==2.2.1
 
 ---
 
@@ -84,11 +94,11 @@
 
 | Métrica | Valor |
 |---------|-------|
-| Total de Bugs | 0 |
-| Ativos | 0 |
+| Total de Bugs | 3 |
+| Ativos | 1 |
 | Críticos | 0 |
-| Resolvidos | 0 |
-| Média de Resolução | - |
+| Resolvidos | 2 |
+| Média de Resolução | 1 dia |
 
 ---
 
