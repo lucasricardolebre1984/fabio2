@@ -98,105 +98,26 @@ contratos/templates/
 │  │                                                           │  │
 │  │  VALORES:                                                │  │
 │  │  Total: R$ [________] (calcula extenso automaticamente)  │  │
-│  │                                                           │  │
 │  └──────────────────────────────────────────────────────────┘  │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  PREVIEW DO CONTRATO (Atualiza em tempo real)            │  │
-│  │                                                           │  │
-│  │  CONTRATO DE PRESTAÇÃO DE SERVIÇOS                       │  │
-│  │                                                           │  │
-│  │  CONTRATANTE: João da Silva                              │  │
-│  │  CPF: 123.456.789-00                                     │  │
-│  │                                                           │  │
-│  │  CLÁUSULA PRIMEIRA...                                    │  │
-│  │  Valor: R$ 1.000,00 (um mil reais)                       │  │
-│  │                                                           │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                                                                  │
-│  [SALVAR CONTRATO]  [GERAR PDF]  [CANCELAR]                     │
+│                              │                                  │
+│                              ▼                                  │
+│  [SALVAR] ──► Salva contrato + cadastra cliente                │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-#### Componentes Frontend
+### Componentes de Layout
 
-**1. Menu de Contratos (`/contratos`)**
-- Grid de cards com os templates disponíveis
-- Cada card: imagem ilustrativa, nome, descrição breve
-- Ao clicar: navega para `/contratos/novo?template=bacen`
-
-**2. Editor de Contrato (`/contratos/novo?template=bacen`)**
-- **Painel Esquerdo**: Formulário dinâmico gerado do template
-- **Painel Direito**: Preview do contrato atualizando em tempo real
-- Campos calculados (extenso) atualizam automaticamente
-
-**3. Preview do Contrato**
-- Renderiza o HTML/CSS do layout institucional
-- Substitui `[VARIAVEIS]` pelos valores digitados
-- Calcula `(extensos)` automaticamente
-
-#### Campos Dinâmicos
-
-**Sintaxe no Template:**
-- `[NOME_CAMPO]` = Input do usuário
-- `(NOME_CAMPO_EXTENSO)` = Valor calculado automaticamente
-
-**Exemplo:**
+#### Cabeçalho Institucional (Reutilizável)
 ```
-Pelos serviços prestados, o(a) CONTRATANTE pagará à CONTRATADA 
-o valor total de R$ [valor_total] (valor_total_extenso), a ser pago 
-da seguinte forma:
-
-Entrada: R$ [valor_entrada] (valor_entrada_extenso)
-Parcelas: [qtd_parcelas] parcelas de R$ [valor_parcela] (valor_parcela_extenso)
+┌─────────────────────────────────────────────────────────────────┐
+│  [LOGO FC]  FC SOLUÇÕES FINANCEIRAS                    Tel:... │
+│             CNPJ: 57.815.628/0001-62                            │
+│             Endereço completo...                                │
+├─────────────────────────────────────────────────────────────────┤
+│              CONTRATO DE PRESTAÇÃO DE SERVIÇOS                  │
+│                       Bacen - Remoção SCR                       │
+└─────────────────────────────────────────────────────────────────┘
 ```
-
-**Processamento:**
-```javascript
-// Pseudo-código
-function processarTemplate(template, valores) {
-  let html = template.html_base;
-  
-  // Substitui inputs
-  for (const [campo, valor] of Object.entries(valores)) {
-    html = html.replace(`[${campo}]`, valor);
-  }
-  
-  // Calcula extensos
-  for (const campo of template.campos_com_extenso) {
-    const valor = valores[campo.nome];
-    const extenso = numeroPorExtenso(valor);
-    html = html.replace(`(${campo.nome}_extenso)`, extenso);
-  }
-  
-  return html;
-}
-```
-
-#### Backend - Serviço de Templates
-
-**Endpoints:**
-```
-GET  /api/v1/contratos/templates              # Lista templates disponíveis
-GET  /api/v1/contratos/templates/{id}         # Detalhes do template
-POST /api/v1/contratos                        # Cria contrato a partir do template
-```
-
-**Serviço Extenso:**
-- `valorPorExtenso(1500.50)` → "mil quinhentos reais e cinquenta centavos"
-- `numeroPorExtenso(12)` → "doze"
-
-### Vantagens
-1. **Reusabilidade**: Mesmo layout para vários contratos
-2. **Manutenibilidade**: Mudanças no layout refletem em todos
-3. **Escalabilidade**: Fácil adicionar novos tipos de contrato
-4. **UX**: Preview em tempo real reduz erros
-
-### Próximos Passos
-1. Criar template JSON do Bacen com todas as cláusulas
-2. Implementar componente `ContratoPreview` no frontend
-3. Criar página `MenuContratos` com seleção de templates
-4. Implementar serviço de cálculo de extensos
 
 ### Alternativas Consideradas
 
@@ -207,6 +128,90 @@ POST /api/v1/contratos                        # Cria contrato a partir do templa
 | **C: HTML Dinâmico (Escolhida)** | Preview em tempo real, fácil gerar PDF | Requer desenvolvimento inicial |
 
 **Decisão:** Implementar solução C (HTML Dinâmico) por melhor UX e facilidade de manutenção.
+
+---
+
+## DECISÃO-002: Geração de PDF - Browser Print vs Backend
+
+### Contexto
+Após tentativas frustradas com bibliotecas backend (WeasyPrint, Playwright), foi necessário escolher uma solução robusta para geração de PDF.
+
+### Problemas Encontrados
+
+| Biblioteca | Problema |
+|------------|----------|
+| **WeasyPrint** | Requer GTK+ no Windows - instalação complexa |
+| **Playwright** | `NotImplementedError: subprocess_exec` no Windows asyncio |
+| **Puppeteer** | Mesmo problema de subprocess no Windows |
+
+### Solução Escolhida: Browser Print (Frontend)
+
+**Arquitetura:**
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│   Frontend      │     │  Nova Janela     │     │  PDF Gerado     │
+│  (Next.js)      │────►│  (HTML Puro)     │────►│  (Browser Print)│
+│                 │     │                  │     │                 │
+│ generatePDF()   │     │ window.print()   │     │ Save as PDF     │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+```
+
+**Vantagens:**
+- ✅ Funciona em qualquer sistema operacional
+- ✅ Layout idêntico entre visualização e impressão
+- ✅ Controle total do CSS/HTML
+- ✅ Não requer instalação de dependências pesadas
+- ✅ Preview imediato antes de salvar
+
+**Desvantagens:**
+- ⚠️ Requer ação do usuário para salvar
+- ⚠️ Popups devem estar permitidos
+
+**Decisão:** Implementar geração de PDF via browser print (frontend).
+
+---
+
+## DECISÃO-003: Layout Institucional - Cabeçalho e Tipografia
+
+### Contexto
+O cabeçalho original continha dados redundantes (CNPJ, endereço, telefone) que já apareciam na seção CONTRATADA.
+
+### Mudanças Realizadas
+
+#### 1. Fonte
+- **Anterior:** Inter (sans-serif) - padrão Tailwind
+- **Nova:** Times New Roman (serif) - fonte institucional tradicional
+
+#### 2. Cabeçalho
+- **Anterior:** Logo + dados completos da empresa (redundante)
+- **Novo:** Faixa azul (#1e3a5f) com logo SVG + nome da empresa
+
+```
+ANTES:
+┌──────────────────────────────────────────────────────────────┐
+│  [FC]  FC SOLUÇÕES FINANCEIRAS                      Tel:...  │
+│        CNPJ: 57.815.628/0001-62                              │
+│        Rua Maria das Graças...                               │
+│        contato@...                                           │
+└──────────────────────────────────────────────────────────────┘
+
+NOVO:
+┌──────────────────────────────────────────────────────────────┐
+│██████████████████████████████████████████████████████████████│
+│█  [⚖️]  F C Soluções Financeiras                            █│
+│██████████████████████████████████████████████████████████████│
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Motivação
+1. **Eliminar redundância:** Dados da empresa aparecem na seção CONTRATADA
+2. **Visual institucional:** Faixa azul é mais profissional
+3. **Economia de espaço:** Mais espaço para o conteúdo do contrato
+4. **Consistência:** Mesmo layout em visualização e PDF
+
+### Arquivos Afetados
+- `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`
+- `frontend/src/lib/pdf.ts`
 
 ---
 
