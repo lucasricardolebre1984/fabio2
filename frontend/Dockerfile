@@ -2,11 +2,10 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy config files
-COPY package*.json tsconfig.json next.config.js tailwind.config.ts postcss.config.js ./
-COPY src ./src
+# Copy all files first
+COPY . .
 
-# Create public folder if it doesn't exist (Next.js requires it)
+# Create public folder if it doesn't exist
 RUN mkdir -p ./public
 
 # Install ALL dependencies (including devDependencies for build)
@@ -28,9 +27,7 @@ RUN npm ci --only=production
 
 # Copy built application from builder stage
 COPY --from=builder /app/.next ./.next
-
-# Create public folder in production
-RUN mkdir -p ./public
+COPY --from=builder /app/public ./public
 
 # Expose port
 EXPOSE 3000
