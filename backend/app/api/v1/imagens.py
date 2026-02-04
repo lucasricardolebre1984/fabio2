@@ -52,15 +52,21 @@ async def gerar_imagem(
     current_user: User = Depends(require_operador)
 ):
     """
-    Generate image using HuggingFace AI.
+    Generate image using GLM-Image API (Z.AI) with cost tracking.
     
-    Free tier: 1,000 requests/month
+    - Custo: US$ 0.015 por imagem (~R$ 0,075)
+    - Modelo: glm-image
+    - Tracking: Cada geração é registrada com custo
     """
     service = ImagemService()
     
     try:
-        # Generate image
-        image_bytes = await service.gerar_imagem_hf(request.prompt, request.formato)
+        # Generate image using GLM-Image with cost tracking
+        image_bytes, custo = await service.gerar_imagem_ia(
+            db=db,
+            prompt=request.prompt,
+            formato=request.formato
+        )
         
         # Save to storage and database
         nome = request.nome or f"Imagem_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -69,13 +75,19 @@ async def gerar_imagem(
             image_bytes=image_bytes,
             nome=nome,
             prompt=request.prompt,
-            formato=request.formato
+            formato=request.formato,
+            custo=custo  # Link cost record to image
         )
         
         return GerarImagemResponse(
             success=True,
             imagem=ImagemResponse.model_validate(imagem),
-            message="Imagem gerada com sucesso"
+            message=f"Imagem gerada com sucesso (Custo: {custo.custo_brl_formatado})",
+            custo={
+                "usd": float(custo.custo_usd),
+                "brl": float(custo.custo_brl),
+                "tempo_ms": custo.tempo_geracao_ms
+            }
         )
         
     except Exception as e:

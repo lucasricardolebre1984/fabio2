@@ -37,69 +37,75 @@ class ImagemService:
         self.storage_path.mkdir(parents=True, exist_ok=True)
         self.campanhas_path.mkdir(parents=True, exist_ok=True)
     
-    async def gerar_imagem_hf(
+    async def gerar_imagem_ia(
         self,
+        db: AsyncSession,
         prompt: str,
         formato: FormatoImagem = FormatoImagem.QUADRADO
-    ) -> bytes:
+    ) -> tuple[bytes, "ImagemCusto"]:
         """
-        Generate image using AI API.
+        Generate image using GLM-Image API (Z.AI) with cost tracking.
         
         Args:
+            db: Database session for cost tracking
             prompt: Text prompt for image generation
             formato: Aspect ratio format
             
         Returns:
-            Image bytes
+            Tuple of (image bytes, ImagemCusto record)
             
         Raises:
             Exception: If API call fails
         """
-        width, height = self.FORMATO_DIMENSOES[formato]
+        from app.services.glm_image_service import glm_image_service
+        from app.models.imagem_custo import ImagemCusto
         
-        # Enhanced prompt with BRAINIMAGE style guidelines
-        enhanced_prompt = self._enhance_prompt(prompt)
+        # Usa GLM-Image API
+        image_bytes, custo_info = await glm_image_service.gerar_imagem(
+            prompt=prompt,
+            formato=formato
+        )
         
-        # Tenta Pollinations.ai primeiro
-        from urllib.parse import quote
-        encoded_prompt = quote(enhanced_prompt)
-        url = f"{self.POLLINATIONS_URL}/{encoded_prompt}?width={width}&height={height}&nologo=true"
+        # Criar registro de custo no banco
+        custo_record = ImagemCusto(
+            modelo=custo_info["modelo"],
+            provider=custo_info["provider"],
+            custo_usd=custo_info["custo_usd"],
+            custo_brl=custo_info["custo_brl"],
+            taxa_cambio=custo_info["taxa_cambio"],
+            dimensoes=custo_info["dimensoes"],
+            formato=custo_info["formato"],
+            tempo_geracao_ms=custo_info["tempo_geracao_ms"],
+            status=custo_info["status"],
+            prompt_original=custo_info["prompt_original"],
+            prompt_enhanced=custo_info["prompt_enhanced"]
+        )
+        db.add(custo_record)
+        await db.commit()
+        await db.refresh(custo_record)
         
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            try:
-                response = await client.get(url)
-                if response.status_code == 200:
-                    return response.content
-            except:
-                pass
-            
-            # Fallback: usa placeholder.com para testes
-            # Gera uma cor baseada no hash do prompt
-            import hashlib
-            color = hashlib.md5(prompt.encode()).hexdigest()[:6]
-            placeholder_url = f"https://placehold.co/{width}x{height}/{color}/white/png?text={quote(prompt[:30])}"
-            
-            response = await client.get(placeholder_url)
-            if response.status_code == 200:
-                return response.content
-            
-            raise Exception(f"Não foi possível gerar imagem. Tente novamente mais tarde.")
+        return image_bytes, custo_record
     
-    def _enhance_prompt(self, prompt: str) -> str:
+    def _enhance_prompt(self, prompt: str, formato: FormatoImagem = FormatoImagem.QUADRADO) -> str:
         """
-        Enhance prompt with BRAINIMAGE institutional guidelines.
+        Enhance prompt with CÉREBRO INSTITUCIONAL (BRAINIMAGE.md).
         
         Args:
             prompt: Original user prompt
+            formato: Image format for context-specific enhancements
             
         Returns:
-            Enhanced prompt for better results
+            Enhanced technical prompt following BRAINIMAGE guidelines
         """
-        # Add professional marketing context
-        prefix = "professional marketing image, commercial photography, "
-        suffix = ", high quality, sharp focus, corporate aesthetic, brand-safe"
+        from app.services.brainimage_service import brain_service
         
-        return f"{prefix}{prompt}{suffix}"
+        enhanced_prompt, _ = brain_service.generate_technical_prompt(
+            user_prompt=prompt,
+            formato=formato.value,
+            style_preset='professional'
+        )
+        
+        return enhanced_prompt
     
     async def salvar_imagem_gerada(
         self,
@@ -108,7 +114,8 @@ class ImagemService:
         nome: str,
         prompt: str,
         formato: FormatoImagem,
-        descricao: Optional[str] = None
+        descricao: Optional[str] = None,
+        custo: Optional["ImagemCusto"] = None
     ) -> Imagem:
         """
         Save generated image to storage and database.
@@ -120,6 +127,7 @@ class ImagemService:
             prompt: Generation prompt
             formato: Image format
             descricao: Optional description
+            custo: Optional ImagemCusto record to link
             
         Returns:
             Created Imagem model
@@ -147,6 +155,11 @@ class ImagemService:
         db.add(imagem)
         await db.commit()
         await db.refresh(imagem)
+        
+        # Link cost record to image if provided
+        if custo:
+            custo.imagem_id = str(imagem.id)
+            await db.commit()
         
         return imagem
     

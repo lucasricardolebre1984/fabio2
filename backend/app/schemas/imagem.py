@@ -68,6 +68,7 @@ class GerarImagemResponse(BaseModel):
     success: bool
     imagem: Optional[ImagemResponse] = None
     message: str
+    custo: Optional[dict] = None  # Informações de custo da geração
 
 
 class UploadImagemResponse(BaseModel):

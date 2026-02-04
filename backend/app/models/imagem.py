@@ -1,6 +1,7 @@
 """Imagem model."""
 import enum
 from sqlalchemy import Column, String, Enum, Text
+from sqlalchemy.orm import relationship
 
 from app.db.base import BaseModel
 
@@ -45,6 +46,9 @@ class Imagem(BaseModel):
     
     # Workflow
     status = Column(Enum(StatusImagem), default=StatusImagem.RASCUNHO, nullable=False)
+    
+    # Relacionamentos
+    custos = relationship("ImagemCusto", back_populates="imagem", lazy="selectin", cascade="all, delete-orphan")
     
     def __repr__(self) -> str:
         return f"<Imagem {self.nome} ({self.tipo.value})>"

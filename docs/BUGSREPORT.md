@@ -286,3 +286,42 @@ const response = await api.post('/imagens/upload', data)
 
 *Atualizado em: 2026-02-04 11:47*  
 *Auditoria: Módulo de Imagens - Correções aplicadas e testadas*
+
+
+---
+
+## 📝 ROLLBACK - CÉREBRO INSTITUCIONAL v2
+
+**Data:** 2026-02-04  
+**Mudança:** Simplificação do BRAINIMAGE + Integração FC/Rezeta
+
+### Arquivos Modificados
+- `backend/app/services/brainimage_service.py` → Nova versão simplificada  
+- `backend/app/services/brainimage_service_v1_backup.py` → Backup v1  
+- `docs/PROMPTS/BRAINIMAGE_v2.md` → Nova documentação  
+- `docs/PROMPTS/BRAINIMAGE.md` → Documentação original  
+- `storage/logos/` → Pasta para logos das empresas
+
+### Como Reverter (Rollback)
+
+**Se necessário voltar à v1:**
+```powershell
+cd C:\projetos\fabio2\backend\app\services
+Copy-Item brainimage_service_v1_backup.py brainimage_service.py
+```
+
+**Ou via git:**
+```powershell
+cd C:\projetos\fabio2
+git checkout HEAD -- backend/app/services/brainimage_service.py
+```
+
+### O que Mudou na v2
+- ✅ Simplificado: Código mais curto e direto
+- ✅ Duas empresas: FC + Rezeta detectadas automaticamente no prompt
+- ✅ Logos: Pasta `storage/logos/` criada para fc_logo.png e rezeta_logo.png
+- ✅ Prompts objetivos: Removeu complexidade desnecessária
+
+---
+
+*Rollback documentado por Automania-AI - 2026-02-04*

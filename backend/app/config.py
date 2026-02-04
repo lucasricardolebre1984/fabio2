@@ -85,6 +85,16 @@ class Settings(BaseSettings):
     AWS_S3_ENDPOINT: Optional[str] = None
     
     # ==================================================================
+    # Z.AI GLM-Image API (Image Generation)
+    # ==================================================================
+    ZAI_API_KEY: Optional[str] = None
+    ZAI_MODEL: str = "glm-image"
+    
+    # Cost tracking
+    CUSTO_POR_IMAGEM_USD: float = 0.015
+    TAXA_CAMBIO_BRL: float = 5.0
+    
+    # ==================================================================
     # Logging
     # ==================================================================
     LOG_LEVEL: str = "INFO"

@@ -5,5 +5,6 @@ from app.models.contrato import Contrato
 from app.models.contrato_template import ContratoTemplate
 from app.models.agenda import Agenda
 from app.models.imagem import Imagem
+from app.models.imagem_custo import ImagemCusto
 
-__all__ = ["User", "Cliente", "Contrato", "ContratoTemplate", "Agenda", "Imagem"]
+__all__ = ["User", "Cliente", "Contrato", "ContratoTemplate", "Agenda", "Imagem", "ImagemCusto"]
