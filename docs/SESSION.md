@@ -1,7 +1,7 @@
 # SESSION - Contexto Atual da Sessão
 
 > **Sessão Ativa:** 2026-02-03  
-> **Status:** 🚀 EM DEPLOY - Configurando produção KingHost + AWS  
+> **Status:** ⚠️ DEPLOY PAUSADO - AWS inacessível | DESENVOLVIMENTO LOCAL ATIVO  
 > **Branch:** main  
 > **Último Commit:** 1e38720 - config: prepara para deploy hibrido
 
@@ -20,11 +20,14 @@
 ### Ambiente de Produção (AWS + KingHost)
 | Componente | Status | URL |
 |------------|--------|-----|
-| Backend API | ✅ Deployado | http://56.124.101.16:8000 |
-| PostgreSQL | ✅ AWS | 56.124.101.16:5432 |
-| Redis | ✅ AWS | 56.124.101.16:6379 |
-| Evolution API | ✅ AWS | http://56.124.101.16:8080 |
+| Backend API | ❌ Não responde | http://56.124.101.16:8000 |
+| PostgreSQL | ❌ Inacessível | 56.124.101.16:5432 |
+| Redis | ❌ Inacessível | 56.124.101.16:6379 |
+| Evolution API | ❌ Não testado | http://56.124.101.16:8080 |
 | Frontend | ⏳ Pendente | https://fabio.automaniaai.com.br |
+
+**⚠️ PROBLEMA**: Servidor AWS não responde - containers Docker provavelmente parados
+**✅ SOLUÇÃO IMEDIATA**: Usar ambiente local (Windows) que está 100% funcional
 
 ---
 
@@ -107,11 +110,12 @@ CORS_ORIGINS = [
 
 ## 📋 CHECKLIST DEPLOY PRODUÇÃO
 
-### Fase 1: AWS Backend (✅ CONCLUÍDO)
+### Fase 1: AWS Backend (⚠️ REQUER AÇÃO)
 - [x] Instalar Docker no Ubuntu
 - [x] Clonar repositório
 - [x] Configurar .env
 - [x] Subir containers
+- [ ] **REINICIAR containers** (pararam de responder)
 - [x] Testar API
 - [x] Liberar portas no Security Group
 
@@ -137,6 +141,31 @@ CORS_ORIGINS = [
 |------------|--------|---------|
 | security_stub.py | Bcrypt 72 bytes no Windows | backend/app/core/security_stub.py |
 | PDF via browser | WeasyPrint precisa GTK+ | frontend/src/lib/pdf.ts |
+
+---
+
+## ⚠️ AÇÃO NECESSÁRIA - AWS ACCESS
+
+### Problema
+O servidor AWS (56.124.101.16) não está respondendo nas portas 8000/8080.
+Containers Docker provavelmente pararam após falta de acesso SSH.
+
+### Solução
+Precisamos acessar o servidor via SSH para reiniciar os containers:
+
+```bash
+# Comando para reiniciar (executar no servidor)
+cd ~/fabio2
+sudo docker-compose -f docker-compose-prod.yml down
+sudo docker-compose -f docker-compose-prod.yml up -d
+
+# Verificar status
+sudo docker-compose -f docker-compose-prod.yml ps
+```
+
+### Pré-requisito
+- Arquivo da chave SSH: `fabio-aws.pem` ou similar
+- Comando: `ssh -i ~/fabio-aws.pem ubuntu@56.124.101.16`
 
 ---
 
