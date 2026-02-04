@@ -1,6 +1,6 @@
--- Migration: Criação das tabelas de Chat WhatsApp
+-- Migration: Criacao das tabelas de Chat WhatsApp
 -- Data: 2026-02-04
--- Descrição: Tabelas para armazenar conversas e mensagens do WhatsApp com IA VIVA
+-- Descricao: Tabelas para armazenar conversas e mensagens do WhatsApp com IA VIVA
 
 -- Tabela de Conversas
 CREATE TABLE IF NOT EXISTS whatsapp_conversas (
@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS whatsapp_conversas (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Índices para conversas
+-- Indices para conversas
 CREATE INDEX IF NOT EXISTS idx_whatsapp_conversas_numero ON whatsapp_conversas(numero_telefone);
 CREATE INDEX IF NOT EXISTS idx_whatsapp_conversas_status ON whatsapp_conversas(status);
 CREATE INDEX IF NOT EXISTS idx_whatsapp_conversas_instance ON whatsapp_conversas(instance_name);
@@ -36,11 +36,11 @@ CREATE TABLE IF NOT EXISTS whatsapp_mensagens (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Índices para mensagens
+-- Indices para mensagens
 CREATE INDEX IF NOT EXISTS idx_whatsapp_mensagens_conversa ON whatsapp_mensagens(conversa_id);
 CREATE INDEX IF NOT EXISTS idx_whatsapp_mensagens_created ON whatsapp_mensagens(created_at DESC);
 
--- Comentários
+-- Comentarios
 COMMENT ON TABLE whatsapp_conversas IS 'Conversas ativas do WhatsApp com clientes';
 COMMENT ON TABLE whatsapp_mensagens IS 'Mensagens individuais das conversas WhatsApp';
 COMMENT ON COLUMN whatsapp_conversas.contexto_ia IS 'Contexto da conversa para a IA VIVA';
@@ -60,7 +60,3 @@ CREATE TRIGGER update_whatsapp_conversas_updated_at
     BEFORE UPDATE ON whatsapp_conversas
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
-
--- Permissões (ajustar conforme seu usuário)
--- GRANT ALL PRIVILEGES ON TABLE whatsapp_conversas TO fabio2_user;
--- GRANT ALL PRIVILEGES ON TABLE whatsapp_mensagens TO fabio2_user;

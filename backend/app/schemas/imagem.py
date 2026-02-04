@@ -1,42 +1,53 @@
 """Imagem schemas."""
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, Dict, Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
-
-from app.models.imagem import TipoImagem, FormatoImagem, StatusImagem
 
 
 class ImagemBase(BaseModel):
     """Base imagem schema."""
     nome: str = Field(..., min_length=1, max_length=255)
     descricao: Optional[str] = None
-    formato: FormatoImagem = Field(default=FormatoImagem.QUADRADO)
+    tipo: str = "upload"  # upload, gerada_ia, documento, assinatura, comprovante
 
 
-class ImagemCreate(BaseModel):
-    """Imagem creation schema."""
+class ImagemCreate(ImagemBase):
+    """Create imagem schema."""
+    contrato_id: UUID
+
+
+class ImagemGerarIA(BaseModel):
+    """Gerar imagem via IA."""
+    contrato_id: UUID
+    prompt: str = Field(..., min_length=10, description="Descrição da imagem desejada")
     nome: str = Field(..., min_length=1, max_length=255)
     descricao: Optional[str] = None
-    formato: FormatoImagem = Field(default=FormatoImagem.QUADRADO)
-    prompt: Optional[str] = None  # Para imagens geradas
+    tamanho: str = "1024x1024"  # 1024x1024, 1792x1024, 1024x1792
+    qualidade: str = "standard"  # standard, hd
+    estilo: str = "vivid"  # vivid, natural
 
 
-class ImagemUpdate(BaseModel):
-    """Imagem update schema."""
-    nome: Optional[str] = Field(None, min_length=1, max_length=255)
-    descricao: Optional[str] = None
-    status: Optional[StatusImagem] = None
+class ImagemProcessar(BaseModel):
+    """Processar imagem existente com IA."""
+    prompt: str = Field(..., min_length=5, description="O que fazer com a imagem")
+    # Ex: "remover fundo", "melhorar resolução", "extrair texto", "assinar"
 
 
-class ImagemInDB(ImagemBase):
-    """Imagem in database schema."""
+class ImagemResponse(ImagemBase):
+    """Imagem response schema."""
     id: UUID
-    url: str
-    tipo: TipoImagem
-    status: StatusImagem
+    contrato_id: UUID
+    status: str
+    nome_arquivo: str
+    caminho_arquivo: str
+    tamanho_bytes: Optional[int] = None
+    mime_type: Optional[str] = None
     prompt: Optional[str] = None
+    url_externa: Optional[str] = None
+    processamento_resultado: Dict[str, Any] = {}
+    erro_mensagem: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     
@@ -44,42 +55,14 @@ class ImagemInDB(ImagemBase):
         from_attributes = True
 
 
-class ImagemResponse(ImagemInDB):
-    """Imagem response schema."""
-    pass
-
-
-class ImagemListResponse(BaseModel):
-    """Imagem list response."""
-    items: List[ImagemResponse]
+class ImagemList(BaseModel):
+    """List imagens response."""
+    items: list[ImagemResponse]
     total: int
 
 
-# Request/Response específicos
-class GerarImagemRequest(BaseModel):
-    """Request para gerar imagem via IA."""
-    prompt: str = Field(..., min_length=10, description="Prompt para geração da imagem")
-    formato: FormatoImagem = Field(default=FormatoImagem.QUADRADO)
-    nome: Optional[str] = Field(None, description="Nome opcional para a imagem")
-
-
-class GerarImagemResponse(BaseModel):
-    """Response da geração de imagem."""
+class ImagemUploadResponse(BaseModel):
+    """Upload response."""
     success: bool
     imagem: Optional[ImagemResponse] = None
-    message: str
-    custo: Optional[dict] = None  # Informações de custo da geração
-
-
-class UploadImagemResponse(BaseModel):
-    """Response do upload de imagem."""
-    success: bool
-    imagem: Optional[ImagemResponse] = None
-    message: str
-
-
-class AprovarImagemResponse(BaseModel):
-    """Response da aprovação de imagem."""
-    success: bool
-    nova_url: Optional[str] = None
     message: str

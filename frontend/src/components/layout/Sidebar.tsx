@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { FileText, Users, Calendar, MessageCircle, LogOut, ImageIcon, Bot } from 'lucide-react'
+import { FileText, Users, Calendar, MessageCircle, LogOut, Bot } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const menuItems = [
@@ -11,7 +11,6 @@ const menuItems = [
   { href: '/agenda', label: 'Agenda', icon: Calendar },
   { href: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
   { href: '/whatsapp/conversas', label: 'Chat IA VIVA', icon: Bot },
-  { href: '/imagens', label: 'Imagens', icon: ImageIcon },
 ]
 
 export function Sidebar() {

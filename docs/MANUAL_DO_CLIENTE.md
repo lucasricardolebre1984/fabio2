@@ -1,15 +1,15 @@
 # 📘 MANUAL DO CLIENTE - FC Soluções Financeiras SaaS
 
-> **Versão:** 1.1  
+> **Versão:** 1.0  
 > **Última atualização:** 2026-02-04  
-> **Sistema:** FC Soluções Financeiras - Gestão Completa  
+> **Sistema:** FC Soluções Financeiras - Gestão de Contratos  
 > **Público-alvo:** Fábio (Administrador) e Operadores
 
 ---
 
 ## 🎯 BEM-VINDO AO SEU SISTEMA
 
-Este é seu **SaaS completo** para gestão de contratos financeiros, clientes, agenda e criação de imagens com IA.
+Este é seu **SaaS completo** para gestão de contratos financeiros. Aqui você pode criar, gerenciar, enviar contratos e acompanhar seus clientes em um só lugar.
 
 ---
 
@@ -20,9 +20,8 @@ Este é seu **SaaS completo** para gestão de contratos financeiros, clientes, a
 3. [Clientes](#3-clientes)
 4. [Agenda](#4-agenda)
 5. [WhatsApp](#5-whatsapp)
-6. [Imagens (NOVO)](#6-imagens)
-7. [Dicas e Atalhos](#7-dicas-e-atalhos)
-8. [Resolução de Problemas](#8-resolução-de-problemas)
+6. [Dicas e Atalhos](#6-dicas-e-atalhos)
+7. [Resolução de Problemas](#7-resolução-de-problemas)
 
 ---
 
@@ -42,8 +41,7 @@ Senha: 1234 (em desenvolvimento) ou sua senha definida
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  FC SOLUÇÕES FINANCEIRAS        [Contratos] [Clientes]     │
-│                                  [Agenda] [WhatsApp]       │
-│                                  [Imagens] [Sair]          │
+│                                  [Agenda] [WhatsApp] [Sair] │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  📊 DASHBOARD PRINCIPAL                                     │
@@ -100,26 +98,83 @@ Senha: 1234 (em desenvolvimento) ou sua senha definida
 
 5. **Clique em "Salvar"** ✅
 
-### 📄 Visualizar/Gerar PDF
+### 👁️ Visualizar Contrato
 
-1. Vá em Contratos → Lista
-2. Clique no olho (👁️) ao lado do contrato
-3. Clique em "Visualizar PDF" ou "Download"
-4. Na nova janela, use Ctrl+P → "Salvar como PDF"
+- Veja o contrato formatado com **layout institucional**
+- Faixa azul metálica no cabeçalho
+- Fonte Times New Roman (estilo formal)
+- Cálculos automáticos por extenso
+
+### 🖨️ Gerar PDF
+
+```
+No contrato → Botão "Baixar PDF"
+→ Arquivo salvo: Contrato_Bacen_Joao_Silva_2026.pdf
+```
+
+### ✏️ Editar Contrato
+
+1. Abra o contrato
+2. Clique em "Editar" (lápis ✏️)
+3. Altere os campos necessários
+4. Salve
+
+**Nota:** Campos calculados (valores por extenso) atualizam automaticamente!
+
+### 📤 Enviar Contrato por WhatsApp
+
+```
+No contrato → Botão "📱 Enviar WhatsApp"
+→ Selecione o número do cliente
+→ Adicione mensagem personalizada (opcional)
+→ Clique "Enviar"
+```
+
+**Exemplo de mensagem:**
+```
+Olá João! Segue o contrato da consulta BACEN. 
+Por favor, revise e me confirme o recebimento. Obrigado!
+```
+
+### 🗑️ Excluir Contrato
+
+```
+Lista de contratos → Ícone 🗑️ → Confirmar
+⚠️ Atenção: Esta ação não pode ser desfeita!
+```
 
 ---
 
 ## 3. CLIENTES
 
-### 👥 Cadastrar Cliente
+### ➕ Cadastrar Cliente
 
 **Caminho:** Menu → Clientes → Novo Cliente
 
-O sistema cadastra clientes automaticamente quando você cria um contrato, mas você pode:
+```
+Dados pessoais:
+├── Nome completo
+├── CPF/CNPJ
+├── Email
+├── Telefone
+├── Endereço completo
+└── Observações
+```
 
-- Ver histórico completo de contratos por cliente
-- Editar dados cadastrais
-- Adicionar anotações
+### 📋 Histórico do Cliente
+
+Ao clicar em um cliente, você vê:
+- **Dados cadastrais**
+- **Contratos realizados** (lista completa)
+- **Status de cada contrato**
+- **Botão para criar novo contrato** deste cliente
+
+### 🔍 Buscar Cliente
+
+```
+Barra de pesquisa → Digite nome, CPF ou email
+→ Resultados em tempo real
+```
 
 ---
 
@@ -127,193 +182,200 @@ O sistema cadastra clientes automaticamente quando você cria um contrato, mas v
 
 ### 📅 Criar Compromisso
 
-**Caminho:** Menu → Agenda
+**Caminho:** Menu → Agenda → Novo Evento
 
-- Visualize compromissos em calendário
-- Crie eventos vinculados a clientes
-- Receba lembretes (em desenvolvimento)
+```
+Título: Reunião com João Silva
+Data: 04/02/2026
+Hora: 14:00
+Tipo: Reunião / Ligação / Cobrança / Outro
+Cliente: [Selecione da lista]
+Descrição: Discutir proposta de consulta BACEN
+Lembrete: 30 minutos antes
+```
+
+### 🔔 Tipos de Eventos
+
+| Ícone | Tipo | Uso |
+|-------|------|-----|
+| 🤝 | Reunião | Atendimento presencial |
+| 📞 | Ligação | Call de prospecção |
+| 💰 | Cobrança | Follow-up de pagamento |
+| 📝 | Outro | Tarefas diversas |
+
+### 📆 Visualizações
+
+- **Dia** - Agenda detalhada hora a hora
+- **Semana** - Visão geral da semana
+- **Mês** - Calendário mensal com eventos
+
+### 🔗 Integração com Contratos
+
+```
+Ao criar contrato → Opção "Agendar retorno"
+→ Cria evento automático na agenda
+→ Vinculado ao cliente
+```
 
 ---
 
 ## 5. WHATSAPP
 
-### 💬 Conectar WhatsApp
+### 📱 Configuração Inicial
 
 **Caminho:** Menu → WhatsApp
 
-1. Escaneie o QR Code com seu WhatsApp
-2. Pronto! O sistema está conectado
-3. Você pode enviar contratos e mensagens direto do sistema
+```
+1. Clique "Conectar WhatsApp"
+2. Escaneie o QR Code com seu celular
+3. Pronto! Seu número está conectado
+```
 
-### 📤 Enviar Contrato por WhatsApp
+### 💬 Funcionalidades Disponíveis
 
-1. Abra o contrato (visualização)
-2. Clique em "Enviar"
-3. Digite o número do cliente
-4. Clique "Enviar"
+#### Enviar Contrato
+```
+Contrato aberto → Botão "📤 Enviar WhatsApp"
+→ Escolha o contato
+→ PDF enviado automaticamente
+```
 
----
+#### Enviar Mensagem
+```
+WhatsApp → Nova mensagem
+→ Digite número ou escolha contato
+→ Escreva mensagem
+→ Envie texto, imagem ou documento
+```
 
-## 6. IMAGENS (NOVO)
+#### Histórico de Conversas
+```
+Cliente → Aba "Conversas"
+→ Veja todo histórico WhatsApp
+→ Mensagens enviadas e recebidas
+```
 
-> **Módulo de criação e gestão de imagens com IA**
+#### Cobrança Automática
+```
+Configurar → Cobranças
+→ Defina dias antes do vencimento
+→ Mensagem automática enviada
+```
 
-### 🎨 Gerar Imagem com IA
+### 📊 Status das Mensagens
 
-**Caminho:** Menu → Imagens → Gerar com IA
-
-**Passo a passo:**
-
-1. **Digite o Prompt:**
-   ```
-   Exemplo: "Professional marketing flyer for financial services company,
-   modern design, blue and white colors, business people shaking hands,
-   clean background, corporate aesthetic, high quality"
-   ```
-
-2. **Escolha o Formato:**
-   - **1:1** (Quadrado) - Feed Instagram
-   - **16:9** (Paisagem) - Banner/Story horizontal
-   - **9:16** (Retrato) - Story vertical
-
-3. **Clique em "Gerar Imagem"**
-   - Aguarde 30-60 segundos
-   - A imagem aparecerá no preview
-
-4. **Salvar ou Gerar Nova**
-   - "Ver na Galeria" - Salva e vai para a lista
-   - "Gerar Outra" - Cria variação
-
-### 📤 Upload de Imagem
-
-**Caminho:** Menu → Imagens → Upload
-
-1. Clique na área de upload ou arraste um arquivo
-2. Formatos suportados: JPG, PNG, WebP (máx. 10MB)
-3. Dê um nome para a imagem
-4. Selecione o formato apropriado
-5. Clique "Fazer Upload"
-
-### 📁 Pasta Campanhas
-
-**O que é:** Imagens aprovadas para uso em campanhas de marketing
-
-**Como funciona:**
-1. Gere ou faça upload de uma imagem
-2. Na galeria, clique em "Aprovar" na imagem desejada
-3. A imagem é movida automaticamente para a pasta Campanhas
-4. O nome é formatado: `YYYYMMDD_nome_imagem.ext`
-   - Exemplo: `20260204_campanha_bacen.png`
-
-**Para que serve:**
-- Organiza imagens aprovadas
-- Facilita encontrar campanhas passadas
-- Padroniza nomenclatura por data
-
-### 🖼️ Gerenciar Imagens
-
-**Caminho:** Menu → Imagens
-
-**Filtros disponíveis:**
-- **Status:** Todas / Rascunho / Aprovada
-- **Tipo:** Todas / Gerada por IA / Upload
-
-**Visualizações:**
-- **Grid:** Miniaturas em grade
-- **Lista:** Detalhes em linhas
-
-**Tabs:**
-- **Todas** - Todas as imagens
-- **Geradas por IA** - Apenas imagens criadas pela IA
-- **Uploads** - Apenas imagens enviadas
-- **Campanhas** - Apenas imagens aprovadas
-
-**Ações em cada imagem:**
-- **Aprovar** - Move para pasta Campanhas
-- **Excluir** - Remove permanentemente
+| Status | Significado |
+|--------|-------------|
+| ⏳ | Enviando |
+| ✓ | Enviado |
+| ✓✓ | Entregue |
+| ✓✓ (azul) | Lido |
 
 ---
 
-## 7. DICAS E ATALHOS
+## 6. DICAS E ATALHOS
 
-### ⌨️ Atalhos do Teclado
+### ⌨️ Atalhos de Teclado
 
 | Atalho | Ação |
 |--------|------|
-| Ctrl + S | Salvar (em formulários) |
-| Ctrl + P | Imprimir/Salvar PDF |
-| Esc | Fechar modais |
+| `Ctrl + N` | Novo contrato |
+| `Ctrl + F` | Buscar |
+| `Ctrl + S` | Salvar |
+| `Esc` | Fechar/Voltar |
 
-### 💡 Dicas Gerais
+### 💡 Dicas de Produtividade
 
-1. **Valores por extenso** são calculados automaticamente
-2. **Número do contrato** é gerado automaticamente (CNT-YYYY-NNNN)
-3. **Clientes** são cadastrados automaticamente ao criar contrato
-4. **Imagens geradas** ficam em "Rascunho" até serem aprovadas
-5. **Backup** é feito automaticamente no servidor
+1. **Use templates pré-preenchidos**
+   - Crie contratos mais rápido com dados automáticos
 
----
+2. **Agende sempre**
+   - Todo contrato deve ter um follow-up na agenda
 
-## 8. RESOLUÇÃO DE PROBLEMAS
+3. **Envie confirmação**
+   - Sempre envie o contrato por WhatsApp e peça confirmação
 
-### ❌ Erro de Login
+4. **Mantenha os dados atualizados**
+   - Cliente mudou de telefone? Atualize imediatamente
 
-**Problema:** "Email ou senha incorretos"
-
-**Solução:**
-- Verifique se digitou o email correto: `fabio@fcsolucoes.com`
-- Senha padrão em desenvolvimento: `1234`
-- Limpe o cache do navegador (Ctrl+Shift+Del)
-
-### ❌ WhatsApp Desconectado
-
-**Problema:** QR Code não aparece ou não conecta
-
-**Solução:**
-1. Vá em Menu → WhatsApp
-2. Clique "Desconectar" (se estiver conectado)
-3. Clique "Conectar"
-4. Escaneie o QR Code novamente
-
-### ❌ Imagem não Gera
-
-**Problema:** Erro ao gerar imagem com IA
-
-**Solução:**
-1. Verifique se o prompt tem pelo menos 10 caracteres
-2. Aguarde 30-60 segundos (pode demorar em alta demanda)
-3. Tente um prompt mais simples
-4. Verifique sua conexão com internet
-
-### ❌ Upload Falha
-
-**Problema:** Erro ao fazer upload de imagem
-
-**Solução:**
-1. Verifique o formato (JPG, PNG, WebP apenas)
-2. Verifique o tamanho (máx. 10MB)
-3. Tente um arquivo menor
-4. Verifique sua conexão
-
-### 🆘 Suporte
-
-Em caso de problemas persistentes:
-- **Responsável técnico:** Lucas Lebre (Automania-AI)
-- **Documentação:** Verifique a pasta `docs/` do projeto
+5. **Use as observações**
+   - Anote preferências do cliente para personalizar atendimento
 
 ---
 
-## 📊 RESUMO DOS MÓDULOS
+## 7. RESOLUÇÃO DE PROBLEMAS
 
-| Módulo | Função | Status |
-|--------|--------|--------|
-| Contratos | Criar e gerenciar contratos | ✅ Pronto |
-| Clientes | CRM e histórico | ✅ Pronto |
-| Agenda | Compromissos e lembretes | ✅ Pronto |
-| WhatsApp | Envio de mensagens e contratos | ✅ Pronto |
-| Imagens | Geração com IA + Gestão | ✅ **NOVO** |
+### ❌ Não consigo fazer login
+
+```
+Verifique:
+✓ Email está correto (fabio@fcsolucoes.com)
+✓ Caps Lock desligado
+✓ Conexão com internet
+
+Solução: Clique "Esqueci a senha" ou contate o suporte
+```
+
+### ❌ Contrato não gera PDF
+
+```
+Verifique:
+✓ Todos os campos obrigatórios estão preenchidos
+✓ CPF está no formato correto
+✓ Valores são números válidos
+
+Solução: Edite o contrato e complete os dados faltantes
+```
+
+### ❌ WhatsApp desconectou
+
+```
+Verifique:
+✓ Celular está com internet
+✓ WhatsApp Web está ativo no celular
+
+Solução: Menu WhatsApp → Reconectar → Escaneie QR Code
+```
+
+### ❌ Não recebo notificações da agenda
+
+```
+Verifique:
+✓ Notificações do navegador estão permitidas
+✓ Lembrete está configurado no evento
+
+Solução: Configurações → Notificações → Ativar
+```
 
 ---
 
-*Atualizado em: 2026-02-04*  
-*Versão: 1.1 - Inclui módulo de Imagens*
+## 📞 SUPORTE
+
+**Problemas técnicos:**
+- Email: suporte@automaniaai.com.br
+- WhatsApp: (16) 99999-9999
+
+**Sugestões de melhorias:**
+- Use o botão "💡 Sugerir" no menu principal
+
+---
+
+## 🎓 PRÓXIMOS PASSOS
+
+Para aproveitar 100% do sistema:
+
+1. ✅ Crie seu primeiro contrato de teste
+2. ✅ Cadastre 3 clientes
+3. ✅ Agende 2 compromissos
+4. ✅ Conecte seu WhatsApp
+5. ✅ Envie um contrato para seu próprio número
+
+---
+
+**Sistema desenvolvido por:** Automania AI  
+**Para:** FC Soluções Financeiras  
+**Versão atual:** 1.0 - Janeiro/2026
+
+---
+
+*Este manual é atualizado regularmente. Verifique a data da última versão.*
