@@ -5,7 +5,9 @@ WORKDIR /app
 # Copy config files
 COPY package*.json tsconfig.json next.config.js tailwind.config.ts components.json postcss.config.js ./
 COPY src ./src
-COPY public ./public
+
+# Create public folder if it doesn't exist (Next.js requires it)
+RUN mkdir -p ./public
 
 # Install ALL dependencies (including devDependencies for build)
 RUN npm ci
@@ -26,7 +28,9 @@ RUN npm ci --only=production
 
 # Copy built application from builder stage
 COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
+
+# Create public folder in production
+RUN mkdir -p ./public
 
 # Expose port
 EXPOSE 3000
