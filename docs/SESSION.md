@@ -1,137 +1,133 @@
 # SESSION - Contexto Atual da Sessão
 
-> **Sessão Ativa:** 2026-02-03  
-> **Status:** ✅ AWS BACKEND ONLINE | Aguardando KingHost Frontend  
+> **Sessão Ativa:** 2026-02-04  
+> **Status:** 🟡 GATE 0 CONCLUÍDO - AGUARDANDO APROVAÇÃO GATE 1  
 > **Branch:** main  
-> **Último Commit:** 1e38720 - config: prepara para deploy hibrido
+> **Commit:** 5af16a2 (rollback estado funcional)  
+> **Auditoria:** Institucional em andamento  
+> **Responsável:** Lucas Lebre (Automania-AI)
 
 ---
 
 ## 🎯 ESTADO ATUAL DO SISTEMA
 
-### Ambiente de Desenvolvimento (Windows Local)
+### Ambiente de Desenvolvimento (Windows Local) ✅ FUNCIONANDO
 | Componente | Status | URL |
 |------------|--------|-----|
 | Frontend | ✅ Rodando | http://localhost:3000 |
 | Backend | ✅ Rodando | http://localhost:8000 |
 | PostgreSQL | ✅ Docker | localhost:5432 |
 | Redis | ✅ Docker | localhost:6379 |
+| Evolution API | ✅ Rodando | http://localhost:8080 |
+| Login | ✅ Testado | fabio@fcsolucoes.com / 1234 |
+| WhatsApp | ✅ Conectado | Lucas Lebre - 5516981903443 |
 
-### Ambiente de Produção (AWS + KingHost)
-| Componente | Status | URL |
-|------------|--------|-----|
-| Backend API | ✅ **ONLINE** | http://56.124.101.16:8000 |
-| PostgreSQL | ✅ Container | 56.124.101.16:5432 |
-| Redis | ✅ Container | 56.124.101.16:6379 |
-| Evolution API | ✅ **ONLINE** | http://56.124.101.16:8080 |
-| Frontend | ⏳ Pendente (KingHost) | https://fabio.automaniaai.com.br |
-
-**✅ Backend AWS 100% funcional!** Testado em 2026-02-03 23:20
+### Sistema 100% funcional após rollback para 5af16a2
 
 ---
 
-## ✅ FUNCIONALIDADES IMPLEMENTADAS
+## 🔧 ROLLBACK EXECUTADO ANTERIORMENTE
 
-### Contratos
-- [x] Template Bacen completo (11 cláusulas)
-- [x] Layout institucional com faixa azul
-- [x] Fonte Times New Roman
-- [x] Cálculo automático de valores por extenso
-- [x] Geração de PDF via browser print
-- [x] Visualização de contratos
-- [x] Edição de contratos
-- [x] Exclusão de contratos
-- [x] Listagem com busca
+**Data:** 2026-02-04 08:30  
+**Motivo:** Estado "frankenstein" com porta errada (3001), alterações não commitadas  
+**Solução:** Reset hard para 5af16a2 (último estado funcional confirmado)
 
-### Autenticação
-- [x] Login JWT funcionando
-- [x] Usuário: fabio@fcsolucoes.com / 1234
-- [x] Workaround security_stub para dev
-
-### Integrações
-- [x] Evolution API configurada (AWS)
-- [x] WhatsApp pronto para uso
-
----
-
-## 🏗️ ARQUITETURA DE DEPLOY
-
-### AWS EC2 (Backend + Banco)
-```
-Servidor: 56.124.101.16
-├── fabio2-backend (porta 8000)
-├── fabio2-postgres (porta 5432)
-├── fabio2-redis (porta 6379)
-├── fabio2-evolution (porta 8080)
-└── fabio2-pgadmin (porta 5050)
-```
-
-### KingHost (Frontend)
-```
-Domínio: fabio.automaniaai.com.br
-Pasta: /www/fabio
-├── index.html (Next.js export)
-├── _next/ (assets)
-└── static/ (imagens)
-```
-
-### Comunicação
-```
-Usuário → fabio.automaniaai.com.br (KingHost/Cloudflare)
-       → HTML/JS/CSS carregado
-       → Chamadas API para 56.124.101.16:8000
+```bash
+# Comandos executados:
+git restore .                           # Descartou alterações
+Remove-Item campanhas.* -Force          # Removeu arquivos não rastreados  
+git reset --hard 5af16a2                # Rollback para estado funcional
+Stop-Process node -Force                # Liberou portas
+# Reiniciado serviços limpos na porta 3000
 ```
 
 ---
 
-## 🔧 CONFIGURAÇÕES ATIVAS
+## 📋 CONTEXTO ATUAL (AUDITORIA INSTITUCIONAL)
 
-### Frontend (next.config.js)
+### Objetivo da Sessão
+Implementar **Módulo de Imagens** com:
+- HuggingFace Inference API (gratuito - 1k req/mês)
+- CÉREBRO INSTITUCIONAL (`docs/PROMPTS/BRAINIMAGE.md`)
+- Pasta Campanhas (organização automática)
+
+### Documentação Criada
+| Arquivo | Propósito |
+|---------|-----------|
+| `docs/PROJECT_CONTEXT.md` | Contexto completo do projeto para qualquer agente |
+| `docs/GATE_PLAN.md` | Plano estruturado por gates com rollback |
+| `docs/PROMPTS/BRAINIMAGE.md` | CÉREBRO INSTITUCIONAL (criado pelo usuário) |
+| `docs/PROMPTS/GODMOD.md` | Protocolo operacional DEV DEUS |
+
+### Plano por Gates
+| Gate | Descrição | Status |
+|------|-----------|--------|
+| 0 | Documentação Auditoria | ✅ Concluído |
+| 1 | Backend API HuggingFace | ⏳ Aguardando APROVADO |
+| 2 | Frontend Menu + Página | ⏳ Pendente |
+| 3 | Modal Gerador | ⏳ Pendente |
+| 4 | Pasta Campanhas | ⏳ Pendente |
+| 5 | Testes + Commit | ⏳ Pendente |
+
+---
+
+## 🏗️ ARQUITETURA DO MÓDULO DE IMAGENS
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    MÓDULO DE IMAGENS                        │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  FRONTEND (Next.js)                                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   Sidebar    │  │ Página       │  │   Modal      │      │
+│  │   (Botão)    │──│   Imagens    │──│   Gerador    │      │
+│  │   Imagens    │  │   (Grid)     │  │   (TXT→IMG)  │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│                                                             │
+│  BACKEND (FastAPI)                                          │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   Router     │  │   Service    │  │   Model      │      │
+│  │   /imagens   │──│   HuggingFace│──│   Imagem     │      │
+│  │              │  │   Inference  │  │   (DB)       │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│                              │                              │
+│                              ▼                              │
+│  EXTERNAL API                                               │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  HuggingFace Inference API                          │   │
+│  │  https://api-inference.huggingface.co              │   │
+│  │  Model: stabilityai/stable-diffusion-xl-base-1.0   │   │
+│  │  Limite: 1.000 requisições/mês gratuitas           │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  STORAGE                                                    │
+│  ├── storage/imagens/      (temporárias)                   │
+│  └── storage/campanhas/    (aprovadas - YYYYMMDD_nome)     │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📝 CONFIGURAÇÕES ATIVAS
+
+### Frontend Local (next.config.js)
 ```javascript
 {
-  output: 'standalone',
+  images: { unoptimized: true },
   env: {
-    NEXT_PUBLIC_API_URL: 'http://56.124.101.16:8000/api/v1'
+    NEXT_PUBLIC_API_URL: 'http://localhost:8000/api/v1'
   }
 }
 ```
 
-### Backend (CORS)
-```python
-CORS_ORIGINS = [
-    "http://56.124.101.16",
-    "https://fabio.automaniaai.com.br",
-    "http://localhost:3000"
-]
+### Backend Local (.env)
 ```
-
----
-
-## 📋 CHECKLIST DEPLOY PRODUÇÃO
-
-### Fase 1: AWS Backend (✅ CONCLUÍDO)
-- [x] Instalar Docker no Ubuntu
-- [x] Clonar repositório
-- [x] Configurar .env
-- [x] Subir containers
-- [x] **REINICIAR containers** (feito em 2026-02-03)
-- [x] **Adicionar validate-docbr ao requirements**
-- [x] Testar API
-- [x] Liberar portas no Security Group
-
-### Fase 2: KingHost Frontend (⏳ EM ANDAMENTO)
-- [ ] Gerar build do Next.js
-- [ ] Subir arquivos via FTP para /www/fabio
-- [ ] Configurar DNS fabio.automaniaai.com.br
-- [ ] Testar acesso
-- [ ] Validar comunicação com API
-
-### Fase 3: Validação (⏳ PENDENTE)
-- [ ] Login funcionando
-- [ ] Criar contrato
-- [ ] Visualizar contrato
-- [ ] Gerar PDF
-- [ ] WhatsApp integrado
+DATABASE_URL=postgresql+asyncpg://fabio2_user:fabio2_pass@localhost:5432/fabio2
+SECRET_KEY=dev-secret-key-change-in-production-min-32-chars
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+```
 
 ---
 
@@ -140,52 +136,46 @@ CORS_ORIGINS = [
 | Workaround | Motivo | Arquivo |
 |------------|--------|---------|
 | security_stub.py | Bcrypt 72 bytes no Windows | backend/app/core/security_stub.py |
+| DEV_PASSWORD = "1234" | Facilitar login em dev | security_stub.py |
 | PDF via browser | WeasyPrint precisa GTK+ | frontend/src/lib/pdf.ts |
 
 ---
 
-## ⚠️ AÇÃO NECESSÁRIA - AWS ACCESS
+## 💾 COMANDOS ÚTEIS
 
-### Problema
-O servidor AWS (56.124.101.16) não está respondendo nas portas 8000/8080.
-Containers Docker provavelmente pararam após falta de acesso SSH.
+### Iniciar Sistema (Padrão)
+```powershell
+# Terminal 1 - Backend
+cd C:\projetos\fabio2\backend
+.\venv\Scripts\activate
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-### Solução
-Precisamos acessar o servidor via SSH para reiniciar os containers:
-
-```bash
-# Comando para reiniciar (executar no servidor)
-cd ~/fabio2
-sudo docker-compose -f docker-compose-prod.yml down
-sudo docker-compose -f docker-compose-prod.yml up -d
-
-# Verificar status
-sudo docker-compose -f docker-compose-prod.yml ps
+# Terminal 2 - Frontend  
+cd C:\projetos\fabio2\frontend
+npm run dev
+# → http://localhost:3000
 ```
 
-### Pré-requisito
-- Arquivo da chave SSH: `fabio-aws.pem` ou similar
-- Comando: `ssh -i ~/fabio-aws.pem ubuntu@56.124.101.16`
+### Rollback de Emergência (Qualquer GATE)
+```powershell
+# 1. Parar tudo
+Stop-Process -Name node, python -Force
 
----
+# 2. Reset para estado funcional
+cd C:\projetos\fabio2
+git reset --hard 5af16a2
+git clean -fd
 
-## 📝 PRÓXIMOS PASSOS IMEDIATOS
+# 3. Reiniciar
+# (comandos acima)
+```
 
-1. **Gerar build do frontend**
-   ```powershell
-   cd frontend
-   npm run build
-   ```
-
-2. **Subir no KingHost via FTP**
-   - Host: webftp.kinghost.com.br
-   - Pasta: /www/fabio
-   - Arquivos: .next/standalone ou export estático
-
-3. **Testar produção**
-   - Acessar https://fabio.automaniaai.com.br
-   - Validar login
-   - Criar contrato de teste
+### Testar Login
+```powershell
+$body = '{"email":"fabio@fcsolucoes.com","password":"1234"}'
+Invoke-RestMethod -Uri "http://localhost:8000/api/v1/auth/login" `
+  -Method POST -ContentType "application/json" -Body $body
+```
 
 ---
 
@@ -193,41 +183,43 @@ sudo docker-compose -f docker-compose-prod.yml ps
 
 | Recurso | URL |
 |---------|-----|
-| Repositório | https://github.com/lucasricardolebre1984/fabio2 |
-| API AWS | http://56.124.101.16:8000/docs |
-| KingHost FTP | webftp.kinghost.com.br |
-| Produção | https://fabio.automaniaai.com.br |
+| Local Frontend | http://localhost:3000 ✅ |
+| Local Backend | http://localhost:8000/docs |
+| AWS API | http://56.124.101.16:8000/docs |
+| HuggingFace Inference | https://huggingface.co/docs/api-inference |
 
 ---
 
-## 💾 COMANDOS ÚTEIS
+## 📚 DOCUMENTAÇÃO ESSENCIAL
 
-### AWS (Servidor)
-```bash
-# Ver containers rodando
-docker-compose -f docker-compose-prod.yml ps
-
-# Ver logs
-docker-compose -f docker-compose-prod.yml logs -f
-
-# Restart
-docker-compose -f docker-compose-prod.yml restart
-```
-
-### Windows (Local)
-```powershell
-# Iniciar backend
-cd backend
-.\venv\Scripts\activate
-uvicorn app.main:app --reload
-
-# Iniciar frontend (novo terminal)
-cd frontend
-npm run dev
-```
+**Qualquer agente que entrar DEVE ler (ordem):**
+1. `docs/PROJECT_CONTEXT.md` - Contexto completo
+2. `docs/GATE_PLAN.md` - Plano estruturado atual
+3. `docs/PROMPTS/GODMOD.md` - Protocolo operacional
+4. `docs/PROMPTS/BRAINIMAGE.md` - CÉREBRO INSTITUCIONAL
+5. `docs/SESSION.md` - Este arquivo
 
 ---
 
-*Atualizado em: 2026-02-03 23:00*  
-*Autor: DEV DEUS*  
-*Status: 🟡 Deploy em andamento*
+## 🚦 PRÓXIMA AÇÃO
+
+**Aguardando aprovação de Lucas para iniciar GATE 1:**
+
+> **GATE 1: Backend - API HuggingFace + Model Imagem**
+> - Criar model, schema, service, router
+> - Integrar HuggingFace Inference API
+> - Criar pastas storage/imagens e storage/campanhas
+> 
+> **Tempo:** ~1.5 horas  
+> **Risco:** Médio (integração externa)
+
+**Comandos de aprovação:**
+- `"APROVADO GATE 1"` → Inicia apenas backend
+- `"APROVADO TUDO"` → Executa todos os gates
+
+---
+
+*Atualizado em: 2026-02-04 09:30*  
+*Auditoria Institucional: Em andamento*  
+*Protocolo GODMOD: Ativo*  
+*Status: 🟡 GATE 0 ✅ | GATE 1-5 ⏳*
