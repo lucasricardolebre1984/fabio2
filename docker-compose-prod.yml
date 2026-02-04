@@ -1,45 +1,24 @@
 version: '3.8'
 
 services:
-  nginx:
-    image: nginx:alpine
-    container_name: fabio2-nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      - backend
-      - frontend
-    networks:
-      - fabio2-network
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: fabio2-frontend
-    restart: unless-stopped
-    environment:
-      - NEXT_PUBLIC_API_URL=http://56.124.101.16:8000/api/v1
-      - API_URL=http://backend:8000/api/v1
-    networks:
-      - fabio2-network
-    depends_on:
-      - backend
-
+  # ==================================================================
+  # Backend (FastAPI)
+  # ==================================================================
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: fabio2-backend
     restart: unless-stopped
+    ports:
+      - "8000:8000"
     environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
       - DATABASE_URL=postgresql+asyncpg://fabio2_prod:Fabio2@Secure2026!@postgres:5432/fabio2_prod
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=Fabio2SecureKey2026Prod32CharsSecure
-      - CORS_ORIGINS=http://56.124.101.16,https://fabio.automaniaai.com.br
+      - CORS_ORIGINS=http://56.124.101.16,https://fabio.automaniaai.com.br,http://localhost:3000
       - EVOLUTION_API_URL=http://evolution-api:8080
       - EVOLUTION_API_KEY=Fabio2Evolution2026SecureKey
       - STORAGE_MODE=local
@@ -54,10 +33,15 @@ services:
       redis:
         condition: service_healthy
 
+  # ==================================================================
+  # PostgreSQL
+  # ==================================================================
   postgres:
     image: postgres:15-alpine
     container_name: fabio2-postgres
     restart: unless-stopped
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_USER: fabio2_prod
       POSTGRES_PASSWORD: Fabio2@Secure2026!
@@ -72,10 +56,18 @@ services:
     networks:
       - fabio2-network
 
+  # ==================================================================
+  # Redis
+  # ==================================================================
   redis:
     image: redis:7-alpine
     container_name: fabio2-redis
     restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -84,10 +76,15 @@ services:
     networks:
       - fabio2-network
 
+  # ==================================================================
+  # Evolution API (WhatsApp)
+  # ==================================================================
   evolution-api:
     image: atendai/evolution-api:latest
     container_name: fabio2-evolution
     restart: unless-stopped
+    ports:
+      - "8080:8080"
     environment:
       - DATABASE_ENABLED=true
       - DATABASE_PROVIDER=postgresql
@@ -109,11 +106,31 @@ services:
       - postgres
       - redis
 
+  # ==================================================================
+  # PGAdmin (Opcional - para gerenciar banco)
+  # ==================================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: fabio2-pgadmin
+    restart: unless-stopped
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@fcsolucoes.com
+      PGADMIN_DEFAULT_PASSWORD: Fabio2@Admin2026!
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - fabio2-network
+    depends_on:
+      - postgres
+
 volumes:
   postgres_data:
   redis_data:
   evolution_data:
   backend_storage:
+  pgadmin_data:
 
 networks:
   fabio2-network:
