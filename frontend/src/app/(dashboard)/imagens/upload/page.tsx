@@ -83,7 +83,12 @@ export default function UploadImagemPage() {
       }
     } catch (error: any) {
       console.error('Erro ao fazer upload:', error)
-      const errorMessage = error.response?.data?.detail || 'Erro ao enviar imagem. Tente novamente.'
+      let errorMessage = 'Erro ao enviar imagem. Tente novamente.'
+      if (error.response?.data?.detail) {
+        errorMessage = typeof error.response.data.detail === 'string' 
+          ? error.response.data.detail 
+          : JSON.stringify(error.response.data.detail)
+      }
       toast.error(errorMessage)
     } finally {
       setLoading(false)
