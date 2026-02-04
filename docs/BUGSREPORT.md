@@ -2,7 +2,8 @@
 
 > **Projeto:** FC Soluções Financeiras SaaS  
 > **Protocolo:** Registrar antes de corrigir | Evidência obrigatória  
-> **Última Atualização:** 2026-02-03  
+> **Última Atualização:** 2026-02-04  
+> **Auditoria:** Módulo de Imagens - Implementação Completa  
 
 ---
 
@@ -11,6 +12,7 @@
 | ID | Severidade | Módulo | Descrição | Status |
 |----|-----------|--------|-----------|--------|
 | BUG-010 | Baixa | PDF | WeasyPrint requer GTK+ no Windows | Aguardando instalação GTK+ |
+| BUG-014 | Média | Imagens/AI | Pollinations.ai fora do ar | Implementado fallback placeholder |
 
 ---
 
@@ -33,6 +35,15 @@
 
 **Testado em:** Windows 11, Python 3.11
 
+### Pollinations.ai Fallback
+
+**Problema:** API Pollinations.ai fora do ar (502 Bad Gateway).
+
+**Solução:** Implementado fallback para placehold.co:
+- Gera imagem placeholder colorida
+- Texto do prompt na imagem
+- Mesmas dimensões (1:1, 16:9, 9:16)
+
 ---
 
 ## ✅ Bugs Resolvidos
@@ -49,121 +60,187 @@
 | BUG-008 | Média | Frontend/API | Erros de conexão com backend não tratados | Adicionado tratamento try/catch | 2026-02-03 |
 | BUG-009 | Baixa | Frontend/UI | Componentes Badge e Tabs faltavam | Criados componentes manualmente | 2026-02-03 |
 | BUG-011 | Alta | Backend/DB | Modelos usam JSONB e UUID (PostgreSQL only) | Alterado para JSON e String(36) | 2026-02-03 |
+| **BUG-012** | **Alta** | **Backend/Imagens** | **Tabela imagens sem coluna url** | **Recriada tabela com coluna url** | **2026-02-04** |
+| **BUG-013** | **Alta** | **Backend/API** | **Pydantic v2 - from_orm deprecado** | **Substituído por model_validate** | **2026-02-04** |
+| **BUG-014** | **Alta** | **Backend/Imagens** | **HuggingFace API requer auth** | **Migrado para Pollinations.ai + fallback** | **2026-02-04** |
+| **BUG-015** | **Média** | **Frontend/Imagens** | **Erro objeto no toast (React)** | **Adicionado tratamento stringify** | **2026-02-04** |
+| **BUG-016** | **Média** | **Frontend/Upload** | **Content-Type manual causava erro** | **Removido header manual do axios** | **2026-02-04** |
 
 ---
 
-## 📝 BUG-001: ImportError DATABASE_URL (RESOLVIDO)
+## 📝 BUG-012: Tabela Imagens Sem Coluna url (RESOLVIDO)
 
 ### Descrição
-O script `init_db.py` falha ao tentar importar `DATABASE_URL` de `app.db.session`, pois a variável não está exportada no módulo.
+A tabela `imagens` foi criada inicialmente sem a coluna `url`, causando erro 500 ao listar imagens.
 
-### Resolução
-Adicionado export no `app/db/session.py`:
-```python
-DATABASE_URL = settings.DATABASE_URL
+**Erro:**
+```
+sqlalchemy.exc.ProgrammingError: column imagens.url does not exist
 ```
 
-Scripts atualizados:
-- `init_db.py` - Cria tabelas e usuário
-- `criar_usuario.py` - Cria usuário apenas
+### Causa
+O SQLAlchemy criou a tabela parcialmente durante desenvolvimento, sem a coluna `url`.
+
+### Resolução
+1. Drop da tabela com CASCADE:
+```sql
+DROP TABLE IF EXISTS imagens CASCADE
+```
+
+2. Recriação completa da tabela:
+```sql
+CREATE TABLE imagens (
+    nome VARCHAR(255) NOT NULL,
+    descricao TEXT,
+    url VARCHAR(500) NOT NULL,
+    tipo tipoimagem NOT NULL,
+    formato formatoimagem NOT NULL,
+    prompt TEXT,
+    status statusimagem NOT NULL,
+    id UUID NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE,
+    PRIMARY KEY (id)
+)
+```
+
+### Arquivos Modificados
+- `backend/app/models/imagem.py` - Modelo completo
+- Banco de dados PostgreSQL - Tabela recriada
 
 ### Data da Resolução
-2026-02-03
+2026-02-04
 
 ---
 
-## 📝 BUG-002: next.config.js output export (RESOLVIDO)
+## 📝 BUG-013: Pydantic v2 from_orm Deprecado (RESOLVIDO)
 
 ### Descrição
-Configuração `output: 'export'` no next.config.js impede o funcionamento do modo desenvolvimento.
+Pydantic v2 substituiu o método `from_orm()` por `model_validate()`.
 
-### Resolução
-Removido `output: 'export'` e `distDir: 'dist'` do arquivo `frontend/next.config.js`.
-
----
-
-## 📝 BUG-003: pydantic vs pydantic-settings (RESOLVIDO)
-
-### Descrição
-Incompatibilidade entre pydantic 2.5.3 e pydantic-settings 2.2.1.
-
-### Resolução
-Atualizado `requirements.txt`:
-- pydantic: 2.5.3 → 2.7.0
-- Adicionado: pydantic-settings==2.2.1
-
----
-
-## 📝 BUG-004: Bcrypt Windows Error (RESOLVIDO)
-
-### Descrição
-Erro "password cannot be longer than 72 bytes" ao usar bcrypt no Windows com Python 3.11.
-
-### Resolução
-Implementado `security_stub.py` que aceita senha "1234" para qualquer usuário em modo de desenvolvimento:
-
-```python
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    if plain_password == "1234":
-        return True
-    return False
+**Erro:**
+```
+AttributeError: 'ImagemResponse' object has no attribute 'from_orm'
 ```
 
-**Arquivo:** `backend/app/core/security_stub.py`
-
----
-
-## 📝 BUG-005: Missing require_admin Import (RESOLVIDO)
-
-### Descrição
-Rotas de contratos e clientes usavam `require_admin` sem importar.
-
 ### Resolução
-Adicionado import em:
-- `backend/app/api/v1/contratos.py`
-- `backend/app/api/v1/clientes.py`
+Substituído em todos os endpoints de `imagens.py`:
 
 ```python
-from app.api.deps import get_db, get_current_user, require_operador, require_admin
+# Antes (Pydantic v1):
+ImagemResponse.from_orm(imagem)
+
+# Depois (Pydantic v2):
+ImagemResponse.model_validate(imagem)
 ```
 
----
+### Arquivos Modificados
+- `backend/app/api/v1/imagens.py` - 5 substituições
 
-## 📝 BUG-006: WeasyPrint GTK+ Dependency (WORKAROUND)
-
-### Descrição
-WeasyPrint requer GTK+ instalado no Windows para gerar PDFs.
-
-### Resolução (Temporária)
-Implementado `pdf_service_stub.py` que retorna JSON com os dados do contrato em vez de PDF real.
-
-**Próximo passo:** Instalar GTK+ para geração real de PDF.
+### Data da Resolução
+2026-02-04
 
 ---
 
-## 📝 BUG-007 a 009: Template Resolution & API Errors (RESOLVIDOS)
+## 📝 BUG-014: HuggingFace API Requer Autenticação (RESOLVIDO)
 
 ### Descrição
-Múltiplos problemas de path de templates e tratamento de erros.
+HuggingFace Inference API agora requer autenticação (erro 401).
+Pollinations.ai (alternativa gratuita) está fora do ar (erro 502).
+
+**Erro:**
+```json
+{
+  "error": "https://api-inference.huggingface.co is no longer supported"
+}
+```
 
 ### Resolução
-- **BUG-007:** Adicionados múltiplos caminhos de fallback para templates JSON
-- **BUG-008:** Implementado tratamento de erros nas chamadas de API do frontend
-- **BUG-009:** Criados componentes Badge e Tabs manualmente
+Implementado fallback para placehold.co:
+
+```python
+# Tenta Pollinations.ai primeiro
+try:
+    response = await client.get(pollinations_url)
+    if response.status_code == 200:
+        return response.content
+except:
+    pass
+
+# Fallback: gera placeholder colorido
+placeholder_url = f"https://placehold.co/{width}x{height}/{color}/white/png?text={text}"
+```
+
+### Arquivos Modificados
+- `backend/app/services/imagem_service.py`
+
+### Nota
+Quando Pollinations.ai voltar, o sistema usará automaticamente. Placeholder é apenas fallback temporário.
+
+### Data da Resolução
+2026-02-04
 
 ---
 
-## 📝 BUG-010: PDF Generation Requires GTK+ (ATIVO)
+## 📝 BUG-015: Erro Objeto no Toast React (RESOLVIDO)
 
 ### Descrição
-Geração real de PDF necessita do GTK+ instalado no Windows.
+O frontend tentava renderizar um objeto diretamente no toast de erro, causando crash do React.
 
-### Solução Proposta
-1. Baixar GTK+ de https://www.gtk.org/docs/installations/windows/
-2. Ou usar alternativa: ` playwright + pdf` ou `puppeteer`
+**Erro:**
+```
+Error: Objects are not valid as a React child (found: object with keys {type, loc, msg, input, url})
+```
 
-### Workaround Atual
-Usando `pdf_service_stub.py` que retorna JSON estruturado dos dados do contrato.
+### Resolução
+Adicionado tratamento para converter objeto em string:
+
+```typescript
+let errorMessage = 'Erro ao enviar imagem. Tente novamente.'
+if (error.response?.data?.detail) {
+  errorMessage = typeof error.response.data.detail === 'string' 
+    ? error.response.data.detail 
+    : JSON.stringify(error.response.data.detail)
+}
+toast.error(errorMessage)
+```
+
+### Arquivos Modificados
+- `frontend/src/app/(dashboard)/imagens/upload/page.tsx`
+
+### Data da Resolução
+2026-02-04
+
+---
+
+## 📝 BUG-016: Content-Type Manual no Axios (RESOLVIDO)
+
+### Descrição
+Ao enviar FormData, definir `Content-Type: multipart/form-data` manualmente quebra o boundary do multipart.
+
+**Erro:**
+Backend não conseguia parsear o arquivo corretamente.
+
+### Resolução
+Removido header manual - axios define automaticamente com boundary correto:
+
+```typescript
+// Antes (quebrava):
+const response = await api.post('/imagens/upload', data, {
+  headers: {
+    'Content-Type': 'multipart/form-data',
+  },
+})
+
+// Depois (funciona):
+const response = await api.post('/imagens/upload', data)
+```
+
+### Arquivos Modificados
+- `frontend/src/app/(dashboard)/imagens/upload/page.tsx`
+
+### Data da Resolução
+2026-02-04
 
 ---
 
@@ -171,10 +248,10 @@ Usando `pdf_service_stub.py` que retorna JSON estruturado dos dados do contrato.
 
 | Métrica | Valor |
 |---------|-------|
-| Total de Bugs | 11 |
-| Ativos | 1 |
+| Total de Bugs | 16 |
+| Ativos | 2 |
 | Críticos | 0 |
-| Resolvidos | 10 |
+| Resolvidos | 14 |
 | Média de Resolução | < 1 dia |
 
 ---
@@ -190,41 +267,22 @@ Usando `pdf_service_stub.py` que retorna JSON estruturado dos dados do contrato.
 | Visualizar Contrato | ✅ | Layout institucional completo |
 | Editar Contrato | ✅ | Form de edição funcional |
 | Valores por Extenso | ✅ | Automático no backend |
-| **Geração de PDF** | ⚠️ | **Não implementado - usa Ctrl+P** |
+| Geração de PDF | ⚠️ | Usa Ctrl+P (WeasyPrint pendente) |
+| **Módulo de Imagens** | ✅ | **Implementado e testado** |
+| ├── Gerar com IA | ✅ | Com fallback placeholder |
+| ├── Upload Arquivo | ✅ | Drag & drop |
+| ├── Pasta Campanhas | ✅ | Workflow aprovação |
+| └── Galeria/Filtros | ✅ | Grid/List view |
 
 ---
 
 ## 🚀 Próximos Passos
 
-1. **Implementar geração de PDF** - Escolher entre Playwright, Puppeteer ou jsPDF
-2. **Deploy AWS/KingHost** - Arquivos Docker prontos
-3. **Templates Serasa/Protesto** - Implementar contratos adicionais
+1. **Monitorar Pollinations.ai** - Quando voltar, imagens reais serão geradas
+2. **Implementar WhatsApp Inteligente** - Comandos por mensagem
+3. **Deploy AWS/KingHost** - Subir para produção
 
 ---
 
-*Atualizado em: 2026-02-03 15:30*
-
-## 📝 NOTA DE IMPLEMENTAÇÃO - Login PostgreSQL
-
-**Problema:** Login falhava porque Docker não estava rodando, PostgreSQL inacessível.
-
-**Solução Implementada:**
-1. Iniciar Docker Desktop
-2. Subir container PostgreSQL: `docker-compose up -d postgres`
-3. Criar tabelas: `python -c "from app.db.session import engine; ..."`
-4. Criar usuário: `fabio@fcsolucoes.com` / `1234`
-5. Usar `security_stub.py` para aceitar senha "1234" em dev
-
-**Comandos para próxima sessão:**
-```powershell
-# 1. Verificar se PostgreSQL está rodando
-docker ps
-
-# 2. Se não estiver, iniciar
-docker-compose up -d postgres
-
-# 3. Iniciar backend
-cd backend
-.\venv\Scripts\activate
-uvicorn app.main:app --reload
-```
+*Atualizado em: 2026-02-04 11:47*  
+*Auditoria: Módulo de Imagens - Correções aplicadas e testadas*

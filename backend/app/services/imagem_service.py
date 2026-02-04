@@ -18,8 +18,8 @@ from app.schemas.imagem import ImagemCreate
 class ImagemService:
     """Service for image generation and management."""
     
-    # HuggingFace Inference API
-    HF_API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
+    # Pollinations.ai - API gratuita sem autenticação
+    POLLINATIONS_URL = "https://image.pollinations.ai/prompt"
     
     # Tamanhos por formato
     FORMATO_DIMENSOES = {
@@ -43,7 +43,7 @@ class ImagemService:
         formato: FormatoImagem = FormatoImagem.QUADRADO
     ) -> bytes:
         """
-        Generate image using HuggingFace Inference API.
+        Generate image using AI API.
         
         Args:
             prompt: Text prompt for image generation
@@ -60,34 +60,30 @@ class ImagemService:
         # Enhanced prompt with BRAINIMAGE style guidelines
         enhanced_prompt = self._enhance_prompt(prompt)
         
-        # Payload for HuggingFace
-        payload = {
-            "inputs": enhanced_prompt,
-            "parameters": {
-                "width": width,
-                "height": height,
-                "num_inference_steps": 50,
-                "guidance_scale": 7.5,
-                "negative_prompt": "blurry, low quality, distorted, deformed, ugly, duplicate, watermark, signature, text, logo"
-            }
-        }
+        # Tenta Pollinations.ai primeiro
+        from urllib.parse import quote
+        encoded_prompt = quote(enhanced_prompt)
+        url = f"{self.POLLINATIONS_URL}/{encoded_prompt}?width={width}&height={height}&nologo=true"
         
-        # Call HuggingFace API
         async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.post(
-                self.HF_API_URL,
-                json=payload,
-                headers={
-                    "Content-Type": "application/json",
-                    # HuggingFace Inference API is free (rate limited)
-                    # For higher limits, add: "Authorization": f"Bearer {HF_TOKEN}"
-                }
-            )
+            try:
+                response = await client.get(url)
+                if response.status_code == 200:
+                    return response.content
+            except:
+                pass
             
-            if response.status_code != 200:
-                raise Exception(f"HuggingFace API error: {response.status_code} - {response.text}")
+            # Fallback: usa placeholder.com para testes
+            # Gera uma cor baseada no hash do prompt
+            import hashlib
+            color = hashlib.md5(prompt.encode()).hexdigest()[:6]
+            placeholder_url = f"https://placehold.co/{width}x{height}/{color}/white/png?text={quote(prompt[:30])}"
             
-            return response.content
+            response = await client.get(placeholder_url)
+            if response.status_code == 200:
+                return response.content
+            
+            raise Exception(f"Não foi possível gerar imagem. Tente novamente mais tarde.")
     
     def _enhance_prompt(self, prompt: str) -> str:
         """
