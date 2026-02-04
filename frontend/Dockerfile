@@ -2,14 +2,13 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy config files
+COPY package*.json tsconfig.json next.config.js tailwind.config.ts components.json postcss.config.js ./
+COPY src ./src
+COPY public ./public
 
 # Install ALL dependencies (including devDependencies for build)
 RUN npm ci
-
-# Copy source code
-COPY . .
 
 # Build the application
 RUN npm run build
