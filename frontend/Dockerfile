@@ -3,7 +3,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Copy config files
-COPY package*.json tsconfig.json next.config.js tailwind.config.ts components.json postcss.config.js ./
+COPY package*.json tsconfig.json next.config.js tailwind.config.ts postcss.config.js ./
 COPY src ./src
 
 # Create public folder if it doesn't exist (Next.js requires it)
