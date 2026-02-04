@@ -242,7 +242,7 @@ npm run dev
 
 ## 📁 ROLLBACK (GIT)
 
-**Hash do Commit:** `[HASH_DO_MEGA_COMMIT]`  
+**Hash do Commit:** `be0ba03`  
 **Mensagem:** `MEGA COMMIT - Versão 2.0.0 Funcional Completa`
 
 ### Como Reverter
