@@ -40,7 +40,7 @@ async def listar_imagens(
     imagens = await service.listar_imagens(db, status, tipo, skip, limit)
     
     return ImagemListResponse(
-        items=[ImagemResponse.from_orm(img) for img in imagens],
+        items=[ImagemResponse.model_validate(img) for img in imagens],
         total=len(imagens)
     )
 
@@ -74,7 +74,7 @@ async def gerar_imagem(
         
         return GerarImagemResponse(
             success=True,
-            imagem=ImagemResponse.from_orm(imagem),
+            imagem=ImagemResponse.model_validate(imagem),
             message="Imagem gerada com sucesso"
         )
         
@@ -132,7 +132,7 @@ async def upload_imagem(
         
         return UploadImagemResponse(
             success=True,
-            imagem=ImagemResponse.from_orm(imagem),
+            imagem=ImagemResponse.model_validate(imagem),
             message="Imagem enviada com sucesso"
         )
         
@@ -188,7 +188,7 @@ async def get_imagem(
             detail="Imagem não encontrada"
         )
     
-    return ImagemResponse.from_orm(imagem)
+    return ImagemResponse.model_validate(imagem)
 
 
 @router.patch("/{imagem_id}", response_model=ImagemResponse)
@@ -235,7 +235,7 @@ async def update_imagem(
             detail="Imagem não encontrada"
         )
     
-    return ImagemResponse.from_orm(imagem)
+    return ImagemResponse.model_validate(imagem)
 
 
 @router.delete("/{imagem_id}")
