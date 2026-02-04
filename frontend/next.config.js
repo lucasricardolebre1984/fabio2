@@ -1,12 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
-  distDir: 'dist',
   images: {
     unoptimized: true,
   },
   env: {
-    NEXT_PUBLIC_API_URL: '/api/v1',
+    NEXT_PUBLIC_API_URL: 'http://localhost:8000/api/v1',
   },
 }
 
