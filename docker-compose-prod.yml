@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: fabio2-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./frontend:/usr/share/nginx/html:ro
+    depends_on:
+      - backend
+    networks:
+      - fabio2-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: fabio2-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fabio2_prod
+      POSTGRES_PASSWORD: Fabio2@Secure2026!
+      POSTGRES_DB: fabio2_prod
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - fabio2-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: fabio2-redis
+    restart: unless-stopped
+    networks:
+      - fabio2-network
+
+  evolution-api:
+    image: atendai/evolution-api:latest
+    container_name: fabio2-evolution
+    restart: unless-stopped
+    environment:
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://fabio2_prod:Fabio2@Secure2026!@postgres:5432/evolution
+      - REDIS_ENABLED=true
+      - REDIS_URI=redis://redis:6379/0
+    networks:
+      - fabio2-network
+    depends_on:
+      - postgres
+      - redis
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fabio2-backend
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://fabio2_prod:Fabio2@Secure2026!@postgres:5432/fabio2_prod
+      - SECRET_KEY=Fabio2SecureKey
+      - CORS_ORIGINS=http://56.124.101.16,https://fabio.automaniaai.com.br
+    networks:
+      - fabio2-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  evolution_data:
+  backend_storage:
+
+networks:
+  fabio2-network:
+    driver: bridge
