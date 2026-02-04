@@ -75,19 +75,16 @@ export default function UploadImagemPage() {
       data.append('nome', formData.nome)
       data.append('formato', formData.formato)
 
-      const response = await api.post('/imagens/upload', data, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      })
+      const response = await api.post('/imagens/upload', data)
 
       if (response.data.success) {
         toast.success('Imagem enviada com sucesso!')
         router.push('/imagens')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao fazer upload:', error)
-      toast.error('Erro ao enviar imagem. Tente novamente.')
+      const errorMessage = error.response?.data?.detail || 'Erro ao enviar imagem. Tente novamente.'
+      toast.error(errorMessage)
     } finally {
       setLoading(false)
     }

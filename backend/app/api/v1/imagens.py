@@ -89,7 +89,7 @@ async def gerar_imagem(
 async def upload_imagem(
     file: UploadFile = File(...),
     nome: str = Form(...),
-    formato: FormatoImagem = Form(FormatoImagem.QUADRADO),
+    formato: str = Form("1:1"),
     descricao: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operador)
@@ -110,6 +110,15 @@ async def upload_imagem(
             detail=f"Formato não suportado. Use: {', '.join(allowed_extensions)}"
         )
     
+    # Validate and convert formato
+    try:
+        formato_enum = FormatoImagem(formato)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Formato inválido. Use: 1:1, 16:9 ou 9:16"
+        )
+    
     service = ImagemService()
     
     try:
@@ -117,7 +126,7 @@ async def upload_imagem(
             db=db,
             file=file,
             nome=nome,
-            formato=formato,
+            formato=formato_enum,
             descricao=descricao
         )
         
