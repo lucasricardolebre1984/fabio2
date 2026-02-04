@@ -8,7 +8,7 @@ from sqlalchemy import select, desc, and_
 from typing import List, Optional
 from uuid import UUID
 
-from app.db.database import get_db
+from app.db.session import get_db
 from app.models.whatsapp_conversa import WhatsappConversa, WhatsappMensagem, StatusConversa
 from app.schemas.whatsapp_chat import (
     ConversaResponse, 

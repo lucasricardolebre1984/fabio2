@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Request, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Dict, Any
 
-from app.db.database import get_db
+from app.db.session import get_db
 from app.services.evolution_webhook_service import webhook_service
 
 router = APIRouter()

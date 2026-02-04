@@ -9,7 +9,7 @@ from datetime import datetime
 import uuid
 from enum import Enum
 
-from app.db.database import Base
+from app.db.base import Base
 
 
 class StatusConversa(str, Enum):
