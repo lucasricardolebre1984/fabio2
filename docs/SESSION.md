@@ -40,11 +40,21 @@ VIVA (modelos)
 - PDF é gerado no frontend com `window.print()`
 - Chat interno usa OpenRouter quando configurado, senão modo local
 - WhatsApp usa webhook para alimentar conversas no banco
+- Roteiro de deploy Ubuntu 100% Docker documentado em `docs/DEPLOY_UBUNTU_DOCKER.md`
 
 ## Ajustes desta sessão
 
 - Persona simples da VIVA adicionada ao prompt principal (contexto de servidor, empresas FC/Rezeta e capacidades de imagem/áudio/vídeo)
 - Prompts secundários continuam em `frontend/src/app/viva/PROMPTS` para modos específicos
+- Roteiro de deploy 100% Docker criado com etapas de produção
+
+---
+
+## Plano de Etapas (Ubuntu)
+
+- Etapa 1: Roteiro de deploy 100% Docker (concluída)
+- Etapa 2: WhatsApp funcional e integrado ao backend (pendente)
+- Etapa 3: Protocolo final com DNS, SSL e hardening (pendente)
 
 ---
 

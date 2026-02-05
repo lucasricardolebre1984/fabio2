@@ -13,6 +13,13 @@
 
 ---
 
+## Produção (Ubuntu - Docker 100%)
+
+Guia completo no documento:
+- `docs/DEPLOY_UBUNTU_DOCKER.md`
+
+---
+
 ## Subir serviços com Docker (recomendado)
 
 ```powershell

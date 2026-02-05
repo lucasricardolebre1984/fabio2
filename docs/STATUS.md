@@ -8,7 +8,8 @@
 
 ## Objetivo Atual
 
-Documentar toda a estrutura, endpoints e integração VIVA, sem alterações de código.
+Etapa 1 concluída: roteiro de deploy 100% Docker no Ubuntu.  
+Próxima etapa: ativar WhatsApp funcional no backend.
 
 ---
 
@@ -46,6 +47,14 @@ Documentar toda a estrutura, endpoints e integração VIVA, sem alterações de 
 
 ---
 
+## Etapas de Deploy (Ubuntu)
+
+- Etapa 1: Roteiro de deploy 100% Docker (concluída)
+- Etapa 2: WhatsApp funcional e integrado (pendente)
+- Etapa 3: Protocolo final com DNS, SSL e hardening (pendente)
+
+---
+
 ## Documentação Atualizada
 
 - `docs/ARCHITECTURE/OVERVIEW.md`
@@ -58,6 +67,7 @@ Documentar toda a estrutura, endpoints e integração VIVA, sem alterações de 
 - `docs/RUNBOOK.md`
 - `docs/FOUNDATION.md`
 - `docs/BUGSREPORT.md`
+- `docs/DEPLOY_UBUNTU_DOCKER.md`
 
 ---
 
