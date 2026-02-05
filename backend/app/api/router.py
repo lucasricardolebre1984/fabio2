@@ -1,7 +1,7 @@
 """Main API router."""
 from fastapi import APIRouter
 
-from app.api.v1 import auth, contratos, clientes, agenda, whatsapp, webhook, whatsapp_chat
+from app.api.v1 import auth, contratos, clientes, agenda, whatsapp, webhook, whatsapp_chat, viva
 
 api_router = APIRouter()
 
@@ -12,3 +12,4 @@ api_router.include_router(agenda.router, prefix="/agenda", tags=["Agenda"])
 api_router.include_router(whatsapp.router, prefix="/whatsapp", tags=["WhatsApp"])
 api_router.include_router(webhook.router, prefix="/webhook", tags=["Webhook"])
 api_router.include_router(whatsapp_chat.router, prefix="/whatsapp-chat", tags=["WhatsApp Chat"])
+api_router.include_router(viva.router, prefix="/viva", tags=["VIVA - Assistente Virtual"])

@@ -6,11 +6,11 @@ import { FileText, Users, Calendar, MessageCircle, LogOut, Bot } from 'lucide-re
 import { cn } from '@/lib/utils'
 
 const menuItems = [
+  { href: '/viva', label: 'Chat IA VIVA', icon: Bot },
   { href: '/contratos', label: 'Contratos', icon: FileText },
   { href: '/clientes', label: 'Clientes', icon: Users },
   { href: '/agenda', label: 'Agenda', icon: Calendar },
   { href: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
-  { href: '/whatsapp/conversas', label: 'Chat IA VIVA', icon: Bot },
 ]
 
 export function Sidebar() {

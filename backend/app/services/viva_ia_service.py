@@ -155,11 +155,13 @@ Você está em uma conversa real pelo WhatsApp. Responda de forma natural e úti
                     data = response.json()
                     return data["choices"][0]["message"]["content"]
                 else:
-                    print(f"Erro GLM-4: {response.status_code} - {response.text}")
+                    import logging
+                    logging.error(f"Erro GLM-4: {response.status_code}")
                     return "Desculpe, não consegui processar sua mensagem agora. Pode repetir, por favor?"
                     
         except Exception as e:
-            print(f"Erro ao chamar GLM-4: {str(e)}")
+            import logging
+            logging.error(f"Erro ao chamar GLM-4: {repr(e)}")
             return "Ops! Tive um probleminha técnico. Tente novamente ou digite 'atendente' para falar com uma pessoa."
 
 

@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     # ==================================================================
     # CORS
     # ==================================================================
-    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005"
     
     @property
     def cors_origins_list(self) -> List[str]:
@@ -85,10 +85,30 @@ class Settings(BaseSettings):
     AWS_S3_ENDPOINT: Optional[str] = None
     
     # ==================================================================
-    # Z.AI GLM-Image API (Image Generation)
+    # Z.AI API (GLM Models) - Chat, Vision, Audio, Image
     # ==================================================================
     ZAI_API_KEY: Optional[str] = None
-    ZAI_MODEL: str = "glm-image"
+    ZAI_MODEL_CHAT: str = "glm-4"
+    ZAI_MODEL_VISION: str = "glm-4v"
+    ZAI_MODEL_AUDIO: str = "glm-asr"
+    ZAI_MODEL_IMAGE: str = "glm-image"
+    
+    # ==================================================================
+    # DeepSeek API (Backup)
+    # ==================================================================
+    DEEPSEEK_API_KEY: Optional[str] = None
+    
+    # ==================================================================
+    # OpenRouter API (Gratuito)
+    # Obter API key: https://openrouter.ai/
+    # ==================================================================
+    OPENROUTER_API_KEY: Optional[str] = None
+    
+    # ==================================================================
+    # Ollama API (Local)
+    # ==================================================================
+    OLLAMA_API_KEY: Optional[str] = None
+    OLLAMA_URL: str = "http://localhost:11434"
     
     # Cost tracking
     CUSTO_POR_IMAGEM_USD: float = 0.015
