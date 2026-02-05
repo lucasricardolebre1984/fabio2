@@ -1,294 +1,123 @@
-# ARQUITETURA - Visão Geral
+﻿# ARQUITETURA - Visão Geral
 
 > **Projeto:** FC Soluções Financeiras SaaS  
 > **Versão:** 1.0.0  
+> **Data:** 2026-02-05
 
 ---
 
-## 🏗️ Visão Macro
+## Visão Macro
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                              CLIENTE                                     │
-│                    (Browser - Chrome/Firefox/Safari)                    │
-└─────────────────────────────────┬───────────────────────────────────────┘
-                                  │ HTTPS
-                                  ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           FRONTEND (Next.js)                             │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐ │
-│  │   Login     │  │  Contratos  │  │  Clientes   │  │     Agenda      │ │
-│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────────┘ │
-│                           Zustand + React Query                          │
-└─────────────────────────────────┬───────────────────────────────────────┘
-                                  │ JSON / REST
-                                  ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           BACKEND (FastAPI)                              │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐ │
-│  │    Auth     │  │  Contratos  │  │  Clientes   │  │  Integrações    │ │
-│  │   (JWT)     │  │  (Templates)│  │   (CRUD)    │  │(WhatsApp/PDF)   │ │
-│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────────┘ │
-│                           SQLAlchemy 2.0                                 │
-└─────────────────────────────────┬───────────────────────────────────────┘
-                                  │ SQL
-                                  ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         BANCO DE DADOS                                   │
-│  ┌──────────────────────────────────────────────────────────────────┐   │
-│  │                    PostgreSQL 15+                                 │   │
-│  │  users │ clientes │ contratos │ templates │ agenda │ whatsapp    │   │
-│  └──────────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────┘
-                                  │
-                    ┌─────────────┴─────────────┐
-                    ▼                           ▼
-┌─────────────────────────┐         ┌─────────────────────────┐
-│        REDIS            │         │    EVOLUTION API        │
-│  ┌───────────────────┐  │         │  ┌───────────────────┐  │
-│  │     Cache         │  │         │  │  WhatsApp (BA)    │  │
-│  ├───────────────────┤  │         │  │  ├─ Conectar      │  │
-│  │     Fila (RQ)     │  │         │  │  ├─ Enviar msg    │  │
-│  └───────────────────┘  │         │  │  └─ Enviar PDF    │  │
-└─────────────────────────┘         └─────────────────────────┘
+Cliente (Browser)
+  ↓ HTTPS
+Frontend (Next.js 14)
+  ↓ JSON/REST
+Backend (FastAPI)
+  ↓ SQL
+PostgreSQL
+  ↔ Redis (cache/filas)
+  ↔ Evolution API (WhatsApp)
 ```
 
 ---
 
-## 📦 Camadas da Aplicação
+## Componentes Principais
 
-### 1. Presentation Layer (Frontend)
-```
-app/
-├── (dashboard)/          # Rotas protegidas (grupo)
-│   ├── layout.tsx        # Layout com Sidebar
-│   ├── page.tsx          # Dashboard home
-│   ├── contratos/        # Módulo contratos
-│   ├── clientes/         # Módulo clientes
-│   ├── agenda/           # Módulo agenda
-│   └── whatsapp/         # Módulo WhatsApp
-├── layout.tsx            # Root layout
-└── page.tsx              # Landing/Login
-```
+Frontend
+- Next.js 14 (App Router)
+- UI institucional e módulo Chat IA VIVA
+- Rotas protegidas com JWT
 
-**Responsabilidades:**
-- Renderização de UI
-- Gerenciamento de estado local
-- Comunicação com API
-- Validação de formulários
-- Navegação e routing
+Backend
+- FastAPI com rotas em `/api/v1`
+- Serviços de contratos, clientes, agenda e WhatsApp
+- Serviço VIVA (chat interno e integração WA)
 
-### 2. API Layer (Backend - Routes)
-```
-api/v1/
-├── auth.py               # Login/logout/refresh
-├── contratos.py          # CRUD + geração PDF
-├── clientes.py           # CRUD clientes
-├── agenda.py             # CRUD eventos
-└── whatsapp.py           # Integração WA
-```
+Banco
+- PostgreSQL 15
+- Redis 7 (cache e filas)
 
-**Responsabilidades:**
-- Receber requests HTTP
-- Validar autenticação (JWT)
-- Validar payloads (Pydantic)
-- Chamar services
-- Retornar responses padronizadas
-
-### 3. Business Layer (Services)
-```
-services/
-├── contrato_generator.py     # Geração de contratos
-├── pdf_service.py            # PDF via WeasyPrint
-├── extenso_service.py        # Valor por extenso
-└── whatsapp_service.py       # Evolution API client
-```
-
-**Responsabilidades:**
-- Regras de negócio
-- Orquestração de operações
-- Integrações externas
-- Transformações de dados
-
-### 4. Data Layer (Models/DB)
-```
-models/
-├── user.py               # Usuários do sistema
-├── cliente.py            # Clientes (contratantes)
-├── contrato.py           # Contratos gerados
-├── contrato_template.py  # Templates de contratos
-└── agenda.py             # Eventos da agenda
-```
-
-**Responsabilidades:**
-- Definição de schemas do banco
-- Relacionamentos
-- Constraints e indexes
-- Migrations
+Integrações
+- Evolution API (WhatsApp)
+- Z.AI / OpenRouter / modo local (VIVA)
 
 ---
 
-## 🔐 Segurança
+## Fluxos Principais
 
-### Autenticação
-```
-┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
-│  Login   │────▶│  Verify  │────▶│  JWT     │────▶│  Return  │
-│  (email, │     │  bcrypt  │     │  (15min) │     │  Tokens  │
-│  senha)  │     │          │     │          │     │          │
-└──────────┘     └──────────┘     └──────────┘     └──────────┘
-                                                          │
-                    ┌──────────┐     ┌──────────┐        │
-                    │  Refresh │◀────│  Verify  │◀───────┘
-                    │  Token   │     │  Token   │
-                    │  (7d)    │────▶│  Valid   │
-                    └──────────┘     └──────────┘
-```
+Contratos
+1. Usuário cria contrato pelo frontend
+2. Backend valida dados, calcula extenso e salva
+3. Preview e geração de PDF via `window.print()` no frontend
 
-### Autorização (RBAC)
-| Recurso | Admin | Operador |
-|---------|-------|----------|
-| Criar contrato | ✅ | ✅ |
-| Editar contrato | ✅ | ✅ (próprio) |
-| Excluir contrato | ✅ | ❌ |
-| Gerenciar usuários | ✅ | ❌ |
-| Configurações | ✅ | ❌ |
+PDF (Browser Print)
+1. Frontend monta HTML do contrato
+2. Abre nova janela e chama `window.print()`
+3. Usuário salva como PDF
+
+VIVA Chat (Web)
+1. Usuário abre `/viva`
+2. Envia mensagem e opcionalmente anexo
+3. Backend usa OpenRouter ou modo local
+4. Resposta aparece no chat
+
+WhatsApp + VIVA
+1. Cliente envia mensagem no WhatsApp
+2. Evolution API chama webhook
+3. Backend grava conversa e gera resposta
+4. Resposta fica disponível no frontend de conversas
 
 ---
 
-## 🔄 Fluxos Principais
+## Rotas do Frontend
 
-### Fluxo 1: Criar Contrato
-```
-┌─────────┐   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐
-│  User   │──▶│ Seleciona   │──▶│  Preenche   │──▶│   Salva     │
-│         │   │  Template   │   │   Campos    │   │  Contrato   │
-└─────────┘   └─────────────┘   └─────────────┘   └──────┬──────┘
-                                                         │
-    ┌────────────────────────────────────────────────────┘
-    │
-    ▼
-┌─────────────┐   ┌─────────────┐   ┌─────────────┐
-│   Valida    │──▶│   Cria      │──▶│   Cria      │
-│   Dados     │   │  Contrato   │   │  Cliente    │
-└─────────────┘   └─────────────┘   └──────┬──────┘
-                                           │
-    ┌──────────────────────────────────────┘
-    │
-    ▼
-┌─────────────┐   ┌─────────────┐
-│   Gera      │──▶│   Retorna   │
-│    PDF      │   │   Sucesso   │
-└─────────────┘   └─────────────┘
-```
-
-### Fluxo 2: Enviar por WhatsApp
-```
-┌─────────┐   ┌─────────────┐   ┌─────────────┐
-│  User   │──▶│  Seleciona  │──▶│   Enviar    │
-│         │   │  Contrato   │   │    WA       │
-└─────────┘   └─────────────┘   └──────┬──────┘
-                                       │
-    ┌──────────────────────────────────┘
-    │
-    ▼
-┌─────────────┐   ┌─────────────┐   ┌─────────────┐
-│   Verifica  │──▶│  Upload PDF │──▶│   Evolution │
-│  Conexão WA │   │   (temp)    │   │    API      │
-└─────────────┘   └─────────────┘   └──────┬──────┘
-                                           │
-    ┌──────────────────────────────────────┘
-    │
-    ▼
-┌─────────────┐   ┌─────────────┐
-│   Envia     │──▶│   Confirma  │
-│  Mensagem   │   │    Envio    │
-└─────────────┘   └─────────────┘
-```
+- `/` login
+- `/viva` chat interno VIVA
+- `/contratos` menu de templates
+- `/contratos/novo` criação
+- `/contratos/lista` listagem
+- `/contratos/[id]` visualização
+- `/contratos/[id]/editar` edição
+- `/clientes` cadastro e histórico
+- `/agenda` compromissos
+- `/whatsapp` painel WhatsApp
+- `/whatsapp/conversas` chat WhatsApp (VIVA)
+- `/chat` redireciona para conversas WhatsApp
 
 ---
 
-## 📊 Modelo de Dados
+## Serviços Internos (Backend)
 
-### Entidades Principais
-
-```
-┌──────────────┐       ┌──────────────┐       ┌──────────────┐
-│     USER     │       │   CLIENTE    │       │   CONTRATO   │
-├──────────────┤       ├──────────────┤       ├──────────────┤
-│ id (PK)      │       │ id (PK)      │◀──────┤ id (PK)      │
-│ email        │       │ nome         │   1:N │ numero       │
-│ senha_hash   │       │ documento    │       │ template_id  │
-│ nome         │       │ email        │       │ cliente_id   │
-│ role         │       │ telefone     │       │ valor_total  │
-│ ativo        │       │ endereco     │       │ ...          │
-│ created_at   │       │ created_at   │       │ created_by   │
-└──────────────┘       └──────────────┘       │ created_at   │
-                                              └──────────────┘
-┌──────────────┐       ┌──────────────┐
-│  TEMPLATE    │       │    AGENDA    │
-├──────────────┤       ├──────────────┤
-│ id (PK)      │       │ id (PK)      │
-│ nome         │       │ titulo       │
-│ tipo         │       │ descricao    │
-│ campos (JSON)│       │ data_inicio  │
-│ clausulas    │       │ data_fim     │
-│   (JSON)     │       │ cliente_id   │
-│ created_at   │       │ contrato_id  │
-└──────────────┘       │ created_by   │
-                       └──────────────┘
-```
+- `contrato_service.py` geração e regras de contratos
+- `cliente_service.py` cadastro e histórico
+- `agenda_service.py` compromissos
+- `whatsapp_service.py` integração Evolution API
+- `evolution_webhook_service.py` processamento webhook
+- `viva_ia_service.py` VIVA para WhatsApp
+- `viva_local_service.py` VIVA local (sem API)
+- `openrouter_service.py` VIVA via OpenRouter
+- `zai_service.py` base Z.AI / DeepSeek (placeholder em partes)
 
 ---
 
-## 🚀 Deploy
+## Templates de Contrato
 
-### Ambiente de Desenvolvimento
-```bash
-# 1. Clonar repo
-git clone https://github.com/lucasricardolebre1984/fabio2.git
-cd fabio2
+Pasta: `contratos/templates`
+- `bacen.json`
+- `bacen-v2.json`
 
-# 2. Iniciar serviços
-docker-compose up -d
-
-# 3. Backend
-http://localhost:8000
-
-# 4. Frontend
-http://localhost:3000
-```
-
-### Ambiente de Produção
-```
-┌─────────────────────────────────────────┐
-│           VPS Ubuntu (Hetzner/DO)        │
-│  ┌─────────────────────────────────┐    │
-│  │         Docker Compose           │    │
-│  │  ┌─────┐ ┌─────┐ ┌─────┐ ┌───┐ │    │
-│  │  │ App │ │ App │ │ API │ │WA │ │    │
-│  │  │(FE) │ │(BE) │ │(PG) │ │(RD│ │    │
-│  │  └─────┘ └─────┘ └─────┘ └───┘ │    │
-│  └─────────────────────────────────┘    │
-│              Nginx (reverse proxy)       │
-└─────────────────────────────────────────┘
-```
+Os templates definem campos, seções e cláusulas do contrato.
 
 ---
 
-## 📈 Escalabilidade
+## Observações Operacionais
 
-### Fase Atual (MVP)
-- 1-2 usuários
-- ~100 contratos/mês
-- Single instance
-
-### Futuro (Scale)
-- Worker separado para filas (RQ/Celery)
-- S3 para storage de PDFs
-- CDN para assets
-- Read replicas PostgreSQL
+- Autenticação por JWT
+- PDF oficial via impressão no navegador
+- VIVA chat com menu lateral de prompts
+- Áudio no chat VIVA marcado como não operacional
 
 ---
 
-*Documento atualizado em: 2026-02-03*
+*Documento atualizado em: 2026-02-05*

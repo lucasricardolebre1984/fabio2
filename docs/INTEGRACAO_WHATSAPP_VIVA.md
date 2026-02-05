@@ -1,126 +1,104 @@
-# 🤖 INTEGRAÇÃO WHATSAPP + IA VIVA
+﻿# 🤖 Integração WhatsApp + IA VIVA
 
-> **Data:** 2026-02-04  
-> **Versão:** 1.0.0  
-> **Status:** ✅ IMPLEMENTADO E TESTADO
-
----
-
-## 🎯 VISÃO GERAL
-
-Integração completa entre:
-- **WhatsApp** (via Evolution API)
-- **Frontend** (Next.js)
-- **IA VIVA** (GLM-4 Z.AI)
-
-A VIVA é a assistente virtual que atende automaticamente os clientes no WhatsApp, com personalidade profissional da FC Soluções Financeiras e RezetaBrasil.
+> **Data:** 2026-02-05  
+> **Versão:** 1.1.0  
+> **Status:** ✅ Implementado e testado
 
 ---
 
-## 🏗️ ARQUITETURA
+## Visão Geral
+
+Integração entre:
+- WhatsApp (Evolution API)
+- Backend (FastAPI)
+- Frontend (Next.js)
+- IA VIVA (Z.AI / OpenRouter / modo local)
+
+A VIVA atende automaticamente clientes via WhatsApp e também opera como chat interno no frontend (`/viva`).
+
+---
+
+## Arquitetura
 
 ```
-┌─────────────────┐     HTTP      ┌──────────────────┐
-│  Evolution API  │ ─────────────▶│   Webhook        │
-│  (localhost:8080)│               │  /api/v1/webhook │
-└─────────────────┘               └────────┬─────────┘
-                                           │
-                              ┌────────────▼────────────┐
-                              │  EvolutionWebhookService │
-                              └────────────┬────────────┘
-                                           │
-                              ┌────────────▼────────────┐
-                              │    VivaIAService        │
-                              │    (GLM-4)              │
-                              └────────────┬────────────┘
-                                           │
-                              ┌────────────▼────────────┐
-                              │   Salva no PostgreSQL   │
-                              └────────────┬────────────┘
-                                           │
-                              ┌────────────▼────────────┐
-                              │   Frontend React        │
-                              │   /whatsapp/conversas   │
-                              └─────────────────────────┘
+WhatsApp → Evolution API → Webhook (/api/v1/webhook/evolution)
+                        ↓
+             EvolutionWebhookService
+                        ↓
+                  VivaIAService
+                        ↓
+                 PostgreSQL (logs)
+                        ↓
+             Frontend /whatsapp/conversas
+```
+
+Chat interno (web)
+```
+Frontend /viva → API /api/v1/viva/* → VIVA (Z.AI/OpenRouter/local)
 ```
 
 ---
 
-## 📊 BANCO DE DADOS
+## Endpoints
 
-### Tabelas Criadas
+Webhook (Evolution)
+- POST `/api/v1/webhook/evolution`
+- GET `/api/v1/webhook/evolution`
 
-#### `whatsapp_conversas`
-```sql
-- id (UUID PK)
-- numero_telefone (VARCHAR 20)
-- nome_contato (VARCHAR 200)
-- instance_name (VARCHAR 100)
-- status (ativa|arquivada|aguardando)
-- contexto_ia (JSONB)
-- ultima_mensagem_em (TIMESTAMP)
-- created_at, updated_at
-```
+Chat WhatsApp (Frontend)
+- GET `/api/v1/whatsapp-chat/conversas`
+- GET `/api/v1/whatsapp-chat/conversas/{id}`
+- GET `/api/v1/whatsapp-chat/conversas/{id}/mensagens`
+- POST `/api/v1/whatsapp-chat/conversas/{id}/arquivar`
+- GET `/api/v1/whatsapp-chat/status`
 
-#### `whatsapp_mensagens`
-```sql
-- id (UUID PK)
-- conversa_id (UUID FK)
-- tipo_origem (usuario|ia|sistema)
-- conteudo (TEXT)
-- message_id (VARCHAR 100)
-- tipo_midia, url_midia
-- lida, enviada
-- created_at
-```
+Chat VIVA (Interno)
+- POST `/api/v1/viva/chat`
+- POST `/api/v1/viva/vision`
+- POST `/api/v1/viva/vision/upload`
+- POST `/api/v1/viva/audio/transcribe`
+- POST `/api/v1/viva/image/generate`
+- GET `/api/v1/viva/status`
 
 ---
 
-## 🔌 ENDPOINTS
+## Modelos Z.AI (Configuração Oficial)
 
-### Webhook (Evolution → Backend)
-```
-POST /api/v1/webhook/evolution
-```
+- Chat: `GLM-4.7`
+- Visão: `GLM-4.6V`
+- Imagem: `GLM-Image`
+- Áudio: `GLM-ASR-2512`
+- Vídeo: `CogVideoX-3`
 
-### API de Chat (Frontend)
-```
-GET  /api/v1/whatsapp-chat/conversas
-GET  /api/v1/whatsapp-chat/conversas/{id}
-GET  /api/v1/whatsapp-chat/conversas/{id}/mensagens
-POST /api/v1/whatsapp-chat/conversas/{id}/arquivar
-GET  /api/v1/whatsapp-chat/status
-```
+A configuração é feita via `.env` no backend. Não expor chaves em documentação.
 
 ---
 
-## 🤖 PERSONALIDADE VIVA
+## Status Operacional (Validação Manual)
 
-### Contexto Base
-Você é VIVA, assistente virtual inteligente da FC Soluções Financeiras e RezetaBrasil.
-
-### Características
-- **Profissional, calorosa e eficiente**
-- Conhece profundamente os serviços das empresas
-- Fala de forma natural, como uma concierge experiente
-
-### Empresas
-| Empresa | Foco | Tom | Cores |
-|---------|------|-----|-------|
-| FC Soluções | PJ, empresarial | Profissional | Azul |
-| RezetaBrasil | PF, crédito pessoal | Acessível | Verde |
+- Chat: OK
+- Visão: OK (upload + prompt)
+- Imagem: OK (geração/edição)
+- Áudio: NÃO funciona (botão)
 
 ---
 
-## 🚀 COMO FUNCIONA
+## Persistência
 
-1. Cliente envia mensagem no WhatsApp
-2. Evolution API chama webhook do backend
-3. Backend salva mensagem no banco
-4. VIVA (GLM-4) processa e gera resposta
-5. Resposta é salva e exibida no frontend
-6. (Opcional) Enviar resposta de volta ao WhatsApp
+Tabelas principais
+- `whatsapp_conversas`
+- `whatsapp_mensagens`
+
+As conversas ficam registradas no banco e exibidas no painel `/whatsapp/conversas`.
 
 ---
 
-*Documentação completa disponível em docs/MUDANCAS_WHATSAPP_VIVA.md*
+## Observações
+
+- O chat interno usa OpenRouter quando configurado, senão modo local.
+- O WhatsApp usa `VivaIAService` para gerar respostas automáticas.
+- O envio real de resposta ao WhatsApp deve ser ativado conforme evolução do fluxo.
+
+---
+
+*Documento atualizado em: 2026-02-05*

@@ -218,3 +218,36 @@ NOVO:
 *Documentado em: 2026-02-03*  
 *Autor: Lucas Lebre (Automania-AI)*  
 *Aprovado por: Fábio (FC Soluções Financeiras)*
+
+---
+
+## DECISÃO-004: Modelos Z.AI e Fallback para VIVA
+
+### Contexto
+O sistema passou a operar com IA VIVA no chat interno e no fluxo WhatsApp. Era necessário definir modelos oficiais e estabelecer fallback quando a API principal não estiver disponível.
+
+### Opções consideradas
+A. Z.AI como principal (GLM-4.7 e modelos multimodais)
+B. OpenRouter como principal (modelos gratuitos)
+C. Modo local com templates (sem API)
+
+### Decisão
+- **Principal:** Z.AI com os modelos oficiais
+- **Fallback:** OpenRouter quando disponível
+- **Fallback final:** modo local com templates
+
+### Modelos Oficiais
+- Chat: `GLM-4.7`
+- Visão: `GLM-4.6V`
+- Imagem: `GLM-Image`
+- Áudio: `GLM-ASR-2512`
+- Vídeo: `CogVideoX-3`
+
+### Motivo
+- Z.AI cobre chat e multimodal com consistência
+- OpenRouter garante operação gratuita quando necessário
+- Modo local evita indisponibilidade total
+
+---
+
+*Documentado em: 2026-02-05*

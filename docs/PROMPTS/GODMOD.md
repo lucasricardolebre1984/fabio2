@@ -200,7 +200,7 @@ graph TD
       - docs/API.md
       - docs/SESSION.md
       - RUNBOOK.md
-      - BUGS_REPORT.md
+- docs/BUGSREPORT.md
 
 ✅ 6. PROVAR LEITURA:
       - Citar 7 fatos específicos extraídos dos docs
