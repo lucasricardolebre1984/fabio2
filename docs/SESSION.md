@@ -41,6 +41,11 @@ VIVA (modelos)
 - Chat interno usa OpenRouter quando configurado, senão modo local
 - WhatsApp usa webhook para alimentar conversas no banco
 
+## Ajustes desta sessão
+
+- Persona simples da VIVA adicionada ao prompt principal (contexto de servidor, empresas FC/Rezeta e capacidades de imagem/áudio/vídeo)
+- Prompts secundários continuam em `frontend/src/app/viva/PROMPTS` para modos específicos
+
 ---
 
 *Atualizado em: 2026-02-05*

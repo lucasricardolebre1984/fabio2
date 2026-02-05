@@ -2,14 +2,13 @@
 VIVA - Assistente Virtual Inteligente
 Integração com GLM-4 para atender clientes no WhatsApp
 """
-import httpx
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.models.whatsapp_conversa import WhatsappConversa, WhatsappMensagem, TipoOrigem
-from app.config import settings
+from app.services.zai_service import zai_service
 
 
 class VivaIAService:
@@ -19,10 +18,6 @@ class VivaIAService:
     """
     
     def __init__(self):
-        self.api_key = getattr(settings, 'ZAI_API_KEY', None)
-        self.model = "glm-4"  # Modelo de chat
-        self.base_url = "https://open.bigmodel.cn/api/paas/v4"
-        
         # Contexto base da personalidade VIVA
         self.system_prompt = """Você é VIVA, a assistente virtual inteligente da FC Soluções Financeiras e RezetaBrasil.
 
@@ -131,37 +126,12 @@ Você está em uma conversa real pelo WhatsApp. Responda de forma natural e úti
     
     async def _chamar_glm4(self, messages: List[Dict[str, str]]) -> str:
         """Chama API Z.AI / GLM-4 para gerar resposta"""
-        
-        if not self.api_key:
-            return "Desculpe, estou com dificuldades técnicas no momento. Por favor, tente novamente em alguns minutos ou fale com um atendente."
-        
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": self.model,
-                        "messages": messages,
-                        "temperature": 0.7,
-                        "max_tokens": 800
-                    }
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    return data["choices"][0]["message"]["content"]
-                else:
-                    import logging
-                    logging.error(f"Erro GLM-4: {response.status_code}")
-                    return "Desculpe, não consegui processar sua mensagem agora. Pode repetir, por favor?"
-                    
+            resposta = await zai_service.chat(messages, temperature=0.7, max_tokens=800)
+            return resposta
         except Exception as e:
             import logging
-            logging.error(f"Erro ao chamar GLM-4: {repr(e)}")
+            logging.error(f"Erro ao chamar Z.AI: {repr(e)}")
             return "Ops! Tive um probleminha técnico. Tente novamente ou digite 'atendente' para falar com uma pessoa."
 
 

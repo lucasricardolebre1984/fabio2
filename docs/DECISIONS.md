@@ -251,3 +251,25 @@ C. Modo local com templates (sem API)
 ---
 
 *Documentado em: 2026-02-05*
+
+---
+
+## DECISÃO-005: Persona simples da VIVA no prompt principal
+
+### Contexto
+O chat interno precisava reconhecer o contexto do servidor e as capacidades multimodais, sem depender de prompts longos ou específicos.
+
+### Decisão
+Adicionar uma persona simples no prompt principal da VIVA informando:
+- Contexto do servidor (SaaS interno)
+- Empresas (FC Soluções e RezetaBrasil)
+- Capacidades (chat, imagens, visão, áudio, vídeo)
+
+### Motivo
+- Reduz alucinação sobre limitações
+- Melhora a compreensão do ambiente
+- Facilita uso com prompts secundários
+
+---
+
+*Documentado em: 2026-02-05*

@@ -85,13 +85,15 @@ class Settings(BaseSettings):
     AWS_S3_ENDPOINT: Optional[str] = None
     
     # ==================================================================
-    # Z.AI API (GLM Models) - Chat, Vision, Audio, Image
+    # Z.AI API (GLM Models) - Chat, Vision, Audio, Image, Video
     # ==================================================================
     ZAI_API_KEY: Optional[str] = None
-    ZAI_MODEL_CHAT: str = "glm-4"
-    ZAI_MODEL_VISION: str = "glm-4v"
-    ZAI_MODEL_AUDIO: str = "glm-asr"
+    ZAI_BASE_URL: str = "https://api.z.ai/api/paas/v4"
+    ZAI_MODEL_CHAT: str = "glm-4.7"
+    ZAI_MODEL_VISION: str = "glm-4.6v"
+    ZAI_MODEL_AUDIO: str = "glm-asr-2512"
     ZAI_MODEL_IMAGE: str = "glm-image"
+    ZAI_MODEL_VIDEO: str = "cogvideox-3"
     
     # ==================================================================
     # DeepSeek API (Backup)

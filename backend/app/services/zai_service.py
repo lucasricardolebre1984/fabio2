@@ -1,176 +1,226 @@
+﻿"""
+Z.AI Service - API Oficial
+Suporta: Chat, Visão, Áudio, Imagem e Vídeo
 """
-Z.AI Service - API Unificada
-Suporta: Chat, Visão, Áudio, Imagem
-Usa DeepSeek como fallback
-"""
-import httpx
-import base64
 from typing import List, Dict, Any, Optional
+import httpx
+
 from app.config import settings
 
 
 class ZAIService:
-    """
-    Serviço unificado - tenta Z.AI, fallback para DeepSeek
-    """
-    
-    def __init__(self):
-        # Tentar Z.AI primeiro
-        self.zai_key = getattr(settings, 'ZAI_API_KEY', None)
-        self.zai_base = "https://open.bigmodel.cn/api/paas/v4"
-        
-        # Fallback DeepSeek
-        self.api_key = getattr(settings, 'DEEPSEEK_API_KEY', self.zai_key)
-        self.base_url = "https://api.deepseek.com"
-        
-        # Modelos
-        self.model_chat = "deepseek-chat"
-        self.model_vision = "deepseek-chat"
-        self.model_audio = "deepseek-chat"
-        self.model_image = "deepseek-chat"
-        
-        # Prompt do sistema para VIVA
-        self.system_prompt = """Voce e VIVA, a assistente virtual inteligente da FC Solucoes Financeiras e RezetaBrasil.
+    """Serviço unificado para Z.AI (API oficial)."""
 
-SUA PERSONALIDADE:
-- Profissional, calorosa e eficiente
-- Voce conhece profundamente os servicos das empresas
-- Fala de forma natural, como uma concierge experiente
-- Sempre oferece ajuda antes de direcionar
+    def __init__(self) -> None:
+        self.api_key = settings.ZAI_API_KEY
+        self.base_url = settings.ZAI_BASE_URL.rstrip("/")
+        self.model_chat = settings.ZAI_MODEL_CHAT
+        self.model_vision = settings.ZAI_MODEL_VISION
+        self.model_audio = settings.ZAI_MODEL_AUDIO
+        self.model_image = settings.ZAI_MODEL_IMAGE
+        self.model_video = settings.ZAI_MODEL_VIDEO
 
-SOBRE AS EMPRESAS:
-**FC Solucoes Financeiras**
-- Consultoria empresarial e servicos financeiros
-- Credito empresarial, antecipacao de recebiveis
-- Clientes: Pessoa juridica, empresas
-- Tom: Profissional, corporativo, azul
-
-**RezetaBrasil**
-- Solucoes de credito pessoal
-- Limpa nome, renegociacao de dividas
-- Clientes: Pessoa fisica
-- Tom: Acessivel, promocional, verde
-
-SERVICOS QUE VOCE PODE AJUDAR:
-1. Informacoes sobre produtos/servicos
-2. Agendar reunioes/consultas
-3. Enviar contratos/documentos
-4. Analisar documentos e imagens
-5. Responder duvidas frequentes
-6. Direcionar para atendimento humano quando necessario
-
-REGRAS IMPORTANTES:
-- Nunca invente informacoes sobre valores ou prazos especificos
-- Quando nao souber, ofereca agendar com um consultor
-- Seja prestativa mas nao invada a privacidade
-- Mantenha respostas curtas e objetivas
-- Use emojis ocasionalmente para humanizar
-
-Voce esta conversando com um funcionario da FC Solucoes Financeiras. Responda de forma natural e util."""
-
-    # ============================================
-    # CHAT (Texto)
-    # ============================================
-    async def chat(self, messages: List[Dict[str, str]], temperature: float = 0.7) -> str:
-        """Chat com DeepSeek"""
-        if not self.api_key:
-            return "Erro: API key nao configurada. Adicione DEEPSEEK_API_KEY no .env"
-        
-        try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": self.model_chat,
-                        "messages": messages,
-                        "temperature": temperature,
-                        "max_tokens": 800
-                    }
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    return data["choices"][0]["message"]["content"]
-                elif response.status_code == 402:
-                    return "⚠️ API sem créditos. Para ativar:\n\n1. Acesse https://platform.deepseek.com/\n2. Verifique sua conta\n3. Obtenha 10 yuan gratuitos\n\nOu entre em contato com o administrador."
-                else:
-                    return f"Erro {response.status_code}: Tente novamente"
-                    
-        except Exception as e:
-            return f"Erro de conexao: {str(e)[:100]}"
-
-    def build_chat_messages(self, user_message: str, context: List[Dict] = None, system: str = None) -> List[Dict]:
-        """Monta lista de mensagens para chat"""
-        messages = []
-        
-        # System prompt
-        if system:
-            messages.append({"role": "system", "content": system})
-        else:
-            messages.append({"role": "system", "content": self.system_prompt})
-        
-        # Contexto anterior
-        if context:
-            for msg in context:
-                if msg.get('tipo') == 'usuario':
-                    messages.append({"role": "user", "content": msg.get('conteudo', '')})
-                elif msg.get('tipo') == 'ia':
-                    messages.append({"role": "assistant", "content": msg.get('conteudo', '')})
-        
-        # Mensagem atual
-        messages.append({"role": "user", "content": user_message})
-        
-        return messages
-
-    # ============================================
-    # VISÃO (Análise de Imagens)
-    # ============================================
-    async def vision(self, image_url: str, prompt: str) -> str:
-        """Analisa imagem - usa descrição como fallback"""
-        # DeepSeek nao suporta visao ainda, retorna mensagem explicativa
-        return f"Analise de imagem recebida. Prompt: {prompt}\n\n(Nota: Analise visual sera implementada com modelo de visao)"
-
-    async def vision_base64(self, image_base64: str, prompt: str, mime_type: str = "image/jpeg") -> str:
-        """Analisa imagem em base64"""
-        return await self.vision("", prompt)
-
-    # ============================================
-    # ÁUDIO (Transcrição)
-    # ============================================
-    async def audio_transcribe(self, audio_base64: str, mime_type: str = "audio/wav") -> str:
-        """Transcreve áudio - placeholder"""
-        return "Transcricao de audio sera implementada em breve."
-
-    # ============================================
-    # IMAGEM (Geração)
-    # ============================================
-    async def generate_image(self, prompt: str, width: int = 1024, height: int = 1024) -> Dict[str, Any]:
-        """Gera imagem - placeholder"""
+    def _headers(self) -> Dict[str, str]:
         return {
-            "success": False,
-            "error": "Geracao de imagem sera implementada em breve.",
-            "prompt": prompt
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
         }
 
-    # ============================================
-    # STATUS
-    # ============================================
+    async def chat(
+        self,
+        messages: List[Dict[str, Any]],
+        temperature: float = 0.7,
+        max_tokens: int = 800,
+        stream: bool = False,
+    ) -> str:
+        if not self.api_key:
+            return "Erro: ZAI_API_KEY não configurada"
+
+        payload = {
+            "model": self.model_chat,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": stream,
+        }
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{self.base_url}/chat/completions",
+                headers=self._headers(),
+                json=payload,
+            )
+
+        if response.status_code == 200:
+            data = response.json()
+            return data["choices"][0]["message"]["content"]
+
+        if response.status_code == 401:
+            return "Erro: API key inválida ou não autorizada"
+
+        return f"Erro {response.status_code}: {response.text[:200]}"
+
+    async def vision_base64(
+        self,
+        image_base64: str,
+        prompt: str,
+        mime_type: str = "image/jpeg",
+        max_tokens: int = 800,
+    ) -> str:
+        if not self.api_key:
+            return "Erro: ZAI_API_KEY não configurada"
+
+        image_url = f"data:{mime_type};base64,{image_base64}"
+
+        payload = {
+            "model": self.model_vision,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": image_url}},
+                    ],
+                }
+            ],
+            "max_tokens": max_tokens,
+        }
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{self.base_url}/chat/completions",
+                headers=self._headers(),
+                json=payload,
+            )
+
+        if response.status_code == 200:
+            data = response.json()
+            return data["choices"][0]["message"]["content"]
+
+        return f"Erro {response.status_code}: {response.text[:200]}"
+
+    async def audio_transcribe_bytes(
+        self,
+        audio_bytes: bytes,
+        filename: str,
+        content_type: str,
+        stream: bool = False,
+        prompt: Optional[str] = None,
+    ) -> str:
+        if not self.api_key:
+            return "Erro: ZAI_API_KEY não configurada"
+
+        files = {"file": (filename, audio_bytes, content_type)}
+        data: Dict[str, Any] = {
+            "model": self.model_audio,
+            "stream": "true" if stream else "false",
+        }
+        if prompt:
+            data["prompt"] = prompt
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{self.base_url}/audio/transcriptions",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                data=data,
+                files=files,
+            )
+
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("text", "")
+
+        return f"Erro {response.status_code}: {response.text[:200]}"
+
+    async def generate_image(
+        self,
+        prompt: str,
+        size: str = "1024x1024",
+        quality: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        if not self.api_key:
+            return {"success": False, "error": "ZAI_API_KEY não configurada"}
+
+        payload: Dict[str, Any] = {
+            "model": self.model_image,
+            "prompt": prompt,
+            "size": size,
+        }
+        if quality:
+            payload["quality"] = quality
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{self.base_url}/images/generations",
+                headers=self._headers(),
+                json=payload,
+            )
+
+        if response.status_code == 200:
+            return {"success": True, "data": response.json()}
+
+        return {"success": False, "error": response.text}
+
+    async def generate_video(
+        self,
+        prompt: str,
+        size: str = "1920x1080",
+        fps: int = 30,
+        duration: int = 5,
+        quality: str = "quality",
+        with_audio: bool = True,
+    ) -> Dict[str, Any]:
+        if not self.api_key:
+            return {"success": False, "error": "ZAI_API_KEY não configurada"}
+
+        payload = {
+            "model": self.model_video,
+            "prompt": prompt,
+            "size": size,
+            "fps": fps,
+            "duration": duration,
+            "quality": quality,
+            "with_audio": with_audio,
+        }
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{self.base_url}/videos/generations",
+                headers=self._headers(),
+                json=payload,
+            )
+
+        if response.status_code == 200:
+            return {"success": True, "data": response.json()}
+
+        return {"success": False, "error": response.text}
+
+    async def get_async_result(self, task_id: str) -> Dict[str, Any]:
+        if not self.api_key:
+            return {"success": False, "error": "ZAI_API_KEY não configurada"}
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.get(
+                f"{self.base_url}/async-result/{task_id}",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+            )
+
+        if response.status_code == 200:
+            return {"success": True, "data": response.json()}
+
+        return {"success": False, "error": response.text}
+
     def get_status(self) -> Dict[str, Any]:
-        """Retorna status do serviço"""
         return {
             "api_configurada": bool(self.api_key),
             "modelos": {
                 "chat": self.model_chat,
                 "vision": self.model_vision,
                 "audio": self.model_audio,
-                "image": self.model_image
-            }
+                "image": self.model_image,
+                "video": self.model_video,
+            },
         }
 
 
-# Instância global
 zai_service = ZAIService()

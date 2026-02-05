@@ -11,6 +11,7 @@ from app.api.deps import get_current_user
 from app.models.user import User
 from app.services.viva_local_service import viva_local_service
 from app.services.openrouter_service import openrouter_service
+from app.services.zai_service import zai_service
 from app.config import settings
 
 router = APIRouter()
@@ -36,6 +37,15 @@ class ImageGenerationRequest(BaseModel):
     height: int = 1024
 
 
+class VideoGenerationRequest(BaseModel):
+    prompt: str
+    size: str = "1920x1080"
+    fps: int = 30
+    duration: int = 5
+    quality: str = "quality"
+    with_audio: bool = True
+
+
 # ============================================
 # CHAT
 # ============================================
@@ -56,16 +66,20 @@ async def chat_with_viva(
                 modo = msg.get('modo')
                 break
         
-        # Verifica se tem API configurada
-        if settings.OPENROUTER_API_KEY and settings.OPENROUTER_API_KEY != 'sk-or-v1-000000000000000000000000000000000000000000000000':
-            # Usa OpenRouter
+        # Prioriza Z.AI (oficial). Fallback para OpenRouter e modo local.
+        if settings.ZAI_API_KEY:
             messages = openrouter_service.build_messages(
-                request.mensagem, 
+                request.mensagem,
+                request.contexto
+            )
+            resposta = await zai_service.chat(messages)
+        elif settings.OPENROUTER_API_KEY and settings.OPENROUTER_API_KEY != 'sk-or-v1-000000000000000000000000000000000000000000000000':
+            messages = openrouter_service.build_messages(
+                request.mensagem,
                 request.contexto
             )
             resposta = await openrouter_service.chat(messages)
         else:
-            # Usa modo local (templates)
             messages = viva_local_service.build_messages(
                 request.mensagem,
                 request.contexto
@@ -90,8 +104,10 @@ async def analyze_image(
     Analisa imagem usando GLM-4V
     """
     try:
-        # Usa serviço local para visão
-        resultado = await viva_local_service.vision(
+        if not settings.ZAI_API_KEY:
+            raise HTTPException(status_code=500, detail="ZAI_API_KEY não configurada")
+
+        resultado = await zai_service.vision_base64(
             request.image_base64,
             request.prompt
         )
@@ -115,9 +131,13 @@ async def analyze_image_upload(
         image_base64 = base64.b64encode(contents).decode('utf-8')
         mime_type = file.content_type or "image/jpeg"
         
-        resultado = await viva_local_service.vision(
+        if not settings.ZAI_API_KEY:
+            raise HTTPException(status_code=500, detail="ZAI_API_KEY não configurada")
+
+        resultado = await zai_service.vision_base64(
             image_base64,
-            prompt
+            prompt,
+            mime_type=mime_type
         )
         return {"analise": resultado}
         
@@ -138,12 +158,15 @@ async def transcribe_audio(
     """
     try:
         contents = await file.read()
-        audio_base64 = base64.b64encode(contents).decode('utf-8')
         mime_type = file.content_type or "audio/wav"
         
-        resultado = await zai_service.audio_transcribe(
-            audio_base64,
-            mime_type
+        if not settings.ZAI_API_KEY:
+            raise HTTPException(status_code=500, detail="ZAI_API_KEY não configurada")
+
+        resultado = await zai_service.audio_transcribe_bytes(
+            audio_bytes=contents,
+            filename=file.filename or "audio.wav",
+            content_type=mime_type
         )
         return {"transcricao": resultado}
         
@@ -163,13 +186,64 @@ async def generate_image(
     Gera imagem usando GLM-Image
     """
     try:
+        if not settings.ZAI_API_KEY:
+            raise HTTPException(status_code=500, detail="ZAI_API_KEY não configurada")
+
+        size = f"{request.width}x{request.height}"
         resultado = await zai_service.generate_image(
-            request.prompt,
-            request.width,
-            request.height
+            prompt=request.prompt,
+            size=size
         )
         return resultado
         
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
+
+
+# ============================================
+# VÍDEO - Geração
+# ============================================
+@router.post("/video/generate")
+async def generate_video(
+    request: VideoGenerationRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Gera vídeo usando CogVideoX-3 (Z.AI)
+    """
+    try:
+        if not settings.ZAI_API_KEY:
+            raise HTTPException(status_code=500, detail="ZAI_API_KEY não configurada")
+
+        resultado = await zai_service.generate_video(
+            prompt=request.prompt,
+            size=request.size,
+            fps=request.fps,
+            duration=request.duration,
+            quality=request.quality,
+            with_audio=request.with_audio,
+        )
+        return resultado
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
+
+
+@router.get("/video/result/{task_id}")
+async def get_video_result(
+    task_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Consulta resultado assíncrono de geração de vídeo
+    """
+    try:
+        if not settings.ZAI_API_KEY:
+            raise HTTPException(status_code=500, detail="ZAI_API_KEY não configurada")
+
+        resultado = await zai_service.get_async_result(task_id)
+        return resultado
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
 
@@ -185,6 +259,8 @@ async def viva_status(
     Verifica status da VIVA
     """
     # Verifica se tem API externa configurada
+    if settings.ZAI_API_KEY:
+        return zai_service.get_status()
     if settings.OPENROUTER_API_KEY and settings.OPENROUTER_API_KEY != 'sk-or-v1-000000000000000000000000000000000000000000000000':
         return openrouter_service.get_status()
     else:
