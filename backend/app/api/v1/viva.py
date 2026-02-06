@@ -82,10 +82,10 @@ def _mode_hint(modo: Optional[str]) -> Optional[str]:
         return None
 
     hints = {
-        "LOGO": "Crie uma imagem focada em logo e identidade visual.",
-        "FC": "Crie uma imagem institucional para FC Soluções Financeiras.",
-        "REZETA": "Crie uma imagem promocional para RezetaBrasil.",
-        "CRIADORLANDPAGE": "Crie uma imagem para landing page.",
+        "LOGO": "Fundo clean, moderno e neutro para identidade visual.",
+        "FC": "Fundo corporativo moderno. Paleta dominante azul institucional (#071c4a) e destaque #00a3ff.",
+        "REZETA": "Fundo promocional moderno. Paleta azul marinho (#1E3A5F) e verde esmeralda (#3DAA7F).",
+        "CRIADORLANDPAGE": "Fundo clean e moderno para landing page.",
     }
     return hints.get(modo)
 
@@ -130,24 +130,50 @@ def _is_stackoverflow_error(erro: Any) -> bool:
 
 
 def _build_image_prompt(prompt_extra_image: Optional[str], hint: Optional[str], mensagem: str) -> str:
+    subject = _extract_subject(mensagem)
     parts: List[str] = []
     if prompt_extra_image:
         parts.append(prompt_extra_image)
     if hint:
         parts.append(hint)
-    parts.append(f"Solicitação: {mensagem.strip()}")
+    parts.append(f"Contexto: {subject}")
     return "\n".join(parts)
 
 
 def _build_fallback_image_prompt(hint: Optional[str], mensagem: str) -> str:
+    subject = _extract_subject(mensagem)
     parts: List[str] = []
     if hint:
         parts.append(hint)
-    parts.append(f"Solicitação: {mensagem.strip()}")
+    parts.append(f"Contexto: {subject}")
     return "\n".join(parts)
 
 
 BACKGROUND_ONLY_SUFFIX = "Apenas fundo fotografico. Nao inclua palavras, letras ou logotipos."
+
+
+def _extract_subject(texto: str) -> str:
+    texto_limpo = " ".join(texto.replace("\r", " ").split())
+    lower = texto_limpo.lower()
+    markers = [
+        "segue o texto a ser vinculado",
+        "segue o texto",
+        "texto a ser vinculado",
+        "texto:"
+    ]
+    idx = None
+    for marker in markers:
+        pos = lower.find(marker)
+        if pos >= 0:
+            idx = pos
+            break
+    if idx is not None:
+        texto_limpo = texto_limpo[:idx].strip()
+
+    if not texto_limpo:
+        return "Imagem promocional institucional"
+
+    return _sanitize_prompt(texto_limpo, 300)
 
 
 # ============================================

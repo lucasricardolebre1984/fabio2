@@ -80,13 +80,39 @@ const isImageRequest = (text: string) => {
   return IMAGE_TERMS.some(term => lower.includes(term))
 }
 
+const extractOverlaySource = (text: string) => {
+  const lower = text.toLowerCase()
+  const markers = [
+    'segue o texto a ser vinculado',
+    'segue o texto',
+    'texto a ser vinculado',
+    'texto:'
+  ]
+  const found = markers.find(marker => lower.includes(marker))
+  if (!found) return text
+
+  const parts = text.split(new RegExp(found, 'i'))
+  if (parts.length < 2) return text
+  return parts.slice(1).join(' ').replace(':', '').trim()
+}
+
 const parseOverlayText = (text: string) => {
-  const lines = text
+  const sourceText = extractOverlaySource(text)
+  const lines = sourceText
     .split(/\r?\n/)
     .map(line => line.trim())
     .filter(Boolean)
+    .filter(line => {
+      const lower = line.toLowerCase()
+      return !(
+        lower.startsWith('gerar uma imagem') ||
+        lower.startsWith('segue o texto') ||
+        lower.startsWith('texto a ser vinculado') ||
+        lower.startsWith('segue o texto a ser vinculado')
+      )
+    })
 
-  const headline = lines[0] || 'Mensagem principal'
+  const headline = lines.find(line => !/^(✅|❌|⚠️|•|-)/.test(line) && !line.startsWith('"') && !line.startsWith('“')) || lines[0] || 'Mensagem principal'
   const quote = lines.find(line => line.startsWith('"') || line.startsWith('“'))
   const bulletLines = lines.filter(line => /^(✅|❌|⚠️|•|-)/.test(line))
   const remaining = lines.filter(line => line !== headline && line !== quote && !bulletLines.includes(line))
@@ -156,6 +182,7 @@ export default function VivaChatPage() {
       (modoAtual === 'REZETA' || modoAtual === 'FC') &&
       isImageRequest(textoEntrada)
     )
+    const overlayText = deveGerarOverlay ? extractOverlaySource(textoEntrada) : null
 
     const userMsg: Mensagem = {
       id: Date.now().toString(),
@@ -224,7 +251,7 @@ export default function VivaChatPage() {
               conteudo: resposta || 'Processado com sucesso!',
               timestamp: new Date(),
               anexos: anexosIA,
-              overlay: deveGerarOverlay ? { brand: modoAtual as 'REZETA' | 'FC', text: textoEntrada } : undefined
+              overlay: overlayText ? { brand: modoAtual as 'REZETA' | 'FC', text: overlayText } : undefined
             }
             setMensagens(prev => [...prev, iaMsg])
             return
@@ -237,7 +264,7 @@ export default function VivaChatPage() {
         tipo: 'ia',
         conteudo: resposta || 'Processado com sucesso!',
         timestamp: new Date(),
-        overlay: deveGerarOverlay ? { brand: modoAtual as 'REZETA' | 'FC', text: textoEntrada } : undefined
+        overlay: overlayText ? { brand: modoAtual as 'REZETA' | 'FC', text: overlayText } : undefined
       }
 
       setMensagens(prev => [...prev, iaMsg])
