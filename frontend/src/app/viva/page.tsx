@@ -276,7 +276,15 @@ export default function VivaChatPage() {
               meta: item.meta
             }))
 
-          const overlayMeta = midia.find((item: any) => item?.meta?.overlay)?.meta?.overlay
+          // Log para debug
+          console.log('Midia response:', midia)
+          const primeiroItem = midia[0]
+          console.log('Primeiro item:', primeiroItem)
+          console.log('Primeiro item meta:', primeiroItem?.meta)
+          
+          const overlayMeta = primeiroItem?.meta?.overlay
+          console.log('Overlay meta:', overlayMeta)
+          
           const overlayFromBackend = overlayMeta && (overlayMeta.brand === 'FC' || overlayMeta.brand === 'REZETA')
             ? {
                 brand: overlayMeta.brand as 'FC' | 'REZETA',
@@ -289,6 +297,8 @@ export default function VivaChatPage() {
                 }
               }
             : undefined
+          
+          console.log('Overlay from backend:', overlayFromBackend)
 
           const overlayFallback = overlayText && (modoAtual === 'REZETA' || modoAtual === 'FC')
             ? { brand: modoAtual as 'REZETA' | 'FC', text: overlayText }
@@ -884,11 +894,14 @@ export default function VivaChatPage() {
               const parsed = parseOverlayText(arteAtiva.overlay)
 
               return (
-                <div className="relative w-full aspect-square overflow-hidden rounded-lg border">
+                <div className="relative w-full aspect-square overflow-hidden rounded-lg border bg-gray-100">
                   <img
                     src={arteAtiva.url}
                     alt={arteAtiva.nome || 'Arte gerada'}
                     className="absolute inset-0 h-full w-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
                   />
                   <div className="absolute inset-x-0 top-0 h-[26%] bg-white/85 px-6 py-4">
                     <p className="text-xs uppercase tracking-widest" style={{ color: theme.accent }}>
