@@ -41,12 +41,15 @@ VIVA (modelos)
 - Chat interno usa OpenRouter quando configurado, senão modo local
 - WhatsApp usa webhook para alimentar conversas no banco
 - Roteiro de deploy Ubuntu 100% Docker documentado em `docs/DEPLOY_UBUNTU_DOCKER.md`
+- Erro ativo: `StackOverflowError` na geração de imagens com prompt extra longo (REZETA/FC)
 
 ## Ajustes desta sessão
 
 - Persona simples da VIVA adicionada ao prompt principal (contexto de servidor, empresas FC/Rezeta e capacidades de imagem/áudio/vídeo)
 - Prompts secundários continuam em `frontend/src/app/viva/PROMPTS` para modos específicos
 - Roteiro de deploy 100% Docker criado com etapas de produção
+- Roteamento de intenção de imagem no backend (`/viva/chat`) com retorno de mídia estruturada
+- Prompts laterais enviados como `prompt_extra` para o backend
 
 ---
 

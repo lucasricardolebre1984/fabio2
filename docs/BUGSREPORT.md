@@ -11,6 +11,7 @@
 |---|---|---|---|---|
 | BUG-010 | Baixa | PDF | WeasyPrint requer GTK+ no Windows | Aguardando instalação GTK+ |
 | BUG-012 | Média | VIVA | Botão de áudio no chat não funciona | Ativo |
+| BUG-013 | Média | VIVA | Erro `StackOverflowError` ao gerar imagem com prompt extra longo (REZETA/FC) | Ativo |
 
 ---
 

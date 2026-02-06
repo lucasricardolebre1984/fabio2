@@ -32,7 +32,7 @@ Próxima etapa: ativar WhatsApp funcional no backend.
 
 - Chat: OK
 - Visão: OK (upload + prompt)
-- Imagem: OK
+- Imagem: Intermitente (erro `StackOverflowError` com prompt extra longo)
 - Áudio: NÃO funciona (botão)
 
 ---
