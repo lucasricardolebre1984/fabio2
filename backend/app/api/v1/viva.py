@@ -6,6 +6,8 @@ from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 import base64
+import json
+import re
 
 from app.api.deps import get_current_user
 from app.models.user import User
@@ -26,6 +28,7 @@ class ChatRequest(BaseModel):
 class MediaItem(BaseModel):
     tipo: str
     url: str
+    meta: Optional[Dict[str, Any]] = None
 
 
 class ChatResponse(BaseModel):
@@ -68,6 +71,43 @@ def _is_image_request(texto: str) -> bool:
     ]
     texto_lower = texto.lower()
     return any(t in texto_lower for t in termos)
+
+
+def _is_greeting(texto: str) -> bool:
+    lower = texto.lower().strip()
+    termos = ["oi", "olá", "ola", "bom dia", "boa tarde", "boa noite"]
+    return any(lower.startswith(t) for t in termos)
+
+
+def _preferred_greeting(texto: str) -> str:
+    lower = texto.lower()
+    if "boa noite" in lower:
+        return "Boa noite Fabio!"
+    if "boa tarde" in lower:
+        return "Boa tarde Fabio!"
+    if "bom dia" in lower:
+        return "Bom dia Fabio!"
+    return "Olá Fabio!"
+
+
+def _ensure_fabio_greeting(user_text: str, resposta: str) -> str:
+    if not _is_greeting(user_text):
+        return resposta
+
+    if "fabio" in resposta.lower():
+        return resposta
+
+    greeting = _preferred_greeting(user_text)
+    atualizado = re.sub(
+        r"^(boa\s+noite|boa\s+tarde|bom\s+dia|ol[aá]|oi)[!,.\s-]*",
+        f"{greeting} ",
+        resposta,
+        flags=re.IGNORECASE,
+    )
+
+    if atualizado == resposta:
+        return f"{greeting} {resposta}"
+    return atualizado
 
 
 def _sanitize_prompt(texto: str, max_len: int) -> str:
@@ -149,6 +189,153 @@ def _build_fallback_image_prompt(hint: Optional[str], mensagem: str) -> str:
     return "\n".join(parts)
 
 
+def _extract_overlay_source(texto: str) -> str:
+    texto_limpo = texto.replace("\r", "")
+    lower = texto_limpo.lower()
+    markers = [
+        "segue o texto a ser vinculado",
+        "segue o texto",
+        "texto a ser vinculado",
+        "texto:",
+    ]
+
+    for marker in markers:
+        idx = lower.find(marker)
+        if idx >= 0:
+            payload = texto_limpo[idx + len(marker):].lstrip(" :\n")
+            if payload.strip():
+                return payload.strip()
+
+    return texto_limpo.strip()
+
+
+def _brand_guardrail(modo: str) -> str:
+    if modo == "FC":
+        return (
+            "Marca FC Soluções Financeiras. Paleta obrigatória: #071c4a, #00a3ff, #010a1c, #f9feff. "
+            "Não usar verde. Tom corporativo premium."
+        )
+    return (
+        "Marca RezetaBrasil. Paleta obrigatória: #1E3A5F, #3DAA7F, #2A8B68, #FFFFFF. "
+        "Tom humano, confiável e promocional."
+    )
+
+
+def _extract_json_block(raw: str) -> Optional[Dict[str, Any]]:
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict):
+            return parsed
+    except Exception:
+        pass
+
+    match = re.search(r"\{[\s\S]*\}", raw)
+    if not match:
+        return None
+    try:
+        parsed = json.loads(match.group(0))
+        if isinstance(parsed, dict):
+            return parsed
+    except Exception:
+        return None
+    return None
+
+
+def _fallback_copy(texto: str, modo: str) -> Dict[str, Any]:
+    lines = [ln.strip() for ln in texto.splitlines() if ln.strip()]
+    bullet_lines = [ln for ln in lines if re.match(r"^(✅|❌|⚠️|•|-)", ln)]
+    headline = next((ln for ln in lines if ln not in bullet_lines), "Destrave seu crédito com estratégia")
+    subheadline = next((ln for ln in lines[1:] if ln not in bullet_lines), "Diagnóstico claro e plano de ação objetivo")
+    quote = next((ln for ln in lines if ln.startswith('"') or ln.startswith('“')), "")
+
+    return {
+        "brand": modo,
+        "headline": _sanitize_prompt(headline, 90),
+        "subheadline": _sanitize_prompt(subheadline, 130),
+        "bullets": bullet_lines[:5] or [
+            "✅ Diagnóstico completo",
+            "✅ Plano de melhoria estruturado",
+            "✅ Acompanhamento estratégico",
+        ],
+        "quote": _sanitize_prompt(quote, 120) if quote else "",
+        "cta": "CHAMAR NO WHATSAPP" if modo == "REZETA" else "VER COMO FUNCIONA",
+        "scene": "Pessoa em ambiente profissional moderno, expressão confiante, contexto financeiro",
+    }
+
+
+async def _generate_campaign_copy(
+    mensagem: str,
+    prompt_extra_image: Optional[str],
+    modo: str,
+) -> Dict[str, Any]:
+    fonte = _sanitize_prompt(_extract_overlay_source(mensagem), 5000)
+    guardrail = _brand_guardrail(modo)
+
+    system = (
+        "Você é diretor de criação para campanhas de tráfego pago. "
+        "Responda SOMENTE JSON válido, sem markdown."
+    )
+    user = (
+        f"{guardrail}\n"
+        "Resuma o texto de campanha e devolva JSON com as chaves exatas: "
+        "headline, subheadline, bullets, quote, cta, scene.\n"
+        "Regras:\n"
+        "- headline: 6 a 10 palavras\n"
+        "- subheadline: 8 a 16 palavras\n"
+        "- bullets: array com 3 a 5 bullets curtos\n"
+        "- quote: opcional, curta\n"
+        "- cta: 2 a 5 palavras\n"
+        "- scene: descrição fotográfica realista para fundo sem texto\n"
+        "- Tudo em pt-BR\n"
+        f"Contexto adicional do modo (resumido): {_sanitize_prompt(prompt_extra_image or '', 800)}\n"
+        f"Texto de entrada:\n{fonte}"
+    )
+
+    resposta = await zai_service.chat(
+        [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        temperature=0.4,
+        max_tokens=500,
+    )
+
+    parsed = _extract_json_block(resposta)
+    if not parsed:
+        return _fallback_copy(fonte, modo)
+
+    bullets = parsed.get("bullets") if isinstance(parsed.get("bullets"), list) else []
+    bullets = [str(item).strip() for item in bullets if str(item).strip()][:5]
+
+    copy = {
+        "brand": modo,
+        "headline": _sanitize_prompt(str(parsed.get("headline") or "Destrave seu crédito com estratégia"), 90),
+        "subheadline": _sanitize_prompt(str(parsed.get("subheadline") or "Diagnóstico claro e plano de ação objetivo"), 130),
+        "bullets": bullets or _fallback_copy(fonte, modo)["bullets"],
+        "quote": _sanitize_prompt(str(parsed.get("quote") or ""), 120),
+        "cta": _sanitize_prompt(str(parsed.get("cta") or ("CHAMAR NO WHATSAPP" if modo == "REZETA" else "VER COMO FUNCIONA")), 40),
+        "scene": _sanitize_prompt(str(parsed.get("scene") or "Pessoa em ambiente profissional moderno, expressão confiante, contexto financeiro"), 240),
+    }
+    return copy
+
+
+def _build_branded_background_prompt(modo: str, campaign_copy: Dict[str, Any]) -> str:
+    scene = campaign_copy.get("scene", "")
+    if modo == "FC":
+        return (
+            "Fotografia publicitária corporativa premium, contexto financeiro no Brasil, "
+            "escritório moderno, iluminação natural, composição clean, tons azul institucional "
+            "(#071c4a, #00a3ff, #010a1c), sem verde, sem texto, sem letras, sem logotipo. "
+            f"Cena: {scene}"
+        )
+    return (
+        "Fotografia publicitária realista e humanizada para campanha de crédito no Brasil, "
+        "ambiente moderno e acolhedor, tom de confiança e esperança, cores com presença de "
+        "azul marinho e verde esmeralda (#1E3A5F, #3DAA7F, #2A8B68), sem texto, sem letras, sem logotipo. "
+        f"Cena: {scene}"
+    )
+
+
 BACKGROUND_ONLY_SUFFIX = "Apenas fundo fotografico. Nao inclua palavras, letras ou logotipos."
 
 
@@ -208,8 +395,18 @@ async def chat_with_viva(
                 )
 
             hint = _mode_hint(modo)
-            prompt = _build_image_prompt(prompt_extra_image, hint, request.mensagem)
-            prompt = f"{prompt}\n{BACKGROUND_ONLY_SUFFIX}"
+            campaign_copy: Optional[Dict[str, Any]] = None
+
+            if modo in ("FC", "REZETA"):
+                campaign_copy = await _generate_campaign_copy(
+                    request.mensagem,
+                    prompt_extra_image,
+                    modo,
+                )
+                prompt = _build_branded_background_prompt(modo, campaign_copy)
+            else:
+                prompt = _build_image_prompt(prompt_extra_image, hint, request.mensagem)
+                prompt = f"{prompt}\n{BACKGROUND_ONLY_SUFFIX}"
 
             resultado = await zai_service.generate_image(
                 prompt=prompt,
@@ -227,9 +424,12 @@ async def chat_with_viva(
                     if resultado.get("success"):
                         url = _extract_image_url(resultado)
                         if url:
+                            media = MediaItem(tipo="imagem", url=url)
+                            if campaign_copy:
+                                media.meta = {"overlay": campaign_copy}
                             return ChatResponse(
                                 resposta="Imagem gerada com sucesso.",
-                                midia=[MediaItem(tipo="imagem", url=url)],
+                                midia=[media],
                             )
                         return ChatResponse(
                             resposta="A imagem foi solicitada, mas a API não retornou URL."
@@ -244,9 +444,12 @@ async def chat_with_viva(
                 )
             url = _extract_image_url(resultado)
             if url:
+                media = MediaItem(tipo="imagem", url=url)
+                if campaign_copy:
+                    media.meta = {"overlay": campaign_copy}
                 return ChatResponse(
                     resposta="Imagem gerada com sucesso.",
-                    midia=[MediaItem(tipo="imagem", url=url)],
+                    midia=[media],
                 )
 
             return ChatResponse(
@@ -276,6 +479,8 @@ async def chat_with_viva(
                 request.contexto
             )
             resposta = await viva_local_service.chat(messages, modo)
+
+        resposta = _ensure_fabio_greeting(request.mensagem, resposta)
         
         return ChatResponse(resposta=resposta)
         

@@ -11,9 +11,19 @@ interface Mensagem {
   tipo: 'usuario' | 'ia'
   conteudo: string
   timestamp: Date
-  anexos?: { tipo: 'imagem' | 'audio' | 'arquivo'; url: string; nome?: string }[]
+  anexos?: { tipo: 'imagem' | 'audio' | 'arquivo'; url: string; nome?: string; meta?: any }[]
   modo?: string
-  overlay?: { brand: 'REZETA' | 'FC'; text: string }
+  overlay?: {
+    brand: 'REZETA' | 'FC'
+    text?: string
+    copy?: {
+      headline?: string
+      subheadline?: string
+      bullets?: string[]
+      quote?: string
+      cta?: string
+    }
+  }
 }
 
 interface PromptItem {
@@ -96,8 +106,28 @@ const extractOverlaySource = (text: string) => {
   return parts.slice(1).join(' ').replace(':', '').trim()
 }
 
-const parseOverlayText = (text: string) => {
-  const sourceText = extractOverlaySource(text)
+const parseOverlayText = (overlay?: Mensagem['overlay']) => {
+  if (!overlay) {
+    return {
+      headline: 'Mensagem principal',
+      subheadline: '',
+      bullets: [],
+      quote: '',
+      cta: ''
+    }
+  }
+
+  if (overlay.copy?.headline || overlay.copy?.subheadline || overlay.copy?.bullets?.length) {
+    return {
+      headline: overlay.copy?.headline || 'Mensagem principal',
+      subheadline: overlay.copy?.subheadline || '',
+      bullets: (overlay.copy?.bullets || []).slice(0, 6),
+      quote: overlay.copy?.quote || '',
+      cta: overlay.copy?.cta || ''
+    }
+  }
+
+  const sourceText = extractOverlaySource(overlay.text || '')
   const lines = sourceText
     .split(/\r?\n/)
     .map(line => line.trim())
@@ -122,7 +152,8 @@ const parseOverlayText = (text: string) => {
     headline,
     subheadline,
     bullets: bulletLines.slice(0, 6),
-    quote
+    quote,
+    cta: ''
   }
 }
 
@@ -160,7 +191,7 @@ export default function VivaChatPage() {
   const [promptConteudo, setPromptConteudo] = useState<string | null>(null)
   const [menuAberto, setMenuAberto] = useState(true)
   const [imagemAtiva, setImagemAtiva] = useState<{ url: string; nome?: string } | null>(null)
-  const [arteAtiva, setArteAtiva] = useState<{ url: string; nome?: string; overlay: { brand: 'REZETA' | 'FC'; text: string } } | null>(null)
+  const [arteAtiva, setArteAtiva] = useState<{ url: string; nome?: string; overlay: NonNullable<Mensagem['overlay']> } | null>(null)
   const [erroExport, setErroExport] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -241,8 +272,27 @@ export default function VivaChatPage() {
             .map((item: any) => ({
               tipo: item.tipo === 'imagem' ? 'imagem' : 'arquivo',
               url: item.url,
-              nome: item.nome
+              nome: item.nome,
+              meta: item.meta
             }))
+
+          const overlayMeta = midia.find((item: any) => item?.meta?.overlay)?.meta?.overlay
+          const overlayFromBackend = overlayMeta && (overlayMeta.brand === 'FC' || overlayMeta.brand === 'REZETA')
+            ? {
+                brand: overlayMeta.brand as 'FC' | 'REZETA',
+                copy: {
+                  headline: overlayMeta.headline,
+                  subheadline: overlayMeta.subheadline,
+                  bullets: Array.isArray(overlayMeta.bullets) ? overlayMeta.bullets : [],
+                  quote: overlayMeta.quote,
+                  cta: overlayMeta.cta
+                }
+              }
+            : undefined
+
+          const overlayFallback = overlayText && (modoAtual === 'REZETA' || modoAtual === 'FC')
+            ? { brand: modoAtual as 'REZETA' | 'FC', text: overlayText }
+            : undefined
 
           if (anexosIA.length > 0) {
             const iaMsg: Mensagem = {
@@ -251,7 +301,7 @@ export default function VivaChatPage() {
               conteudo: resposta || 'Processado com sucesso!',
               timestamp: new Date(),
               anexos: anexosIA,
-              overlay: overlayText ? { brand: modoAtual as 'REZETA' | 'FC', text: overlayText } : undefined
+              overlay: overlayFromBackend || overlayFallback
             }
             setMensagens(prev => [...prev, iaMsg])
             return
@@ -264,7 +314,9 @@ export default function VivaChatPage() {
         tipo: 'ia',
         conteudo: resposta || 'Processado com sucesso!',
         timestamp: new Date(),
-        overlay: overlayText ? { brand: modoAtual as 'REZETA' | 'FC', text: overlayText } : undefined
+        overlay: overlayText && (modoAtual === 'REZETA' || modoAtual === 'FC')
+          ? { brand: modoAtual as 'REZETA' | 'FC', text: overlayText }
+          : undefined
       }
 
       setMensagens(prev => [...prev, iaMsg])
@@ -415,7 +467,7 @@ export default function VivaChatPage() {
     setErroExport(null)
 
     const theme = BRAND_THEMES[arteAtiva.overlay.brand]
-    const parsed = parseOverlayText(arteAtiva.overlay.text)
+    const parsed = parseOverlayText(arteAtiva.overlay)
 
     const image = new window.Image()
     image.crossOrigin = 'anonymous'
@@ -829,7 +881,7 @@ export default function VivaChatPage() {
 
             {(() => {
               const theme = BRAND_THEMES[arteAtiva.overlay.brand]
-              const parsed = parseOverlayText(arteAtiva.overlay.text)
+              const parsed = parseOverlayText(arteAtiva.overlay)
 
               return (
                 <div className="relative w-full aspect-square overflow-hidden rounded-lg border">
@@ -864,6 +916,11 @@ export default function VivaChatPage() {
                     </ul>
                     {parsed.quote && (
                       <p className="mt-3 text-xs sm:text-sm italic">{parsed.quote}</p>
+                    )}
+                    {parsed.cta && (
+                      <p className="mt-3 inline-block rounded-full bg-white/20 px-3 py-1 text-xs sm:text-sm font-semibold tracking-wide">
+                        {parsed.cta}
+                      </p>
                     )}
                   </div>
                 </div>
