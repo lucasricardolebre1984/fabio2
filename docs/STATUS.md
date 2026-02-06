@@ -1,8 +1,8 @@
 ﻿# STATUS DO PROJETO - FC Soluções Financeiras
 
-**Data:** 2026-02-05  
+**Data:** 2026-02-06  
 **Sessão:** Mapeamento e documentação completa  
-**Status:** ✅ FUNCIONANDO - PRONTO PARA TESTES
+**Status:** ⚠️ FUNCIONANDO COM LIMITAÇÕES EM IMAGENS
 
 ---
 
@@ -32,7 +32,7 @@ Próxima etapa: ativar WhatsApp funcional no backend.
 
 - Chat: OK
 - Visão: OK (upload + prompt)
-- Imagem: Intermitente (erro `StackOverflowError` com prompt extra longo)
+- Imagem: gera fundo, mas não respeita paleta/brief; arte final ainda parcial
 - Áudio: NÃO funciona (botão)
 - Upload de imagem: falha com PNG (MIME incorreto)
 

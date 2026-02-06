@@ -1,6 +1,6 @@
 ﻿# SESSION - Contexto Atual da Sessão
 
-> **Sessão Ativa:** 2026-02-05  
+> **Sessão Ativa:** 2026-02-06  
 > **Status:** ✅ Sistema estável - VIVA e contratos operacionais  
 > **Branch:** main
 
@@ -43,6 +43,8 @@ VIVA (modelos)
 - Roteiro de deploy Ubuntu 100% Docker documentado em `docs/DEPLOY_UBUNTU_DOCKER.md`
 - Erro ativo: `StackOverflowError` na geração de imagens com prompt extra longo (REZETA/FC)
 - Erro ativo: upload de imagem falha com PNG (MIME assumido como JPEG)
+- Erro ativo: fundo da imagem não respeita paleta/brief do prompt (BUG-015)
+- Erro ativo: arte final perde partes do texto (overlay truncado) (BUG-016)
 
 ## Ajustes desta sessão
 
@@ -51,6 +53,7 @@ VIVA (modelos)
 - Roteiro de deploy 100% Docker criado com etapas de produção
 - Roteamento de intenção de imagem no backend (`/viva/chat`) com retorno de mídia estruturada
 - Prompts laterais enviados como `prompt_extra` para o backend
+- Geração de fundo sem texto + overlay no front (arte final), ainda com perdas de conteúdo e paleta
 
 ---
 
@@ -62,4 +65,4 @@ VIVA (modelos)
 
 ---
 
-*Atualizado em: 2026-02-05*
+*Atualizado em: 2026-02-06*

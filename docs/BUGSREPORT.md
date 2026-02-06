@@ -1,7 +1,7 @@
 ﻿# BUGSREPORT - Registro de Bugs
 
 > **Projeto:** FC Soluções Financeiras SaaS  
-> **Última Atualização:** 2026-02-05
+> **Última Atualização:** 2026-02-06
 
 ---
 
@@ -13,6 +13,8 @@
 | BUG-012 | Média | VIVA | Botão de áudio no chat não funciona | Ativo |
 | BUG-013 | Média | VIVA | Erro `StackOverflowError` ao gerar imagem com prompt extra longo (REZETA/FC) | Ativo |
 | BUG-014 | Média | VIVA | Upload de imagem falha quando a imagem é PNG (MIME assumido como JPEG) | Ativo |
+| BUG-015 | Alta | VIVA | Fundo da imagem não respeita paleta/brief do prompt (resultado genérico) | Ativo |
+| BUG-016 | Média | VIVA | Arte final perde partes do texto (overlay truncado) | Ativo |
 
 ---
 
@@ -40,4 +42,4 @@
 
 ---
 
-*Atualizado em: 2026-02-05*
+*Atualizado em: 2026-02-06*
