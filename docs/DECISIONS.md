@@ -292,3 +292,37 @@ Centralizar a detecção de intenção de imagem no backend (`/viva/chat`) e ret
 ---
 
 *Documentado em: 2026-02-05*
+
+---
+
+## DECISÃO-007: Pipeline institucional para geração de imagens da VIVA
+
+### Data
+2026-02-06
+
+### Contexto
+A geração de imagem atual da VIVA estava entregando resultado inconsistente: texto duplicado, overflow visual, baixa aderência ao brief e paleta institucional parcialmente ignorada em campanhas FC/Rezeta.
+
+### Decisão
+Adotar pipeline de geração de imagem em duas etapas:
+1. **Copy estruturada** (resumo de campanha em formato controlado)
+2. **Background fotográfico sem texto/logo**
+3. **Composição final institucional** com template fixo por marca
+
+Adicionalmente, padronizar saudação da VIVA com nome do cliente: **"Olá Fabio!"**.
+
+### Motivo
+- Evita poluição visual e duplicação de texto
+- Garante legibilidade mobile e consistência institucional
+- Separa responsabilidade entre IA geradora de fundo e render final de campanha
+- Facilita governança de marca para FC e Rezeta
+
+### Rollback
+- Estratégia primária: `git revert <hash-da-implementacao>`
+- Estratégia de contingência (somente aprovação dupla):
+  - `git reset --hard <commit-anterior>`
+  - `git push --force origin main`
+
+---
+
+*Documentado em: 2026-02-06*

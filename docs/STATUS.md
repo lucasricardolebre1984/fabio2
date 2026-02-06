@@ -1,4 +1,4 @@
-﻿# STATUS DO PROJETO - FC Soluções Financeiras
+# STATUS DO PROJETO - FC Soluções Financeiras
 
 **Data:** 2026-02-06  
 **Sessão:** Mapeamento e documentação completa  
@@ -35,6 +35,25 @@ Próxima etapa: ativar WhatsApp funcional no backend.
 - Imagem: gera fundo, mas não respeita paleta/brief; arte final ainda parcial
 - Áudio: NÃO funciona (botão)
 - Upload de imagem: falha com PNG (MIME incorreto)
+
+---
+
+## Plano Atual (GODMOD) — Correção de Imagens VIVA
+
+Objetivo imediato
+- Corrigir geração de imagem da VIVA para FC e Rezeta com resultado institucional de campanha.
+
+Estratégia aprovada
+1. Pipeline em 2 etapas:
+   - Etapa A: gerar copy estruturada (headline, subheadline, CTA, bullets, quote)
+   - Etapa B: gerar somente background fotográfico sem texto/logo
+2. Composição final institucional com layout fixo por marca (FC e Rezeta)
+3. Saudação padrão com nome do cliente: **"Olá Fabio!"**
+4. Testes com prompt real de campanha enviado pelo cliente
+
+Rollback obrigatório
+- Reverter commit da mudança de pipeline: `git revert <hash>`
+- Em incidente imediato local: `git reset --hard <commit-anterior>` (somente com aprovação dupla para force push)
 
 ---
 

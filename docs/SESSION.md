@@ -1,4 +1,4 @@
-﻿# SESSION - Contexto Atual da Sessão
+# SESSION - Contexto Atual da Sessão
 
 > **Sessão Ativa:** 2026-02-06  
 > **Status:** ✅ Sistema estável - VIVA e contratos operacionais  
@@ -54,6 +54,21 @@ VIVA (modelos)
 - Roteamento de intenção de imagem no backend (`/viva/chat`) com retorno de mídia estruturada
 - Prompts laterais enviados como `prompt_extra` para o backend
 - Geração de fundo sem texto + overlay no front (arte final), ainda com perdas de conteúdo e paleta
+
+---
+
+## Protocolo GODMOD aplicado nesta sessão
+
+Fluxo aplicado
+- Mapeamento completo do frontend `/viva` e backend `/api/v1/viva/*`
+- Diagnóstico com causa-raiz (prompt longo + overlay parcial)
+- Arquitetura de correção definida para FC e Rezeta
+- Registro formal em `STATUS` e `DECISIONS`
+- Rollback obrigatório documentado
+
+Critério institucional da sessão
+- Nenhuma entrega sem plano de rollback
+- Toda comunicação e evidência em pt-BR
 
 ---
 

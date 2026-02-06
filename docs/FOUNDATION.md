@@ -1,4 +1,4 @@
-﻿# FOUNDATION - Regras Operacionais
+# FOUNDATION - Regras Operacionais
 
 > **Projeto:** FC Soluções Financeiras SaaS  
 > **Data:** 2026-02-05
@@ -26,6 +26,25 @@
 
 - Respostas em pt-BR
 - Evidências sempre que possível (logs, diffs, comandos)
+
+---
+
+## Protocolo Operacional DEV DEUS (GODMOD)
+
+Fluxo institucional obrigatório para qualquer mudança:
+
+1. Mapeamento (read-only)
+2. Diagnóstico com evidências
+3. Arquitetura proposta
+4. Aprovação explícita
+5. Execução em passos atômicos
+6. Versionamento + documentação
+
+Regras complementares:
+- Operar em `main` (sem branch paralela)
+- Toda alteração deve atualizar `docs/STATUS.md`, `docs/DECISIONS.md` e `docs/SESSION.md`
+- Toda entrega deve conter plano de rollback explícito
+- Commit e push apenas com autorização explícita
 
 ---
 
