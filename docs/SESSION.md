@@ -42,6 +42,7 @@ VIVA (modelos)
 - WhatsApp usa webhook para alimentar conversas no banco
 - Roteiro de deploy Ubuntu 100% Docker documentado em `docs/DEPLOY_UBUNTU_DOCKER.md`
 - Erro ativo: `StackOverflowError` na geração de imagens com prompt extra longo (REZETA/FC)
+- Erro ativo: upload de imagem falha com PNG (MIME assumido como JPEG)
 
 ## Ajustes desta sessão
 

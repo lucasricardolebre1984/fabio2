@@ -273,3 +273,22 @@ Adicionar uma persona simples no prompt principal da VIVA informando:
 ---
 
 *Documentado em: 2026-02-05*
+
+---
+
+## DECISÃO-006: Roteamento de intenção de imagem no backend
+
+### Contexto
+O chat interno precisava gerar imagens quando solicitado, sem duplicar regras no frontend.
+
+### Decisão
+Centralizar a detecção de intenção de imagem no backend (`/viva/chat`) e retornar mídia estruturada.
+
+### Motivo
+- Evita lógica duplicada no frontend
+- Permite uso futuro no WhatsApp e outros canais
+- Mantém governança e consistência institucional
+
+---
+
+*Documentado em: 2026-02-05*

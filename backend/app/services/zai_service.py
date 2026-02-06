@@ -157,7 +157,10 @@ class ZAIService:
             )
 
         if response.status_code == 200:
-            return {"success": True, "data": response.json()}
+            payload = response.json()
+            if isinstance(payload, dict) and payload.get("error"):
+                return {"success": False, "error": payload.get("error")}
+            return {"success": True, "data": payload}
 
         return {"success": False, "error": response.text}
 

@@ -684,6 +684,7 @@ Request (JSON)
 ```json
 {
   "mensagem": "Olá, VIVA",
+  "prompt_extra": "Instruções extras do modo ativo (opcional, truncado no backend)",
   "contexto": [
     {
       "id": "123",
@@ -698,7 +699,12 @@ Request (JSON)
 
 Response 200
 ```json
-{ "resposta": "..." }
+{
+  "resposta": "...",
+  "midia": [
+    { "tipo": "imagem", "url": "https://..." }
+  ]
+}
 ```
 
 ### POST /viva/vision

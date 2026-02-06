@@ -2,7 +2,7 @@
 Chat direto com a VIVA - Assistente Virtual Interna
 Usa Z.AI (GLM-4) para Chat, Visão, Áudio e Imagem
 """
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
 import base64
@@ -20,10 +20,17 @@ router = APIRouter()
 class ChatRequest(BaseModel):
     mensagem: str
     contexto: List[Dict[str, Any]] = []
+    prompt_extra: Optional[str] = None
+
+
+class MediaItem(BaseModel):
+    tipo: str
+    url: str
 
 
 class ChatResponse(BaseModel):
     resposta: str
+    midia: Optional[List[MediaItem]] = None
 
 
 class ImageAnalysisRequest(BaseModel):
@@ -46,6 +53,72 @@ class VideoGenerationRequest(BaseModel):
     with_audio: bool = True
 
 
+def _is_image_request(texto: str) -> bool:
+    termos = [
+        "imagem",
+        "banner",
+        "logo",
+        "logotipo",
+        "post",
+        "flyer",
+        "arte",
+        "cartaz",
+        "thumbnail",
+        "capa",
+    ]
+    texto_lower = texto.lower()
+    return any(t in texto_lower for t in termos)
+
+
+def _sanitize_prompt(texto: str, max_len: int) -> str:
+    texto_limpo = " ".join(texto.replace("\r", " ").split())
+    if len(texto_limpo) <= max_len:
+        return texto_limpo
+    return texto_limpo[:max_len].rstrip() + "..."
+
+
+def _mode_hint(modo: Optional[str]) -> Optional[str]:
+    if not modo:
+        return None
+
+    hints = {
+        "LOGO": "Crie uma imagem focada em logo e identidade visual.",
+        "FC": "Crie uma imagem institucional para FC Soluções Financeiras.",
+        "REZETA": "Crie uma imagem promocional para RezetaBrasil.",
+        "CRIADORLANDPAGE": "Crie uma imagem para landing page.",
+    }
+    return hints.get(modo)
+
+
+def _extract_image_url(result: Dict[str, Any]) -> Optional[str]:
+    payload = result.get("data") if isinstance(result, dict) else None
+
+    if isinstance(payload, dict):
+        data_list = payload.get("data")
+        if isinstance(data_list, list) and data_list:
+            item = data_list[0]
+            if isinstance(item, dict):
+                if item.get("url"):
+                    return item["url"]
+                if item.get("b64_json"):
+                    return f"data:image/png;base64,{item['b64_json']}"
+
+        if isinstance(payload.get("url"), str):
+            return payload["url"]
+        if isinstance(payload.get("image_url"), str):
+            return payload["image_url"]
+
+    if isinstance(payload, list) and payload:
+        item = payload[0]
+        if isinstance(item, dict):
+            if item.get("url"):
+                return item["url"]
+            if item.get("b64_json"):
+                return f"data:image/png;base64,{item['b64_json']}"
+
+    return None
+
+
 # ============================================
 # CHAT
 # ============================================
@@ -65,6 +138,50 @@ async def chat_with_viva(
             if msg.get('modo'):
                 modo = msg.get('modo')
                 break
+
+        prompt_extra_raw = request.prompt_extra.strip() if request.prompt_extra else None
+        prompt_extra_chat = _sanitize_prompt(prompt_extra_raw, 4000) if prompt_extra_raw else None
+        prompt_extra_image = _sanitize_prompt(prompt_extra_raw, 1200) if prompt_extra_raw else None
+
+        # Roteia intenção de imagem diretamente para o gerador
+        if _is_image_request(request.mensagem):
+            if not settings.ZAI_API_KEY:
+                return ChatResponse(
+                    resposta="A geração de imagens está indisponível no momento."
+                )
+
+            hint = _mode_hint(modo)
+            prompt_parts: List[str] = []
+            if prompt_extra_image:
+                prompt_parts.append(prompt_extra_image)
+            if hint:
+                prompt_parts.append(hint)
+            prompt_parts.append(f"Solicitação: {request.mensagem.strip()}")
+            prompt = "\n".join(prompt_parts)
+
+            resultado = await zai_service.generate_image(
+                prompt=prompt,
+                size="1024x1024",
+            )
+            if not resultado.get("success"):
+                erro = resultado.get("error")
+                if isinstance(erro, dict):
+                    msg = erro.get("message", "Erro desconhecido")
+                else:
+                    msg = str(erro)
+                return ChatResponse(
+                    resposta=f"Erro ao gerar imagem: {msg}"
+                )
+            url = _extract_image_url(resultado)
+            if url:
+                return ChatResponse(
+                    resposta="Imagem gerada com sucesso.",
+                    midia=[MediaItem(tipo="imagem", url=url)],
+                )
+
+            return ChatResponse(
+                resposta="A imagem foi solicitada, mas a API não retornou URL."
+            )
         
         # Prioriza Z.AI (oficial). Fallback para OpenRouter e modo local.
         if settings.ZAI_API_KEY:
@@ -72,12 +189,16 @@ async def chat_with_viva(
                 request.mensagem,
                 request.contexto
             )
+            if prompt_extra_chat:
+                messages.insert(1, {"role": "system", "content": prompt_extra_chat})
             resposta = await zai_service.chat(messages)
         elif settings.OPENROUTER_API_KEY and settings.OPENROUTER_API_KEY != 'sk-or-v1-000000000000000000000000000000000000000000000000':
             messages = openrouter_service.build_messages(
                 request.mensagem,
                 request.contexto
             )
+            if prompt_extra_chat:
+                messages.insert(1, {"role": "system", "content": prompt_extra_chat})
             resposta = await openrouter_service.chat(messages)
         else:
             messages = viva_local_service.build_messages(

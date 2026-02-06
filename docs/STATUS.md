@@ -34,6 +34,7 @@ Próxima etapa: ativar WhatsApp funcional no backend.
 - Visão: OK (upload + prompt)
 - Imagem: Intermitente (erro `StackOverflowError` com prompt extra longo)
 - Áudio: NÃO funciona (botão)
+- Upload de imagem: falha com PNG (MIME incorreto)
 
 ---
 

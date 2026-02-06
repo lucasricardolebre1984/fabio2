@@ -51,6 +51,13 @@ const PROMPTS: PromptItem[] = [
     icone: <FileText className="w-5 h-5" />,
     descricao: 'Imagens para RezetaBrasil',
     cor: 'bg-green-500'
+  },
+  {
+    id: 'CRIADORPROMPT',
+    titulo: 'Criador Prompt',
+    icone: <Sparkles className="w-5 h-5" />,
+    descricao: 'Criar instruções de sistema',
+    cor: 'bg-amber-500'
   }
 ]
 
@@ -68,7 +75,9 @@ export default function VivaChatPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [anexos, setAnexos] = useState<{ file: File; tipo: 'imagem' | 'audio' | 'arquivo'; preview?: string }[]>([])
   const [promptAtivo, setPromptAtivo] = useState<string | null>(null)
+  const [promptConteudo, setPromptConteudo] = useState<string | null>(null)
   const [menuAberto, setMenuAberto] = useState(true)
+  const [imagemAtiva, setImagemAtiva] = useState<{ url: string; nome?: string } | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const audioInputRef = useRef<HTMLInputElement>(null)
@@ -126,9 +135,33 @@ export default function VivaChatPage() {
         const contexto = mensagens.slice(-10)
         const response = await api.post('/viva/chat', {
           mensagem: input.trim(),
-          contexto
+          contexto,
+          prompt_extra: promptConteudo || undefined
         })
         resposta += response.data.resposta
+
+        const midia = Array.isArray(response.data.midia) ? response.data.midia : []
+        if (midia.length > 0) {
+          const anexosIA = midia
+            .filter((item: any) => item && item.url)
+            .map((item: any) => ({
+              tipo: item.tipo === 'imagem' ? 'imagem' : 'arquivo',
+              url: item.url,
+              nome: item.nome
+            }))
+
+          if (anexosIA.length > 0) {
+            const iaMsg: Mensagem = {
+              id: (Date.now() + 1).toString(),
+              tipo: 'ia',
+              conteudo: resposta || 'Processado com sucesso!',
+              timestamp: new Date(),
+              anexos: anexosIA
+            }
+            setMensagens(prev => [...prev, iaMsg])
+            return
+          }
+        }
       }
 
       const iaMsg: Mensagem = {
@@ -160,6 +193,7 @@ export default function VivaChatPage() {
     try {
       const response = await fetch(`/viva/PROMPTS/${promptId}.md`)
       const texto = await response.text()
+      setPromptConteudo(texto)
       
       const novoContexto = `Modo **${PROMPTS.find(p => p.id === promptId)?.titulo}** ativado!\n\nComo posso ajudar?`
       
@@ -172,6 +206,7 @@ export default function VivaChatPage() {
       
       setMensagens(prev => [...prev, iaMsg])
     } catch (e) {
+      setPromptConteudo(null)
       // Se não conseguir carregar, apenas mostra mensagem
       const iaMsg: Mensagem = {
         id: Date.now().toString(),
@@ -232,6 +267,7 @@ export default function VivaChatPage() {
       timestamp: new Date()
     }])
     setPromptAtivo(null)
+    setPromptConteudo(null)
   }
 
   const copyMessage = (id: string, texto: string) => {
@@ -241,7 +277,8 @@ export default function VivaChatPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)]">
+    <>
+      <div className="flex h-[calc(100vh-4rem)]">
       {/* Menu Lateral de Prompts */}
       <div className={`bg-gray-50 border-r transition-all duration-300 ${menuAberto ? 'w-64' : 'w-0 overflow-hidden'}`}>
         <div className="p-4">
@@ -355,7 +392,8 @@ export default function VivaChatPage() {
                               <img 
                                 src={anexo.url} 
                                 alt={anexo.nome || 'Imagem'} 
-                                className="max-w-xs rounded-lg"
+                                className="max-w-sm sm:max-w-md rounded-lg cursor-zoom-in"
+                                onClick={() => setImagemAtiva({ url: anexo.url, nome: anexo.nome })}
                               />
                             )}
                             {anexo.tipo === 'audio' && (
@@ -511,5 +549,31 @@ export default function VivaChatPage() {
         </div>
       </div>
     </div>
+
+      {imagemAtiva && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
+        onClick={() => setImagemAtiva(null)}
+      >
+        <div
+          className="relative max-w-5xl w-full"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => setImagemAtiva(null)}
+            className="absolute -top-10 right-0 text-white hover:text-gray-200"
+            aria-label="Fechar imagem"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          <img
+            src={imagemAtiva.url}
+            alt={imagemAtiva.nome || 'Imagem ampliada'}
+            className="w-full h-auto rounded-lg"
+          />
+        </div>
+      </div>
+      )}
+    </>
   )
 }
