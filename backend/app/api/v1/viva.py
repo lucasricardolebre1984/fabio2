@@ -3,7 +3,7 @@ Chat direto com a VIVA - Assistente Virtual Interna
 Usa Z.AI (GLM-4) para Chat, Visão, Áudio e Imagem
 """
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 import base64
 
@@ -119,6 +119,37 @@ def _extract_image_url(result: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def _is_stackoverflow_error(erro: Any) -> bool:
+    if not erro:
+        return False
+    if isinstance(erro, dict):
+        msg = str(erro.get("message") or erro.get("error") or "")
+    else:
+        msg = str(erro)
+    return "StackOverflowError" in msg or "stack overflow" in msg.lower()
+
+
+def _build_image_prompt(prompt_extra_image: Optional[str], hint: Optional[str], mensagem: str) -> str:
+    parts: List[str] = []
+    if prompt_extra_image:
+        parts.append(prompt_extra_image)
+    if hint:
+        parts.append(hint)
+    parts.append(f"Solicitação: {mensagem.strip()}")
+    return "\n".join(parts)
+
+
+def _build_fallback_image_prompt(hint: Optional[str], mensagem: str) -> str:
+    parts: List[str] = []
+    if hint:
+        parts.append(hint)
+    parts.append(f"Solicitação: {mensagem.strip()}")
+    return "\n".join(parts)
+
+
+BACKGROUND_ONLY_SUFFIX = "Apenas fundo fotografico. Nao inclua palavras, letras ou logotipos."
+
+
 # ============================================
 # CHAT
 # ============================================
@@ -151,13 +182,8 @@ async def chat_with_viva(
                 )
 
             hint = _mode_hint(modo)
-            prompt_parts: List[str] = []
-            if prompt_extra_image:
-                prompt_parts.append(prompt_extra_image)
-            if hint:
-                prompt_parts.append(hint)
-            prompt_parts.append(f"Solicitação: {request.mensagem.strip()}")
-            prompt = "\n".join(prompt_parts)
+            prompt = _build_image_prompt(prompt_extra_image, hint, request.mensagem)
+            prompt = f"{prompt}\n{BACKGROUND_ONLY_SUFFIX}"
 
             resultado = await zai_service.generate_image(
                 prompt=prompt,
@@ -165,6 +191,24 @@ async def chat_with_viva(
             )
             if not resultado.get("success"):
                 erro = resultado.get("error")
+                if _is_stackoverflow_error(erro):
+                    fallback_prompt = _build_fallback_image_prompt(hint, request.mensagem)
+                    fallback_prompt = f"{fallback_prompt}\n{BACKGROUND_ONLY_SUFFIX}"
+                    resultado = await zai_service.generate_image(
+                        prompt=fallback_prompt,
+                        size="1024x1024",
+                    )
+                    if resultado.get("success"):
+                        url = _extract_image_url(resultado)
+                        if url:
+                            return ChatResponse(
+                                resposta="Imagem gerada com sucesso.",
+                                midia=[MediaItem(tipo="imagem", url=url)],
+                            )
+                        return ChatResponse(
+                            resposta="A imagem foi solicitada, mas a API não retornou URL."
+                        )
+
                 if isinstance(erro, dict):
                     msg = erro.get("message", "Erro desconhecido")
                 else:
@@ -241,7 +285,7 @@ async def analyze_image(
 @router.post("/vision/upload")
 async def analyze_image_upload(
     file: UploadFile = File(...),
-    prompt: str = "Descreva esta imagem",
+    prompt: str = Form("Descreva esta imagem"),
     current_user: User = Depends(get_current_user)
 ):
     """

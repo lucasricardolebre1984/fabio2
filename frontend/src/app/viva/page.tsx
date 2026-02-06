@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, Bot, User, Sparkles, Trash2, Copy, Check, ImageIcon, Mic, X, FileUp, Layout, Palette, Image, FileText, ChevronRight } from 'lucide-react'
+import { Send, Bot, User, Sparkles, Trash2, Copy, Check, ImageIcon, Mic, X, FileUp, Layout, Palette, Image as ImageLucide, FileText, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { api } from '@/lib/api'
@@ -13,6 +13,7 @@ interface Mensagem {
   timestamp: Date
   anexos?: { tipo: 'imagem' | 'audio' | 'arquivo'; url: string; nome?: string }[]
   modo?: string
+  overlay?: { brand: 'REZETA' | 'FC'; text: string }
 }
 
 interface PromptItem {
@@ -41,7 +42,7 @@ const PROMPTS: PromptItem[] = [
   {
     id: 'FC',
     titulo: 'Imagens FC',
-    icone: <Image className="w-5 h-5" />,
+    icone: <ImageLucide className="w-5 h-5" />,
     descricao: 'Imagens para FC Soluções',
     cor: 'bg-indigo-500'
   },
@@ -61,6 +62,61 @@ const PROMPTS: PromptItem[] = [
   }
 ]
 
+const IMAGE_TERMS = [
+  'imagem',
+  'banner',
+  'logo',
+  'logotipo',
+  'post',
+  'flyer',
+  'arte',
+  'cartaz',
+  'thumbnail',
+  'capa'
+]
+
+const isImageRequest = (text: string) => {
+  const lower = text.toLowerCase()
+  return IMAGE_TERMS.some(term => lower.includes(term))
+}
+
+const parseOverlayText = (text: string) => {
+  const lines = text
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+
+  const headline = lines[0] || 'Mensagem principal'
+  const quote = lines.find(line => line.startsWith('"') || line.startsWith('“'))
+  const bulletLines = lines.filter(line => /^(✅|❌|⚠️|•|-)/.test(line))
+  const remaining = lines.filter(line => line !== headline && line !== quote && !bulletLines.includes(line))
+  const subheadline = remaining[0] || ''
+
+  return {
+    headline,
+    subheadline,
+    bullets: bulletLines.slice(0, 6),
+    quote
+  }
+}
+
+const BRAND_THEMES = {
+  REZETA: {
+    label: 'RezetaBrasil',
+    primary: '#1E3A5F',
+    accent: '#3DAA7F',
+    dark: '#2A8B68',
+    light: '#FFFFFF'
+  },
+  FC: {
+    label: 'FC Solucoes Financeiras',
+    primary: '#071c4a',
+    accent: '#00a3ff',
+    dark: '#010a1c',
+    light: '#f9feff'
+  }
+} as const
+
 export default function VivaChatPage() {
   const [mensagens, setMensagens] = useState<Mensagem[]>([
     {
@@ -78,6 +134,8 @@ export default function VivaChatPage() {
   const [promptConteudo, setPromptConteudo] = useState<string | null>(null)
   const [menuAberto, setMenuAberto] = useState(true)
   const [imagemAtiva, setImagemAtiva] = useState<{ url: string; nome?: string } | null>(null)
+  const [arteAtiva, setArteAtiva] = useState<{ url: string; nome?: string; overlay: { brand: 'REZETA' | 'FC'; text: string } } | null>(null)
+  const [erroExport, setErroExport] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const audioInputRef = useRef<HTMLInputElement>(null)
@@ -91,17 +149,25 @@ export default function VivaChatPage() {
   const handleSend = async () => {
     if ((!input.trim() && anexos.length === 0) || loading) return
 
+    const textoEntrada = input.trim()
+    const modoAtual = promptAtivo
+    const deveGerarOverlay = Boolean(
+      textoEntrada &&
+      (modoAtual === 'REZETA' || modoAtual === 'FC') &&
+      isImageRequest(textoEntrada)
+    )
+
     const userMsg: Mensagem = {
       id: Date.now().toString(),
       tipo: 'usuario',
-      conteudo: input.trim() || (anexos.length > 0 ? 'Anexos enviados:' : ''),
+      conteudo: textoEntrada || (anexos.length > 0 ? 'Anexos enviados:' : ''),
       timestamp: new Date(),
       anexos: anexos.map(a => ({ 
         tipo: a.tipo, 
         url: a.preview || '', 
         nome: a.file.name 
       })),
-      modo: promptAtivo || undefined
+      modo: modoAtual || undefined
     }
 
     setMensagens(prev => [...prev, userMsg])
@@ -114,10 +180,11 @@ export default function VivaChatPage() {
       // Processa anexos primeiro
       for (const anexo of anexos) {
         if (anexo.tipo === 'imagem') {
-          const base64 = await fileToBase64(anexo.file)
-          const response = await api.post('/viva/vision', {
-            image_base64: base64.split(',')[1],
-            prompt: input.trim() || 'Descreva esta imagem em detalhes'
+          const formData = new FormData()
+          formData.append('file', anexo.file)
+          formData.append('prompt', input.trim() || 'Descreva esta imagem em detalhes')
+          const response = await api.post('/viva/vision/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
           })
           resposta += `📷 **Análise da imagem "${anexo.file.name}":**\n${response.data.analise}\n\n`
         } else if (anexo.tipo === 'audio') {
@@ -131,10 +198,10 @@ export default function VivaChatPage() {
       }
 
       // Se tiver mensagem de texto, processa
-      if (input.trim()) {
+      if (textoEntrada) {
         const contexto = mensagens.slice(-10)
         const response = await api.post('/viva/chat', {
-          mensagem: input.trim(),
+          mensagem: textoEntrada,
           contexto,
           prompt_extra: promptConteudo || undefined
         })
@@ -156,7 +223,8 @@ export default function VivaChatPage() {
               tipo: 'ia',
               conteudo: resposta || 'Processado com sucesso!',
               timestamp: new Date(),
-              anexos: anexosIA
+              anexos: anexosIA,
+              overlay: deveGerarOverlay ? { brand: modoAtual as 'REZETA' | 'FC', text: textoEntrada } : undefined
             }
             setMensagens(prev => [...prev, iaMsg])
             return
@@ -168,7 +236,8 @@ export default function VivaChatPage() {
         id: (Date.now() + 1).toString(),
         tipo: 'ia',
         conteudo: resposta || 'Processado com sucesso!',
-        timestamp: new Date()
+        timestamp: new Date(),
+        overlay: deveGerarOverlay ? { brand: modoAtual as 'REZETA' | 'FC', text: textoEntrada } : undefined
       }
 
       setMensagens(prev => [...prev, iaMsg])
@@ -218,15 +287,6 @@ export default function VivaChatPage() {
     }
   }
 
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result as string)
-      reader.onerror = reject
-      reader.readAsDataURL(file)
-    })
-  }
-
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, tipo: 'imagem' | 'audio' | 'arquivo') => {
     const files = e.target.files
     if (!files) return
@@ -274,6 +334,130 @@ export default function VivaChatPage() {
     navigator.clipboard.writeText(texto)
     setCopiedId(id)
     setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  const hexToRgba = (hex: string, alpha: number) => {
+    const normalized = hex.replace('#', '')
+    const bigint = parseInt(normalized, 16)
+    const r = (bigint >> 16) & 255
+    const g = (bigint >> 8) & 255
+    const b = bigint & 255
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`
+  }
+
+  const wrapText = (
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    x: number,
+    y: number,
+    maxWidth: number,
+    lineHeight: number,
+    maxLines?: number
+  ) => {
+    const words = text.split(' ')
+    let line = ''
+    let lines = 0
+    let currentY = y
+
+    words.forEach(word => {
+      const testLine = `${line}${word} `
+      const metrics = ctx.measureText(testLine)
+      if (metrics.width > maxWidth && line) {
+        ctx.fillText(line.trim(), x, currentY)
+        line = `${word} `
+        currentY += lineHeight
+        lines += 1
+        if (maxLines && lines >= maxLines) {
+          line = ''
+        }
+      } else {
+        line = testLine
+      }
+    })
+
+    if (line && (!maxLines || lines < maxLines)) {
+      ctx.fillText(line.trim(), x, currentY)
+      currentY += lineHeight
+    }
+
+    return currentY
+  }
+
+  const exportarArte = async () => {
+    if (!arteAtiva) return
+    setErroExport(null)
+
+    const theme = BRAND_THEMES[arteAtiva.overlay.brand]
+    const parsed = parseOverlayText(arteAtiva.overlay.text)
+
+    const image = new window.Image()
+    image.crossOrigin = 'anonymous'
+
+    const loadImage = () =>
+      new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve()
+        image.onerror = () => reject(new Error('Falha ao carregar imagem'))
+        image.src = arteAtiva.url
+      })
+
+    try {
+      await loadImage()
+      const canvas = document.createElement('canvas')
+      const width = image.naturalWidth || 1024
+      const height = image.naturalHeight || 1024
+      canvas.width = width
+      canvas.height = height
+
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        setErroExport('Nao foi possivel inicializar o canvas.')
+        return
+      }
+
+      ctx.drawImage(image, 0, 0, width, height)
+
+      const topHeight = Math.round(height * 0.26)
+      const bottomHeight = Math.round(height * 0.3)
+      const margin = Math.round(width * 0.06)
+
+      ctx.fillStyle = hexToRgba(theme.light, 0.86)
+      ctx.fillRect(0, 0, width, topHeight)
+
+      const gradient = ctx.createLinearGradient(0, height - bottomHeight, width, height)
+      gradient.addColorStop(0, hexToRgba(theme.dark, 0.9))
+      gradient.addColorStop(1, hexToRgba(theme.accent, 0.9))
+      ctx.fillStyle = gradient
+      ctx.fillRect(0, height - bottomHeight, width, bottomHeight)
+
+      ctx.fillStyle = theme.primary
+      ctx.font = `bold ${Math.round(width * 0.045)}px Inter, Arial, sans-serif`
+      wrapText(ctx, parsed.headline, margin, Math.round(topHeight * 0.35), width - margin * 2, Math.round(width * 0.055), 2)
+
+      if (parsed.subheadline) {
+        ctx.font = `${Math.round(width * 0.03)}px Inter, Arial, sans-serif`
+        wrapText(ctx, parsed.subheadline, margin, Math.round(topHeight * 0.72), width - margin * 2, Math.round(width * 0.04), 2)
+      }
+
+      ctx.fillStyle = '#ffffff'
+      ctx.font = `${Math.round(width * 0.028)}px Inter, Arial, sans-serif`
+      let currentY = height - bottomHeight + Math.round(bottomHeight * 0.25)
+      parsed.bullets.forEach((bullet) => {
+        currentY = wrapText(ctx, bullet, margin, currentY, width - margin * 2, Math.round(width * 0.038), 2)
+      })
+
+      if (parsed.quote) {
+        ctx.font = `italic ${Math.round(width * 0.025)}px Inter, Arial, sans-serif`
+        wrapText(ctx, parsed.quote, margin, height - Math.round(bottomHeight * 0.18), width - margin * 2, Math.round(width * 0.035), 2)
+      }
+
+      const dataUrl = canvas.toDataURL('image/png')
+      const link = document.createElement('a')
+      link.href = dataUrl
+      link.download = `arte-${arteAtiva.overlay.brand.toLowerCase()}.png`
+      link.click()
+    } catch (error) {
+      setErroExport('Nao foi possivel exportar a imagem. Se a URL nao permitir CORS, use "Abrir imagem" e salve manualmente.')
+    }
   }
 
   return (
@@ -389,12 +573,25 @@ export default function VivaChatPage() {
                         {msg.anexos.map((anexo, idx) => (
                           <div key={idx}>
                             {anexo.tipo === 'imagem' && anexo.url && (
-                              <img 
-                                src={anexo.url} 
-                                alt={anexo.nome || 'Imagem'} 
-                                className="max-w-sm sm:max-w-md rounded-lg cursor-zoom-in"
-                                onClick={() => setImagemAtiva({ url: anexo.url, nome: anexo.nome })}
-                              />
+                              <div className="space-y-2">
+                                <img 
+                                  src={anexo.url} 
+                                  alt={anexo.nome || 'Imagem'} 
+                                  className="max-w-sm sm:max-w-md rounded-lg cursor-zoom-in"
+                                  onClick={() => setImagemAtiva({ url: anexo.url, nome: anexo.nome })}
+                                />
+                                {msg.overlay && (
+                                  <button
+                                    onClick={() => {
+                                      setArteAtiva({ url: anexo.url, nome: anexo.nome, overlay: msg.overlay! })
+                                      setErroExport(null)
+                                    }}
+                                    className="text-xs text-blue-600 hover:text-blue-800"
+                                  >
+                                    Ver arte final
+                                  </button>
+                                )}
+                              </div>
                             )}
                             {anexo.tipo === 'audio' && (
                               <div className="flex items-center gap-2 text-sm bg-black/10 px-3 py-2 rounded">
@@ -573,6 +770,80 @@ export default function VivaChatPage() {
           />
         </div>
       </div>
+      )}
+
+      {arteAtiva && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
+          onClick={() => setArteAtiva(null)}
+        >
+          <div
+            className="relative w-full max-w-5xl rounded-lg bg-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Arte final</h2>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => window.open(arteAtiva.url, '_blank')}>
+                  Abrir imagem
+                </Button>
+                <Button size="sm" onClick={exportarArte}>
+                  Baixar PNG
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setArteAtiva(null)}>
+                  Fechar
+                </Button>
+              </div>
+            </div>
+
+            {erroExport && (
+              <p className="mb-3 text-sm text-red-600">{erroExport}</p>
+            )}
+
+            {(() => {
+              const theme = BRAND_THEMES[arteAtiva.overlay.brand]
+              const parsed = parseOverlayText(arteAtiva.overlay.text)
+
+              return (
+                <div className="relative w-full aspect-square overflow-hidden rounded-lg border">
+                  <img
+                    src={arteAtiva.url}
+                    alt={arteAtiva.nome || 'Arte gerada'}
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                  <div className="absolute inset-x-0 top-0 h-[26%] bg-white/85 px-6 py-4">
+                    <p className="text-xs uppercase tracking-widest" style={{ color: theme.accent }}>
+                      {theme.label}
+                    </p>
+                    <h3 className="mt-2 text-lg sm:text-2xl font-bold" style={{ color: theme.primary }}>
+                      {parsed.headline}
+                    </h3>
+                    {parsed.subheadline && (
+                      <p className="mt-1 text-sm sm:text-base" style={{ color: theme.primary }}>
+                        {parsed.subheadline}
+                      </p>
+                    )}
+                  </div>
+                  <div
+                    className="absolute inset-x-0 bottom-0 h-[30%] px-6 py-4 text-white"
+                    style={{
+                      background: `linear-gradient(90deg, ${theme.dark}e6, ${theme.accent}e6)`
+                    }}
+                  >
+                    <ul className="space-y-1 text-xs sm:text-sm">
+                      {parsed.bullets.map((bullet, idx) => (
+                        <li key={idx}>{bullet}</li>
+                      ))}
+                    </ul>
+                    {parsed.quote && (
+                      <p className="mt-3 text-xs sm:text-sm italic">{parsed.quote}</p>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+        </div>
       )}
     </>
   )
