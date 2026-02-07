@@ -268,27 +268,53 @@ async def _generate_campaign_copy(
     prompt_extra_image: Optional[str],
     modo: str,
 ) -> Dict[str, Any]:
+    """
+    Gera copy estruturada combinando o prompt mestre (REZETA.md ou FC.md) 
+    com o brief específico do usuário.
+    """
     fonte = _sanitize_prompt(_extract_overlay_source(mensagem), 5000)
-    guardrail = _brand_guardrail(modo)
+    
+    # Se temos o prompt_extra (conteúdo do REZETA.md ou FC.md), usamos ele como base
+    prompt_mestre = prompt_extra_image or ""
+    
+    # Guardrails específicos por marca
+    if modo == "REZETA":
+        guardrail = (
+            "Você é um diretor de arte especialista em campanhas RezetaBrasil. "
+            "Use as diretrizes visuais da marca: azul marinho (#1E3A5F), verde esmeralda (#3DAA7F), "
+            "layout com overlay branco superior e verde inferior, fotografia realista de pessoas."
+        )
+    else:  # FC
+        guardrail = (
+            "Você é um diretor de arte especialista em campanhas FC Soluções Financeiras. "
+            "Use as diretrizes visuais da marca: azul escuro (#071c4a), azul claro (#00a3ff), "
+            "layout institucional corporativo, fotografia realista profissional."
+        )
 
     system = (
-        "Você é diretor de criação para campanhas de tráfego pago. "
+        f"{guardrail}\n\n"
+        "Você deve analisar o brief do cliente e extrair/copy estruturada. "
         "Responda SOMENTE JSON válido, sem markdown."
     )
+    
     user = (
-        f"{guardrail}\n"
-        "Resuma o texto de campanha e devolva JSON com as chaves exatas: "
-        "headline, subheadline, bullets, quote, cta, scene.\n"
-        "Regras:\n"
-        "- headline: 6 a 10 palavras\n"
-        "- subheadline: 8 a 16 palavras\n"
-        "- bullets: array com 3 a 5 bullets curtos\n"
-        "- quote: opcional, curta\n"
-        "- cta: 2 a 5 palavras\n"
-        "- scene: descrição fotográfica realista para fundo sem texto\n"
-        "- Tudo em pt-BR\n"
-        f"Contexto adicional do modo (resumido): {_sanitize_prompt(prompt_extra_image or '', 800)}\n"
-        f"Texto de entrada:\n{fonte}"
+        "ANÁLISE DO BRIEF DE CAMPANHA:\n\n"
+        f"{fonte}\n\n"
+        "---\n\n"
+        "DIRETRIZES VISUAIS DA MARCA (use como referência):\n\n"
+        f"{prompt_mestre[:3000]}\n\n"  # Limita para não ultrapassar tokens
+        "---\n\n"
+        "INSTRUÇÃO:\n"
+        "Com base no brief acima e nas diretrizes visuais da marca, "
+        "extraia/devolva um JSON com as chaves exatas:\n"
+        "- headline: título principal impactante (6-10 palavras)\n"
+        "- subheadline: subtítulo de apoio (8-16 palavras)\n"
+        "- bullets: array com 3-5 bullets curtos destacando benefícios\n"
+        "- quote: depoimento ou frase de impacto (opcional)\n"
+        "- cta: call-to-action curto e direto (2-5 palavras)\n"
+        "- scene: descrição detalhada da cena fotográfica para o fundo (sem texto, sem logo)\n\n"
+        "O headline e subheadline devem capturar a essência do problema/solução do brief.\n"
+        "A scene deve descrever uma fotografia realista de pessoa em contexto financeiro."
     )
 
     resposta = await zai_service.chat(
@@ -297,7 +323,7 @@ async def _generate_campaign_copy(
             {"role": "user", "content": user},
         ],
         temperature=0.4,
-        max_tokens=500,
+        max_tokens=800,
     )
 
     parsed = _extract_json_block(resposta)
@@ -310,7 +336,7 @@ async def _generate_campaign_copy(
     copy = {
         "brand": modo,
         "headline": _sanitize_prompt(str(parsed.get("headline") or "Destrave seu crédito com estratégia"), 90),
-        "subheadline": _sanitize_prompt(str(parsed.get("subheadline") or "Diagnóstico claro e plano de ação objetivo"), 130),
+        "subheadline": _sanitize_prompt(str(parsed.get("subheadline") or "Diagnóstico claro e pleno de ação objetivo"), 130),
         "bullets": bullets or _fallback_copy(fonte, modo)["bullets"],
         "quote": _sanitize_prompt(str(parsed.get("quote") or ""), 120),
         "cta": _sanitize_prompt(str(parsed.get("cta") or ("CHAMAR NO WHATSAPP" if modo == "REZETA" else "VER COMO FUNCIONA")), 40),
