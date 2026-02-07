@@ -1,113 +1,60 @@
-# Integração WhatsApp + IA VIVA
+﻿# Integracao WhatsApp + VIVA
 
-> **Data:** 2026-02-07  
-> **Versão:** 1.2.0  
-> **Status:** ⚠️ Parcial - estabilização em execução
+> Data: 07/02/2026
+> Versao: 1.3.0
+> Status: Base integrada e pacote operacional aprovado para V1 de teste
 
----
+## Visao geral
+Integracao entre WhatsApp (Evolution), backend FastAPI, frontend Next.js e
+motor de atendimento da VIVA para operacao comercial da Rezeta.
 
-## Visão Geral
-
-Integração entre:
-- WhatsApp (Evolution API)
-- Backend (FastAPI)
-- Frontend (Next.js)
-- IA VIVA (Z.AI / OpenRouter / modo local)
-
-A VIVA atende clientes via WhatsApp e também opera como chat interno no frontend (`/viva`).
-
----
-
-## Arquitetura
-
+## Fluxo tecnico
 ```text
-WhatsApp -> Evolution API -> Webhook (/api/v1/webhook/evolution)
+WhatsApp -> Evolution API -> /api/v1/webhook/evolution
                          -> EvolutionWebhookService
                          -> VivaIAService
-                         -> PostgreSQL (logs/historico)
+                         -> PostgreSQL (conversas/mensagens)
                          -> Frontend /whatsapp/conversas
 ```
 
-Chat interno (web)
-```text
-Frontend /viva -> API /api/v1/viva/* -> VIVA (Z.AI/OpenRouter/local)
-```
-
----
-
-## Endpoints
-
-Webhook (Evolution)
+## Rotas principais
+Webhook
 - POST `/api/v1/webhook/evolution`
 - GET `/api/v1/webhook/evolution`
 
-WhatsApp (Conexão/Envio)
+Conexao WhatsApp
 - GET `/api/v1/whatsapp/status`
 - POST `/api/v1/whatsapp/conectar`
 - POST `/api/v1/whatsapp/desconectar`
 - POST `/api/v1/whatsapp/enviar-texto`
 - POST `/api/v1/whatsapp/enviar-arquivo`
 
-Chat WhatsApp (Frontend)
+Conversas
 - GET `/api/v1/whatsapp-chat/conversas`
 - GET `/api/v1/whatsapp-chat/conversas/{id}`
 - GET `/api/v1/whatsapp-chat/conversas/{id}/mensagens`
 - POST `/api/v1/whatsapp-chat/conversas/{id}/arquivar`
 - GET `/api/v1/whatsapp-chat/status`
 
-Chat VIVA (Interno)
-- POST `/api/v1/viva/chat`
-- POST `/api/v1/viva/vision`
-- POST `/api/v1/viva/vision/upload`
-- POST `/api/v1/viva/audio/transcribe`
-- POST `/api/v1/viva/image/generate`
-- GET `/api/v1/viva/status`
+## Pacote operacional aprovado (negocio)
+- Modo B com persona Viviane (consultora Rezeta).
+- Fluxo de qualificacao: objetivo -> perfil -> urgencia -> proximo passo.
+- Coleta minima: nome, telefone, servico, cidade e urgencia.
+- Politica de resposta P1/P2 com adaptacao de formalidade.
+- SLA 24/7 com callback de ate 15 minutos.
+- Diagnostico 360 como oferta recomendada inicial.
+- Excecao de venda direta: Limpa Nome, Score e Rating.
+- Tabela de preco com margem operacional de 15% para oferta inicial.
+
+## Fontes de conhecimento V1
+- `frontend/src/app/viva/REGRAS/Descrição_Detalhada_dos_Serviços_Rezeta_Brasil.md`
+- `frontend/src/app/viva/REGRAS/Tabela Precços IA.xlsx`
+- `frontend/src/app/viva/REGRAS/tabela_precos_ia_01_planilha1.csv`
+
+## Gate atual
+Documentacao institucional concluida. Proximo passo: aplicar a V1 de teste no
+backend e validar ponta a ponta.
 
 ---
 
-## Diagnóstico Atual (2026-02-07)
-
-- Evolution API está ativa em `http://localhost:8080`.
-- Instância ativa detectada: `Teste` (estado `open`).
-- Backend reporta desconectado em `/whatsapp/status` quando há divergência entre `WA_INSTANCE_NAME`/`EVOLUTION_API_KEY` e runtime da Evolution.
-- Serviço backend de envio está defasado em relação ao contrato atual da Evolution v1.8.
-- Webhook ainda não envia de fato a resposta da VIVA para o WhatsApp (somente persiste no banco).
-- Endpoints `/whatsapp-chat/*` com erro 500 no estado atual.
-- Frontend `/whatsapp` está em placeholder e `/whatsapp/conversas` tem inconsistência de token/base URL.
-
----
-
-## Plano de Aplicação
-
-1. Alinhamento de configuração
-   - Padronizar `EVOLUTION_API_KEY`, `WA_INSTANCE_NAME` e webhook da instância.
-2. Correção do backend WhatsApp
-   - Ajustar leitura de status e payloads de envio para Evolution v1.8.
-3. Correção de persistência/conversas
-   - Resolver incompatibilidade ORM/schema que gera erro 500.
-4. Conexão do frontend
-   - Implementar painel real de conexão WhatsApp (`/whatsapp`).
-   - Ajustar `/whatsapp/conversas` para API client padrão e `access_token`.
-5. Validação ponta a ponta
-   - Entrada no WhatsApp -> webhook -> resposta VIVA -> envio real -> histórico no frontend.
-
----
-
-## Persistência
-
-Tabelas principais
-- `whatsapp_conversas`
-- `whatsapp_mensagens`
-
----
-
-## Referências
-
-- `docs/STATUS.md`
-- `docs/SESSION.md`
-- `docs/DECISIONS.md`
-- `docs/BUGSREPORT.md`
-
----
-
-*Documento atualizado em: 2026-02-07*
+Documento atualizado em: 07/02/2026

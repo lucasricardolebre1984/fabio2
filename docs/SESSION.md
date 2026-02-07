@@ -1,65 +1,43 @@
-# SESSION - Contexto Atual da Sessão
+﻿# SESSION - contexto atual da sessao
 
-> **Sessão Ativa:** 2026-02-07  
-> **Status:** ⚠️ Diagnóstico concluído, execução técnica WhatsApp pendente  
-> **Branch:** main
+Sessao ativa: 07/02/2026
+Status: alinhamento de negocio fechado com cliente; aguardando execucao tecnica
+Branch: main
 
----
+## Resumo executivo
+Nesta sessao, o cliente (Lebre + Fabio) fechou o pacote definitivo de
+atendimento WhatsApp da Viviane para a Rezeta, com foco em atendimento humano,
+conversao e controle de operacao.
 
-## Estado Atual do Sistema
+## Definicoes aprovadas
+- Modo B: VIVA conduz quase tudo.
+- Persona: Viviane, consultora de negocios da Rezeta.
+- Tom: hibrido (consultivo, direto, cordial, simples e acolhedor).
+- Fluxo: objetivo -> perfil -> urgencia -> proximo passo.
+- Politica P1 com fallback P2 em conversa formal.
+- SLA 24/7 com callback em ate 15 minutos.
+- 3 tentativas maximas sem resposta antes de encerrar.
+- Coleta minima obrigatoria: nome, telefone, servico, cidade e urgencia.
 
-Funcionalidades principais
-- Contratos com template Bacen
-- Criação, edição e visualização institucional
-- PDF via impressão do navegador
-- Clientes e agenda funcionando
-- VIVA chat interno em `/viva`
-- Módulo WhatsApp com backend/frontend parcialmente conectado
+## Regras comerciais
+- Diagnostico 360 como primeira recomendacao.
+- Venda direta sem 360 para servicos simples:
+  - Limpa Nome
+  - Aumento de Score
+  - Aumento de Rating
+- Oferta inicial com +15% sobre tabela de referencia.
+- Negociacao de valor final somente atendimento humano.
+- Motivo financeiro no nao fechamento deve ser registrado para follow-up.
 
-VIVA (modelos)
-- Chat: GLM-4.7
-- Visão: GLM-4.6V
-- Imagem: GLM-Image
-- Áudio: GLM-ASR-2512 (botão não operacional)
-- Vídeo: CogVideoX-3
+## Fontes consolidadas na sessao
+- `frontend/src/app/viva/REGRAS/Descrição_Detalhada_dos_Serviços_Rezeta_Brasil.md`
+- `frontend/src/app/viva/REGRAS/Tabela Precços IA.xlsx`
+- `frontend/src/app/viva/REGRAS/tabela_precos_ia_01_planilha1.csv`
 
----
-
-## Evidências Técnicas da Sessão
-
-- `localhost:8080` ativo com Evolution e instância `Teste` em estado `open`.
-- `/api/v1/whatsapp/status` no backend reporta desconectado por divergência de instância/chave.
-- `/api/v1/whatsapp-chat/*` retorna erro 500 no estado atual.
-- Webhook `/api/v1/webhook/evolution` responde health, porém envio real da resposta da VIVA ao WhatsApp ainda não foi implementado.
-- Frontend `/whatsapp` está em placeholder e `/whatsapp/conversas` usa token/key incompatível com login atual.
-
----
-
-## Proposta Registrada para Execução
-
-1. Alinhar configuração Evolution/Backend (`EVOLUTION_API_KEY`, `WA_INSTANCE_NAME`, webhook).
-2. Corrigir `whatsapp_service.py` para contrato atual da Evolution v1.8.
-3. Corrigir erro 500 de `whatsapp-chat` (modelagem ORM x schema).
-4. Ligar frontend WhatsApp aos endpoints reais com autenticação correta.
-5. Validar fluxo ponta a ponta com evidências de envio/recebimento.
+## Gate institucional atual
+Documentacao completa entregue conforme protocolo. Proximo passo e executar a
+V1 de teste no backend e validar o fluxo ponta a ponta.
 
 ---
 
-## Bugs Abertos nesta Sessão
-
-- BUG-017: erro 500 em `/whatsapp-chat/*`
-- BUG-018: divergência de instância/chave Evolution
-- BUG-019: token incorreto e URL hardcoded no frontend WhatsApp
-- BUG-020: webhook sem envio real de resposta ao WhatsApp
-
----
-
-## Plano de Etapas (Ubuntu)
-
-- Etapa 1: Roteiro de deploy 100% Docker (concluída)
-- Etapa 2: WhatsApp funcional e integrado ao backend/frontend (em execução)
-- Etapa 3: Protocolo final com DNS, SSL e hardening (pendente)
-
----
-
-*Atualizado em: 2026-02-07*
+Atualizado em: 07/02/2026

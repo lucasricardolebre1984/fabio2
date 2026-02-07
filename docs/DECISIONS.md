@@ -360,3 +360,47 @@ Executar a integração em cinco frentes técnicas, nesta ordem:
 ---
 
 *Documentado em: 2026-02-07*
+
+## DECISÃO-009: pacote definitivo de atendimento WhatsApp da Viviane (Rezeta)
+
+### Data
+07/02/2026
+
+### Contexto
+O cliente validou em reuniao operacional o modelo final de atendimento para
+leads no WhatsApp, com objetivo de elevar conversao sem perder linguagem
+humana e controle comercial.
+
+### Decisão
+Adotar o seguinte pacote institucional:
+- Operacao em Modo B (VIVA conduz quase tudo; humano por excecao).
+- Persona fixa: Viviane, consultora de negocios da Rezeta.
+- Tom hibrido com respostas naturais e variacao de linguagem.
+- Fluxo de qualificacao: objetivo -> perfil -> urgencia -> proximo passo.
+- Coleta obrigatoria: nome, telefone, servico, cidade e urgencia.
+- SLA 24/7 com callback em ate 15 minutos.
+- Diagnostico 360 como recomendacao inicial padrao.
+- Excecao de venda direta para Limpa Nome, Score e Rating.
+- Oferta inicial com margem de 15% sobre tabela de referencia.
+- Negociacao de valor final e descontos somente com atendimento humano.
+- Registro obrigatorio de objecao financeira para follow-up.
+
+### Governanca de conhecimento
+As fontes oficiais para a V1 ficam versionadas em:
+- `frontend/src/app/viva/REGRAS/Descrição_Detalhada_dos_Serviços_Rezeta_Brasil.md`
+- `frontend/src/app/viva/REGRAS/Tabela Precços IA.xlsx`
+- `frontend/src/app/viva/REGRAS/tabela_precos_ia_01_planilha1.csv`
+
+### Motivo
+- Aumenta taxa de fechamento com abordagem consultiva e humana.
+- Mantem previsibilidade operacional com regras claras de escala.
+- Permite manutencao rapida de preco sem refatorar fluxo inteiro.
+
+### Rollback
+Se o pacote precisar revisao:
+- rollback documental por commit dedicado;
+- rollback funcional por `git revert` na implementacao da V1.
+
+---
+
+*Documentado em: 07/02/2026*

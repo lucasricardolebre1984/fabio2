@@ -54,3 +54,20 @@ Dados
 ---
 
 *Documento atualizado em: 2026-02-05*
+
+---
+
+## Camada de conhecimento operacional da Viviane (V1)
+
+A operacao WhatsApp da Rezeta utiliza base versionada de regras em arquivos para
+permitir manutencao continua sem alterar fluxo de atendimento inteiro.
+
+Fontes oficiais:
+- `frontend/src/app/viva/REGRAS/Descrição_Detalhada_dos_Serviços_Rezeta_Brasil.md`
+- `frontend/src/app/viva/REGRAS/Tabela Precços IA.xlsx`
+- `frontend/src/app/viva/REGRAS/tabela_precos_ia_01_planilha1.csv`
+
+Essa camada define:
+- linguagem e postura comercial da Viviane;
+- portfolio e contexto institucional da Rezeta;
+- tabela base de oferta com margem operacional.
