@@ -349,7 +349,7 @@ export default function VivaChatPage() {
     
     // Carrega o prompt
     try {
-      const response = await fetch(`/viva/PROMPTS/${promptId}.md`)
+      const response = await fetch(`/PROMPTS/${promptId}.md`)
       const texto = await response.text()
       setPromptConteudo(texto)
       
