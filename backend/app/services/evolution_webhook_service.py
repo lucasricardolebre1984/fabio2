@@ -17,8 +17,8 @@ from app.models.whatsapp_conversa import (
     WhatsappMensagem,
 )
 from app.services.viva_ia_service import viva_service
+from app.services.viva_model_service import viva_model_service
 from app.services.whatsapp_service import WhatsAppService
-from app.services.zai_service import zai_service
 
 
 class EvolutionWebhookService:
@@ -384,7 +384,7 @@ class EvolutionWebhookService:
 
         mime_type = str(audio_data.get("mimetype") or "audio/ogg")
         filename = self._build_audio_filename(message_wrapper, mime_type)
-        transcricao = await zai_service.audio_transcribe_bytes(
+        transcricao = await viva_model_service.audio_transcribe_bytes(
             audio_bytes=audio_bytes,
             filename=filename,
             content_type=mime_type,

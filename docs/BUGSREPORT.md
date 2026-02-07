@@ -11,7 +11,7 @@
 |---|---|---|---|---|
 | BUG-010 | Baixa | PDF | WeasyPrint requer GTK+ no Windows | Aguardando instalação GTK+ |
 | BUG-012 | Média | VIVA | Botão de áudio no chat não funciona | Ativo |
-| BUG-013 | Média | VIVA | Erro `StackOverflowError` ao gerar imagem com prompt extra longo (REZETA/FC) | Ativo |
+| BUG-013 | Média | VIVA | Erro `StackOverflowError` ao gerar imagem com prompt extra longo (REZETA/FC) | Resolvido |
 | BUG-014 | Média | VIVA | Upload de imagem falha quando a imagem é PNG (MIME assumido como JPEG) | Ativo |
 | BUG-015 | Alta | VIVA | Fundo da imagem não respeita paleta/brief do prompt (resultado genérico) | Ativo |
 | BUG-016 | Média | VIVA | Arte final perde partes do texto (overlay truncado) | Ativo |
@@ -19,8 +19,10 @@
 | BUG-018 | Alta | WhatsApp Evolution | Backend consulta instância/chave divergentes do runtime (instância ativa `Teste`), causando falso desconectado (`Status 404`) | Resolvido |
 | BUG-019 | Média | Frontend WhatsApp | `/whatsapp/conversas` usa token incorreto (`localStorage.token`) e base URL hardcoded em `localhost:8000` | Ativo |
 | BUG-020 | Alta | Webhook WhatsApp | Resposta da VIVA não é enviada ao WhatsApp no webhook (envio real marcado como TODO) | Resolvido |
-| BUG-021 | Alta | Webhook WhatsApp | Mensagem de áudio recebida no WhatsApp não era transcrita para o fluxo da VIVA (áudio obrigatório) | Em validação |
+| BUG-021 | Alta | Webhook WhatsApp | Mensagem de áudio recebida no WhatsApp não era transcrita para o fluxo da VIVA (áudio obrigatório) | Resolvido |
 | BUG-022 | Média | Webhook WhatsApp | Intermitência de envio (`400 Text is required` e `exists:false`) por payload vazio/JID não entregável no retorno da IA | Resolvido |
+| BUG-023 | Alta | VIVA/OpenAI | `OPENAI_API_KEY` vazio no container por override do `docker-compose` bloqueava respostas da IA | Resolvido |
+| BUG-024 | Média | VIVA/OpenAI | Geração de imagem falhava com `Unknown parameter: response_format` no endpoint OpenAI Images | Resolvido |
 
 ---
 
@@ -47,7 +49,10 @@
 | BUG-011 | DB | JSONB/UUID incompatível | 2026-02-03 |
 | BUG-018 | WhatsApp Evolution | Instância e chave divergentes geravam falso desconectado | 2026-02-07 |
 | BUG-020 | Webhook WhatsApp | Resposta da VIVA não era enviada (TODO removido e envio ativo) | 2026-02-07 |
+| BUG-021 | Webhook WhatsApp | Transcrição de áudio estabilizada no fluxo ativo da VIVA (OpenAI) | 2026-02-07 |
 | BUG-022 | Webhook WhatsApp | Blindagem contra resposta vazia e JID não entregável (`exists:false`) | 2026-02-07 |
+| BUG-023 | VIVA/OpenAI | Removido override vazio de `OPENAI_API_KEY` no compose | 2026-02-07 |
+| BUG-024 | VIVA/OpenAI | Ajustado payload OpenAI Images sem `response_format` incompatível | 2026-02-07 |
 
 ---
 

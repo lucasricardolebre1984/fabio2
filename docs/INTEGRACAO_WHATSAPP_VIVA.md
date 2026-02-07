@@ -1,8 +1,8 @@
 ﻿# Integracao WhatsApp + VIVA
 
 > Data: 07/02/2026
-> Versao: 1.4.0
-> Status: Operacao estabilizada com webhook ativo e runbook completo
+> Versao: 1.5.0
+> Status: Operacao estabilizada e homologada localmente com cliente
 
 ## Visao geral
 Integracao entre WhatsApp (Evolution), backend FastAPI, frontend Next.js e
@@ -56,14 +56,16 @@ Conversas
 - `frontend/src/app/viva/REGRAS/tabela_precos_ia_01_planilha1.csv`
 
 ## Gate atual
-V1.4 aplicada no backend com:
+V1.5 aplicada no backend com:
 - normalizacao de eventos webhook (`MESSAGES_UPSERT` / `CONNECTION_UPDATE`);
 - fallback contra resposta vazia do modelo;
 - bloqueio de retries para JID nao entregavel (`exists:false`);
 - base de conhecimento carregada por volume no container.
+- VIVA padronizada em OpenAI (`gpt-5-mini`).
+- geracao de imagem migrada para OpenAI Images.
 
 Proximo passo:
-- homologacao assistida com cliente e monitoramento de conversao.
+- monitoramento de conversao e evolucoes incrementais de atendimento.
 
 ## Ativacoes obrigatorias no Evolution Manager
 - Ativo: ON
@@ -74,7 +76,7 @@ Proximo passo:
 
 ## Suporte a audio (WhatsApp)
 - Webhook agora detecta `audioMessage` e tenta transcrever automaticamente.
-- Fluxo: Evolution (midia base64) -> transcricao Z.AI (`glm-asr-2512`) -> VIVA.
+- Fluxo: Evolution (midia base64) -> transcricao OpenAI -> VIVA.
 - Se a transcricao falhar, a Viviane responde com fallback pedindo texto/audio curto
   para manter atendimento sem travar a conversa.
 

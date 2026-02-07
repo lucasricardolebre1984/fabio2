@@ -1,6 +1,6 @@
 """
 VIVA - Assistente Virtual Inteligente
-Integracao com GLM para atendimento de WhatsApp.
+Integracao com OpenAI para atendimento de WhatsApp.
 """
 from datetime import datetime, timezone
 import logging
@@ -12,8 +12,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.whatsapp_conversa import TipoOrigem, WhatsappConversa, WhatsappMensagem
+from app.services.viva_model_service import viva_model_service
 from app.services.viva_knowledge_service import ServiceInfo, viva_knowledge_service
-from app.services.zai_service import zai_service
 
 
 class VivaIAService:
@@ -579,13 +579,21 @@ ESCALA PARA HUMANO:
         return messages
 
     async def _chamar_glm(self, messages: List[Dict[str, str]], formal: bool) -> str:
-        """Chama o modelo de chat."""
+        """Chama o provedor de IA configurado para a VIVA."""
         try:
             if formal:
-                return await zai_service.chat(messages, temperature=0.45, max_tokens=520)
-            return await zai_service.chat(messages, temperature=0.58, max_tokens=360)
+                return await viva_model_service.chat(
+                    messages=messages,
+                    temperature=0.45,
+                    max_tokens=520,
+                )
+            return await viva_model_service.chat(
+                messages=messages,
+                temperature=0.58,
+                max_tokens=360,
+            )
         except Exception as exc:
-            logging.error("Erro ao chamar Z.AI: %r", exc)
+            logging.error("Erro ao chamar provedor de IA da VIVA: %r", exc)
             return (
                 "Tive uma instabilidade agora. "
                 "Posso continuar por aqui ou te encaminho para um atendente humano."

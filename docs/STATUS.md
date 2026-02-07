@@ -2,7 +2,7 @@
 
 Data: 07/02/2026
 Sessao: alinhamento final da operacao WhatsApp VIVA com cliente
-Status: V1 de teste aplicada no backend; em validacao assistida
+Status: V1.5 homologada localmente com cliente (OpenAI + Evolution estável)
 
 ## Objetivo atual
 Consolidar operacao comercial da Viviane no WhatsApp com regras de negocio,
@@ -20,6 +20,7 @@ qualificacao de lead, politica de preco e governanca de atendimento humano.
 - Instancia de teste removida: `tmp-fc-8601`
 - Persona comercial aprovada: Viviane, consultora da Rezeta
 - Fontes de conhecimento organizadas em `frontend/src/app/viva/REGRAS`
+- Provedor IA ativo: OpenAI (`gpt-5-mini`)
 
 ## Decisoes validadas com cliente
 - Modo B (VIVA conduz; humano por excecao)
@@ -34,8 +35,8 @@ qualificacao de lead, politica de preco e governanca de atendimento humano.
 - Objecao financeira registrada para follow-up
 
 ## Proximo gate
-Homologar conversa real no WhatsApp com cliente piloto e ajustar detalhes de
-persona/roteiro conforme retorno operacional.
+Iniciar ciclo de melhoria incremental (etiquetas de lead, scripts PF/PJ e painel de metricas),
+mantendo observabilidade do webhook e taxa de conversao.
 
 ## Documentos de referencia
 - `docs/WHATSAPP_VIVA_PACOTE_DEFINITIVO.md`

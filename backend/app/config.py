@@ -85,17 +85,6 @@ class Settings(BaseSettings):
     AWS_S3_ENDPOINT: Optional[str] = None
     
     # ==================================================================
-    # Z.AI API (GLM Models) - Chat, Vision, Audio, Image, Video
-    # ==================================================================
-    ZAI_API_KEY: Optional[str] = None
-    ZAI_BASE_URL: str = "https://api.z.ai/api/paas/v4"
-    ZAI_MODEL_CHAT: str = "glm-4.7"
-    ZAI_MODEL_VISION: str = "glm-4.6v"
-    ZAI_MODEL_AUDIO: str = "glm-asr-2512"
-    ZAI_MODEL_IMAGE: str = "glm-image"
-    ZAI_MODEL_VIDEO: str = "cogvideox-3"
-    
-    # ==================================================================
     # DeepSeek API (Backup)
     # ==================================================================
     DEEPSEEK_API_KEY: Optional[str] = None
@@ -105,6 +94,25 @@ class Settings(BaseSettings):
     # Obter API key: https://openrouter.ai/
     # ==================================================================
     OPENROUTER_API_KEY: Optional[str] = None
+
+    # ==================================================================
+    # OpenAI API (Primary for VIVA WhatsApp)
+    # ==================================================================
+    OPENAI_API_KEY: Optional[str] = None
+    OPENAI_BASE_URL: str = "https://api.openai.com/v1"
+    OPENAI_API_MODEL: str = "gpt-5-mini"
+    OPENAI_AUDIO_MODEL: str = "gpt-4o-mini-transcribe"
+    OPENAI_IMAGE_MODEL: str = "gpt-image-1"
+    OPENAI_VISION_MODEL: str = "gpt-4o-mini"
+    OPENAI_TIMEOUT_SECONDS: int = 60
+
+    # VIVA provider strategy (institucional): openai
+    VIVA_PROVIDER: str = "openai"
+
+    # ==================================================================
+    # Legacy vars (ignored in runtime logic; kept for backward compatibility)
+    # ==================================================================
+    ZAI_API_KEY: Optional[str] = None
     
     # ==================================================================
     # Ollama API (Local)
@@ -126,6 +134,7 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = True
+        extra = "ignore"
 
 
 @lru_cache()

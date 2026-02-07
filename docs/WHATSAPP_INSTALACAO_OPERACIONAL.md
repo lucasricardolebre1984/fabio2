@@ -20,7 +20,7 @@ FastAPI (container: fabio2-backend)
   - EvolutionWebhookService
   - VivaIAService
   - WhatsAppService
-  - ZAIService (modelo conversacional/transcricao)
+  - OpenAIService (chat, audio, imagem e visao)
                    |
                    v
 PostgreSQL (conversas e mensagens)
@@ -56,6 +56,16 @@ No `docker-compose.yml`, manter:
 
 Observacao:
 - A chave global usada no Manager deve ser a mesma de `EVOLUTION_API_KEY`.
+
+## 4.1 Parametros criticos (OpenAI)
+No `backend/.env`, manter:
+- `OPENAI_API_KEY=<sua_chave>`
+- `OPENAI_API_MODEL=gpt-5-mini`
+- `OPENAI_IMAGE_MODEL=gpt-image-1`
+- `OPENAI_AUDIO_MODEL=gpt-4o-mini-transcribe`
+
+Observacao:
+- O backend le `backend/.env` diretamente; evite sobrescrever `OPENAI_API_KEY` vazio no `docker-compose`.
 
 ## 5. Login no Evolution Manager
 URL:
@@ -103,7 +113,7 @@ Invoke-RestMethod -Method Get -Uri 'http://localhost:8080/webhook/find/fc-soluco
 ```
 
 ## 7.1 Integracoes do Evolution (deixar OFF)
-Para este projeto, a IA roda no backend FastAPI (VIVA + Z.AI), nao no painel interno do Evolution.
+Para este projeto, a IA roda no backend FastAPI (VIVA + OpenAI), nao no painel interno do Evolution.
 
 Deixe DESATIVADO no Evolution:
 - `Integracoes > OpenAI`

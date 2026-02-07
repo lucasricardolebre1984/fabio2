@@ -11,7 +11,7 @@
 - Chat interno VIVA publicado em `/viva`
 - Menu lateral com prompts específicos
 - Integração WhatsApp com histórico de conversas
-- Modelos Z.AI definidos para chat, visão, imagem, áudio e vídeo
+- Modelos OpenAI definidos para chat, visao, imagem e audio
 
 ---
 
@@ -30,13 +30,12 @@ WhatsApp
 
 ---
 
-## Modelos Z.AI (Oficiais)
+## Modelos OpenAI (Oficiais)
 
-- Chat: GLM-4.7
-- Visão: GLM-4.6V
-- Imagem: GLM-Image
-- Áudio: GLM-ASR-2512
-- Vídeo: CogVideoX-3
+- Chat: gpt-5-mini
+- Visao: gpt-4o-mini
+- Imagem: gpt-image-1
+- Audio: gpt-4o-mini-transcribe
 
 ---
 
@@ -45,14 +44,14 @@ WhatsApp
 - Chat: OK
 - Visão: OK
 - Imagem: OK
-- Áudio: NÃO funciona (botão)
+- Audio: OK (transcricao ativa no webhook e endpoint)
 
 ---
 
 ## Observações Técnicas
 
-- Chat interno usa OpenRouter quando há chave configurada
-- Sem OpenRouter, VIVA opera em modo local com templates
+- Chat interno e WhatsApp usam OpenAI como provedor institucional
+- Modo local permanece como contingencia
 - WhatsApp utiliza VivaIAService para respostas automáticas
 
 ---
@@ -77,4 +76,13 @@ WhatsApp
   - `frontend/src/app/viva/REGRAS/Descrição_Detalhada_dos_Serviços_Rezeta_Brasil.md`
   - `frontend/src/app/viva/REGRAS/tabela_precos_ia_01_planilha1.csv`
 
-Status do ciclo: documentacao concluida, aguardando execucao tecnica da V1.
+## Ciclo 2026-02-07 (tarde) - migracao completa para OpenAI
+
+- Removido `zai_service.py` do runtime.
+- `VivaIAService` e webhook de audio roteados para OpenAI.
+- `/api/v1/viva/chat` migrado para OpenAI no fluxo principal.
+- `/api/v1/viva/image/generate` migrado para OpenAI Images.
+- Corrigido bug de imagem (`Unknown parameter: response_format`).
+- Corrigido bug de chave OpenAI vazia por override no compose.
+
+Status do ciclo: OpenAI ativo e backend saudável.

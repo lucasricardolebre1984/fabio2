@@ -19,7 +19,7 @@ Centralizar a operação de contratos, clientes e agenda da FC Soluções Financ
 - Banco: PostgreSQL 15
 - Cache/Fila: Redis 7
 - WhatsApp: Evolution API
-- IA VIVA: Z.AI (modelo principal), OpenRouter e modo local como fallback
+- IA VIVA: OpenAI (modelo principal), com fallback local controlado
 
 ---
 

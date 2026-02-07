@@ -53,7 +53,7 @@ Regras complementares:
 - API base: `/api/v1`
 - Auth: JWT Bearer
 - PDF: impressão via browser
-- VIVA: Z.AI com fallback para OpenRouter ou modo local
+- VIVA: OpenAI como provedor institucional, com fallback local
 
 ---
 

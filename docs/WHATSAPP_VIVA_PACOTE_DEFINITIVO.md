@@ -112,6 +112,19 @@ Transferir quando houver:
 - Esta versao documenta o acordo final com o cliente e libera a
   implementacao da V1 de teste no backend.
 
+## Execucao concluida (07/02/2026 - 17:20)
+- Homologado localmente com cliente no WhatsApp real.
+- VIVA operando com OpenAI (`gpt-5-mini`) no runtime.
+- Fluxo comercial da Viviane validado com contexto, qualificacao e proposta.
+- Transcricao de audio ativa via OpenAI.
+- Processo Evolution consolidado:
+  - instancia oficial `fc-solucoes`;
+  - webhook unico para backend;
+  - `Webhook por Eventos`: OFF;
+  - `Webhook Base64`: ON;
+  - eventos ativos: `MESSAGES_UPSERT`, `CONNECTION_UPDATE`;
+  - integracoes nativas do Evolution mantidas OFF para evitar conflito.
+
 ## Operacao e instalacao
 - Runbook completo: `docs/WHATSAPP_INSTALACAO_OPERACIONAL.md`
 - Ativacoes obrigatorias no Evolution:

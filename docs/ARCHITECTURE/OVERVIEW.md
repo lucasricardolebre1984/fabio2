@@ -40,7 +40,7 @@ Banco
 
 Integrações
 - Evolution API (WhatsApp)
-- Z.AI / OpenRouter / modo local (VIVA)
+- OpenAI / modo local (VIVA)
 
 ---
 
@@ -96,8 +96,8 @@ WhatsApp + VIVA
 - `evolution_webhook_service.py` processamento webhook
 - `viva_ia_service.py` VIVA para WhatsApp
 - `viva_local_service.py` VIVA local (sem API)
-- `openrouter_service.py` VIVA via OpenRouter
-- `zai_service.py` base Z.AI / DeepSeek (placeholder em partes)
+- `openai_service.py` provedor OpenAI institucional
+- `viva_model_service.py` roteamento padrao da VIVA
 
 ---
 

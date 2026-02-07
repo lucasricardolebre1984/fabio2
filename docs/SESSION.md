@@ -1,7 +1,7 @@
 ﻿# SESSION - contexto atual da sessao
 
 Sessao ativa: 07/02/2026
-Status: alinhamento fechado e V1 aplicada; aguardando homologacao em conversa real
+Status: alinhamento fechado e V1.5 homologada localmente com cliente
 Branch: main
 
 ## Resumo executivo
@@ -36,7 +36,17 @@ conversao e controle de operacao.
 
 ## Gate institucional atual
 V1 tecnica aplicada com base de conhecimento carregada em container. Proximo
-passo e homologar com atendimento real e ajustes finos.
+passo e evoluir para melhorias incrementais sem quebrar o fluxo homologado.
+
+## Atualizacao tecnica do fim da sessao
+- VIVA migrada para OpenAI como provedor principal e unico no runtime.
+- Chat/Audio/Imagem/Visao ativos via OpenAI.
+- `zai_service.py` removido do backend ativo para eliminar conflito.
+- Governanca Evolution consolidada:
+  - instancia oficial `fc-solucoes`
+  - webhook unico para backend
+  - eventos ativos `MESSAGES_UPSERT` e `CONNECTION_UPDATE`
+  - integracoes nativas do Evolution desativadas para evitar dupla automacao.
 
 ---
 

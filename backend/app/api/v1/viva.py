@@ -1,6 +1,6 @@
 """
 Chat direto com a VIVA - Assistente Virtual Interna
-Usa Z.AI (GLM-4) para Chat, Visão, Áudio e Imagem
+Usa OpenAI para Chat, Visao, Audio e Imagem
 """
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
@@ -12,8 +12,9 @@ import re
 from app.api.deps import get_current_user
 from app.models.user import User
 from app.services.viva_local_service import viva_local_service
+from app.services.viva_model_service import viva_model_service
+from app.services.openai_service import openai_service
 from app.services.openrouter_service import openrouter_service
-from app.services.zai_service import zai_service
 from app.config import settings
 
 router = APIRouter()
@@ -317,7 +318,7 @@ async def _generate_campaign_copy(
         "A scene deve descrever uma fotografia realista de pessoa em contexto financeiro."
     )
 
-    resposta = await zai_service.chat(
+    resposta = await openai_service.chat(
         [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -397,28 +398,21 @@ async def chat_with_viva(
     request: ChatRequest,
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Chat direto com a VIVA
-    Usa OpenRouter se disponível, senão usa modo local
-    """
+    """Chat direto com a VIVA usando OpenAI como provedor institucional."""
     try:
-        # Detecta modo ativo pelo contexto
         modo = None
         for msg in reversed(request.contexto):
-            if msg.get('modo'):
-                modo = msg.get('modo')
+            if msg.get("modo"):
+                modo = msg.get("modo")
                 break
 
         prompt_extra_raw = request.prompt_extra.strip() if request.prompt_extra else None
         prompt_extra_chat = _sanitize_prompt(prompt_extra_raw, 4000) if prompt_extra_raw else None
         prompt_extra_image = _sanitize_prompt(prompt_extra_raw, 1200) if prompt_extra_raw else None
 
-        # Roteia intenção de imagem diretamente para o gerador
         if _is_image_request(request.mensagem):
-            if not settings.ZAI_API_KEY:
-                return ChatResponse(
-                    resposta="A geração de imagens está indisponível no momento."
-                )
+            if not settings.OPENAI_API_KEY:
+                return ChatResponse(resposta="A geracao de imagens esta indisponivel no momento.")
 
             hint = _mode_hint(modo)
             campaign_copy: Optional[Dict[str, Any]] = None
@@ -434,16 +428,13 @@ async def chat_with_viva(
                 prompt = _build_image_prompt(prompt_extra_image, hint, request.mensagem)
                 prompt = f"{prompt}\n{BACKGROUND_ONLY_SUFFIX}"
 
-            resultado = await zai_service.generate_image(
-                prompt=prompt,
-                size="1024x1024",
-            )
+            resultado = await openai_service.generate_image(prompt=prompt, size="1024x1024")
             if not resultado.get("success"):
                 erro = resultado.get("error")
                 if _is_stackoverflow_error(erro):
                     fallback_prompt = _build_fallback_image_prompt(hint, request.mensagem)
                     fallback_prompt = f"{fallback_prompt}\n{BACKGROUND_ONLY_SUFFIX}"
-                    resultado = await zai_service.generate_image(
+                    resultado = await openai_service.generate_image(
                         prompt=fallback_prompt,
                         size="1024x1024",
                     )
@@ -453,66 +444,39 @@ async def chat_with_viva(
                             media = MediaItem(tipo="imagem", url=url)
                             if campaign_copy:
                                 media.meta = {"overlay": campaign_copy}
-                            return ChatResponse(
-                                resposta="Imagem gerada com sucesso.",
-                                midia=[media],
-                            )
-                        return ChatResponse(
-                            resposta="A imagem foi solicitada, mas a API não retornou URL."
-                        )
+                            return ChatResponse(resposta="Imagem gerada com sucesso.", midia=[media])
+                        return ChatResponse(resposta="A imagem foi solicitada, mas a API nao retornou URL.")
 
-                if isinstance(erro, dict):
-                    msg = erro.get("message", "Erro desconhecido")
-                else:
-                    msg = str(erro)
-                return ChatResponse(
-                    resposta=f"Erro ao gerar imagem: {msg}"
-                )
+                msg = erro.get("message", "Erro desconhecido") if isinstance(erro, dict) else str(erro)
+                return ChatResponse(resposta=f"Erro ao gerar imagem: {msg}")
+
             url = _extract_image_url(resultado)
             if url:
-                # Passa meta diretamente no construtor para garantir serialização
                 media_meta = {"overlay": campaign_copy} if campaign_copy else None
                 media = MediaItem(tipo="imagem", url=url, meta=media_meta)
-                return ChatResponse(
-                    resposta="Imagem gerada com sucesso.",
-                    midia=[media],
-                )
+                return ChatResponse(resposta="Imagem gerada com sucesso.", midia=[media])
+            return ChatResponse(resposta="A imagem foi solicitada, mas a API nao retornou URL.")
 
-            return ChatResponse(
-                resposta="A imagem foi solicitada, mas a API não retornou URL."
-            )
-        
-        # Prioriza Z.AI (oficial). Fallback para OpenRouter e modo local.
-        if settings.ZAI_API_KEY:
-            messages = openrouter_service.build_messages(
-                request.mensagem,
-                request.contexto
-            )
-            if prompt_extra_chat:
-                messages.insert(1, {"role": "system", "content": prompt_extra_chat})
-            resposta = await zai_service.chat(messages)
-        elif settings.OPENROUTER_API_KEY and settings.OPENROUTER_API_KEY != 'sk-or-v1-000000000000000000000000000000000000000000000000':
-            messages = openrouter_service.build_messages(
-                request.mensagem,
-                request.contexto
-            )
-            if prompt_extra_chat:
-                messages.insert(1, {"role": "system", "content": prompt_extra_chat})
-            resposta = await openrouter_service.chat(messages)
-        else:
-            messages = viva_local_service.build_messages(
-                request.mensagem,
-                request.contexto
-            )
+        if not settings.OPENAI_API_KEY:
+            messages = viva_local_service.build_messages(request.mensagem, request.contexto)
             resposta = await viva_local_service.chat(messages, modo)
+        else:
+            messages = openrouter_service.build_messages(request.mensagem, request.contexto)
+            if prompt_extra_chat:
+                messages.insert(1, {"role": "system", "content": prompt_extra_chat})
+            resposta = await viva_model_service.chat(
+                messages=messages,
+                temperature=0.58,
+                max_tokens=700,
+            )
+            if not resposta or resposta.strip().lower().startswith(("erro", "error")):
+                messages_local = viva_local_service.build_messages(request.mensagem, request.contexto)
+                resposta = await viva_local_service.chat(messages_local, modo)
 
         resposta = _ensure_fabio_greeting(request.mensagem, resposta)
-        
         return ChatResponse(resposta=resposta)
-        
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
-
 
 # ============================================
 # VISÃO - Análise de Imagens
@@ -522,22 +486,19 @@ async def analyze_image(
     request: ImageAnalysisRequest,
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Analisa imagem usando GLM-4V
-    """
+    """Analisa imagem usando modelo de visao da OpenAI."""
     try:
-        if not settings.ZAI_API_KEY:
-            raise HTTPException(status_code=500, detail="ZAI_API_KEY não configurada")
+        if not settings.OPENAI_API_KEY:
+            raise HTTPException(status_code=500, detail="OPENAI_API_KEY nao configurada")
 
-        resultado = await zai_service.vision_base64(
+        resultado = await openai_service.vision_base64(
             request.image_base64,
-            request.prompt
+            request.prompt,
         )
         return {"analise": resultado}
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
-
 
 @router.post("/vision/upload")
 async def analyze_image_upload(
@@ -545,27 +506,24 @@ async def analyze_image_upload(
     prompt: str = Form("Descreva esta imagem"),
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Faz upload e analisa imagem
-    """
+    """Faz upload e analisa imagem com OpenAI."""
     try:
         contents = await file.read()
-        image_base64 = base64.b64encode(contents).decode('utf-8')
+        image_base64 = base64.b64encode(contents).decode("utf-8")
         mime_type = file.content_type or "image/jpeg"
-        
-        if not settings.ZAI_API_KEY:
-            raise HTTPException(status_code=500, detail="ZAI_API_KEY não configurada")
 
-        resultado = await zai_service.vision_base64(
+        if not settings.OPENAI_API_KEY:
+            raise HTTPException(status_code=500, detail="OPENAI_API_KEY nao configurada")
+
+        resultado = await openai_service.vision_base64(
             image_base64,
             prompt,
-            mime_type=mime_type
+            mime_type=mime_type,
         )
         return {"analise": resultado}
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
-
 
 # ============================================
 # ÁUDIO - Transcrição
@@ -575,26 +533,26 @@ async def transcribe_audio(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Transcreve áudio usando GLM-ASR
-    """
+    """Transcreve audio usando OpenAI."""
     try:
         contents = await file.read()
         mime_type = file.content_type or "audio/wav"
-        
-        if not settings.ZAI_API_KEY:
-            raise HTTPException(status_code=500, detail="ZAI_API_KEY não configurada")
 
-        resultado = await zai_service.audio_transcribe_bytes(
+        if not settings.OPENAI_API_KEY:
+            raise HTTPException(status_code=500, detail="OPENAI_API_KEY nao configurada")
+
+        resultado = await viva_model_service.audio_transcribe_bytes(
             audio_bytes=contents,
             filename=file.filename or "audio.wav",
-            content_type=mime_type
+            content_type=mime_type,
         )
+        if not resultado or resultado.strip().lower().startswith(("erro", "error")):
+            raise HTTPException(status_code=502, detail=resultado or "Falha na transcricao")
+
         return {"transcricao": resultado}
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
-
 
 # ============================================
 # IMAGEM - Geração
@@ -604,23 +562,20 @@ async def generate_image(
     request: ImageGenerationRequest,
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Gera imagem usando GLM-Image
-    """
+    """Gera imagem usando OpenAI Images."""
     try:
-        if not settings.ZAI_API_KEY:
-            raise HTTPException(status_code=500, detail="ZAI_API_KEY não configurada")
+        if not settings.OPENAI_API_KEY:
+            raise HTTPException(status_code=500, detail="OPENAI_API_KEY nao configurada")
 
         size = f"{request.width}x{request.height}"
-        resultado = await zai_service.generate_image(
+        resultado = await openai_service.generate_image(
             prompt=request.prompt,
-            size=size
+            size=size,
         )
         return resultado
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
-
 
 # ============================================
 # VÍDEO - Geração
@@ -630,45 +585,22 @@ async def generate_video(
     request: VideoGenerationRequest,
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Gera vídeo usando CogVideoX-3 (Z.AI)
-    """
-    try:
-        if not settings.ZAI_API_KEY:
-            raise HTTPException(status_code=500, detail="ZAI_API_KEY não configurada")
-
-        resultado = await zai_service.generate_video(
-            prompt=request.prompt,
-            size=request.size,
-            fps=request.fps,
-            duration=request.duration,
-            quality=request.quality,
-            with_audio=request.with_audio,
-        )
-        return resultado
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
-
+    """Video generation nao habilitada no provedor OpenAI deste projeto."""
+    raise HTTPException(
+        status_code=501,
+        detail="Geracao de video nao esta habilitada nesta versao OpenAI da VIVA.",
+    )
 
 @router.get("/video/result/{task_id}")
 async def get_video_result(
     task_id: str,
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Consulta resultado assíncrono de geração de vídeo
-    """
-    try:
-        if not settings.ZAI_API_KEY:
-            raise HTTPException(status_code=500, detail="ZAI_API_KEY não configurada")
-
-        resultado = await zai_service.get_async_result(task_id)
-        return resultado
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
-
+    """Consulta de video nao habilitada no provedor OpenAI deste projeto."""
+    raise HTTPException(
+        status_code=501,
+        detail="Consulta de video nao esta habilitada nesta versao OpenAI da VIVA.",
+    )
 
 # ============================================
 # STATUS
@@ -677,13 +609,15 @@ async def get_video_result(
 async def viva_status(
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Verifica status da VIVA
-    """
-    # Verifica se tem API externa configurada
-    if settings.ZAI_API_KEY:
-        return zai_service.get_status()
-    if settings.OPENROUTER_API_KEY and settings.OPENROUTER_API_KEY != 'sk-or-v1-000000000000000000000000000000000000000000000000':
-        return openrouter_service.get_status()
-    else:
-        return viva_local_service.get_status()
+    """Verifica status da VIVA."""
+    if settings.OPENAI_API_KEY:
+        return viva_model_service.get_status()
+    return viva_local_service.get_status()
+
+
+
+
+
+
+
+

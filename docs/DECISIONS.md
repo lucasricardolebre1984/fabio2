@@ -429,3 +429,78 @@ caminho, impedindo leitura em runtime.
 ---
 
 *Documentado em: 07/02/2026*
+
+---
+
+## DECISÃO-011: OpenAI como provedor único da VIVA (remoção de Z.AI no runtime)
+
+### Data
+07/02/2026
+
+### Contexto
+O atendimento WhatsApp e o chat da VIVA estavam com comportamento inconsistente por mistura de provedores, além de falhas em geração de imagem e risco de conflito operacional.
+
+### Decisão
+- Padronizar VIVA em **OpenAI-only** no runtime.
+- Trocar o roteamento de chat e transcrição para `openai_service`/`viva_model_service`.
+- Migrar geração de imagem para OpenAI Images (`OPENAI_IMAGE_MODEL`).
+- Migrar análise de imagem (vision) para OpenAI.
+- Remover `zai_service.py` do backend ativo.
+- Manter fallback local apenas para contingência quando a API externa falhar.
+
+### Ajustes operacionais aplicados
+- Variáveis institucionais:
+  - `OPENAI_API_KEY`
+  - `OPENAI_API_MODEL` (aprovado: `gpt-5-mini`)
+  - `OPENAI_AUDIO_MODEL`
+  - `OPENAI_IMAGE_MODEL` (default técnico: `gpt-image-1`)
+  - `OPENAI_VISION_MODEL`
+- Removido override vazio de `OPENAI_API_KEY` no `docker-compose` para não sobrescrever `.env`.
+
+### Motivo
+- Elimina conflito entre provedores.
+- Mantém previsibilidade do atendimento da Viviane.
+- Corrige regressão de imagem e estabiliza áudio no mesmo provedor institucional.
+
+### Rollback
+- `git revert <hash-da-migracao-openai>`
+- Reintroduzir provedor anterior somente com decisão formal e testes de regressão.
+
+---
+
+*Documentado em: 07/02/2026*
+
+---
+
+## DECISÃO-012: Governança operacional do Evolution API para produção local estável
+
+### Data
+07/02/2026
+
+### Contexto
+Durante a homologação com cliente, o comportamento intermitente do WhatsApp exigiu padronização do processo no Evolution Manager para evitar conflito de automação, QR inconsistente e eventos desnecessários.
+
+### Decisão
+- Manter a automação da VIVA exclusivamente no backend FastAPI.
+- No Evolution Manager, manter integrações nativas (`OpenAI`, `Typebot`, `Dify`, `Flowise`, `Chatwoot`) desativadas para este fluxo.
+- Webhook institucional único:
+  - URL: `http://backend:8000/api/v1/webhook/evolution`
+  - `Webhook por Eventos`: OFF
+  - `Webhook Base64`: ON
+  - Eventos ativos: `MESSAGES_UPSERT`, `CONNECTION_UPDATE`
+- Instância oficial única para operação: `fc-solucoes`.
+
+### Motivo
+- Elimina concorrência entre automações.
+- Reduz ruído operacional e risco de resposta duplicada.
+- Preserva rastreabilidade completa no backend e no banco local.
+
+### Rollback
+- Reverter para configuração anterior apenas com validação de impacto:
+  - `git revert <hash-da-decisao/processo>`
+  - reaplicar configuração manual no Evolution conforme runbook.
+
+---
+
+*Documentado em: 07/02/2026*
+
