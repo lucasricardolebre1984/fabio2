@@ -125,6 +125,14 @@ Transferir quando houver:
   - eventos ativos: `MESSAGES_UPSERT`, `CONNECTION_UPDATE`;
   - integracoes nativas do Evolution mantidas OFF para evitar conflito.
 
+## Ajustes tecnicos complementares (07/02/2026 - noite)
+- Contratos voltaram a criar/vincular clientes automaticamente.
+- Endpoint de saneamento criado: `POST /api/v1/clientes/sincronizar-contratos`.
+- Tela `Clientes` agora tem cadastro manual + sincronizacao.
+- Tela `Agenda` minima funcional (criar/listar/concluir/excluir).
+- Chat interno da VIVA passou a criar agenda com comando:
+  - `agendar TITULO | DD/MM/AAAA HH:MM | descricao opcional`
+
 ## Operacao e instalacao
 - Runbook completo: `docs/WHATSAPP_INSTALACAO_OPERACIONAL.md`
 - Ativacoes obrigatorias no Evolution:

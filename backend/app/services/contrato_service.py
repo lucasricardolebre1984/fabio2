@@ -165,65 +165,67 @@ class ContratoService:
     
     async def create(self, data: ContratoCreate, user_id: UUID) -> Contrato:
         """Create a new contract."""
-        # Get template
         template = await self.get_template(data.template_id)
         if not template:
             raise ValueError(f"Template {data.template_id} não encontrado")
-        
-        # Calculate extenso values if not provided
+
+        documento_limpo = self._normalize_document(data.contratante_documento)
+
         valor_total = Decimal(str(data.valor_total))
         valor_entrada = Decimal(str(data.valor_entrada))
-        
+
         if not data.valor_total_extenso:
             data.valor_total_extenso = self.extenso.valor_por_extenso(valor_total)
         if not data.valor_entrada_extenso:
             data.valor_entrada_extenso = self.extenso.valor_por_extenso(valor_entrada)
         if not data.qtd_parcelas_extenso:
             data.qtd_parcelas_extenso = self.extenso.numero_por_extenso(data.qtd_parcelas)
-        
-        # Calculate parcela if not provided
+
         if not data.valor_parcela:
             data.valor_parcela = self.extenso.calcular_valor_parcela(
                 valor_total, valor_entrada, data.qtd_parcelas
             )
-        
         if not data.valor_parcela_extenso:
             data.valor_parcela_extenso = self.extenso.valor_por_extenso(data.valor_parcela)
-        
         if not data.prazo_1_extenso:
             data.prazo_1_extenso = self.extenso.numero_por_extenso(data.prazo_1)
         if not data.prazo_2_extenso:
             data.prazo_2_extenso = self.extenso.numero_por_extenso(data.prazo_2)
-        
-        # Find or create client
+
         result = await self.db.execute(
-            select(Cliente).where(Cliente.documento == data.contratante_documento)
+            select(Cliente).where(
+                func.replace(
+                    func.replace(
+                        func.replace(Cliente.documento, ".", ""),
+                        "-",
+                        "",
+                    ),
+                    "/",
+                    "",
+                ) == documento_limpo
+            )
         )
         cliente = result.scalar_one_or_none()
-        
+
         if not cliente:
-            # Create new client
             cliente = Cliente(
                 nome=data.contratante_nome,
-                tipo_pessoa="fisica" if len(data.contratante_documento) == 11 else "juridica",
-                documento=data.contratante_documento,
+                tipo_pessoa="fisica" if len(documento_limpo) == 11 else "juridica",
+                documento=documento_limpo,
                 email=data.contratante_email,
                 telefone=data.contratante_telefone,
-                endereco=data.contratante_endereco
+                endereco=data.contratante_endereco,
             )
             self.db.add(cliente)
             await self.db.flush()
         else:
-            # Update client info
             cliente.nome = data.contratante_nome
             cliente.email = data.contratante_email
             cliente.telefone = data.contratante_telefone
             cliente.endereco = data.contratante_endereco
-        
-        # Generate contract number
+
         numero = await self._generate_numero()
-        
-        # Create contract
+
         contrato = Contrato(
             numero=numero,
             status=ContratoStatus.RASCUNHO,
@@ -231,7 +233,7 @@ class ContratoService:
             template_nome=template.get("nome", data.template_id),
             cliente_id=cliente.id,
             contratante_nome=data.contratante_nome,
-            contratante_documento=data.contratante_documento,
+            contratante_documento=documento_limpo,
             contratante_email=data.contratante_email,
             contratante_telefone=data.contratante_telefone,
             contratante_endereco=data.contratante_endereco,
@@ -250,28 +252,40 @@ class ContratoService:
             local_assinatura=data.local_assinatura,
             data_assinatura=data.data_assinatura,
             dados_extras=data.dados_extras,
-            created_by=user_id
+            created_by=user_id,
         )
-        
+
         self.db.add(contrato)
+        await self.db.flush()
+        await self._recalculate_cliente_metrics(cliente.id)
         await self.db.commit()
         await self.db.refresh(contrato)
-        
+
         return contrato
     
     async def _generate_numero(self) -> str:
         """Generate contract number: CNT-YYYY-XXXX"""
         year = datetime.now().year
-        
-        # Count contracts this year
+        prefix = f"CNT-{year}-"
+
+        # Use current max sequence to avoid duplicate numbers when there are gaps.
         result = await self.db.execute(
-            select(func.count(Contrato.id)).where(
-                func.extract('year', Contrato.created_at) == year
-            )
+            select(Contrato.numero)
+            .where(Contrato.numero.like(f"{prefix}%"))
+            .order_by(desc(Contrato.numero))
+            .limit(1)
         )
-        count = result.scalar() + 1
-        
-        return f"CNT-{year}-{count:04d}"
+        ultimo_numero = result.scalar_one_or_none()
+
+        if not ultimo_numero:
+            sequencial = 1
+        else:
+            try:
+                sequencial = int(str(ultimo_numero).split("-")[-1]) + 1
+            except (TypeError, ValueError):
+                sequencial = 1
+
+        return f"CNT-{year}-{sequencial:04d}"
     
     async def list(
         self,
@@ -402,3 +416,5 @@ class ContratoService:
         pdf_service = PlaywrightPDFService(self.db)
         pdf_bytes = await pdf_service.generate_contrato_pdf(contrato_id)
         return pdf_bytes
+
+

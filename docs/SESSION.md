@@ -54,6 +54,21 @@ passo e evoluir para melhorias incrementais sem quebrar o fluxo homologado.
 - Novo achado: geracao de PDF de contrato quebra com `ModuleNotFoundError: playwright` (`BUG-026`).
 - Acao pendente: corrigir pipeline de templates/pdfs antes de nova rodada institucional de contratos.
 
+## Atualizacao tecnica adicional (2026-02-07 - noite)
+- `BUG-025` corrigido:
+  - fallback de template (`bacen/serasa/protesto`) para ambiente sem seed;
+  - geracao de numero de contrato passou a usar maior sequencial do ano (evita duplicidade).
+- Cadastro de clientes reforcado:
+  - contrato novo volta a vincular/criar cliente automaticamente;
+  - endpoint `POST /api/v1/clientes/sincronizar-contratos` para recuperar contratos orfaos.
+- Frontend entregue com minimo funcional:
+  - `Clientes`: listagem real + cadastro manual + botao de sincronizacao.
+  - `Agenda`: criacao/listagem/conclusao/exclusao de compromissos.
+- VIVA (chat interno com Fabio) integrada com agenda:
+  - comando suportado: `agendar TITULO | DD/MM/AAAA HH:MM | descricao opcional`;
+  - cria evento real no backend e retorna confirmacao.
+- `BUG-026` permanece pendente (PDF via Playwright nao instalado no container).
+
 ---
 
 Atualizado em: 07/02/2026

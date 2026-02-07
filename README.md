@@ -2,7 +2,7 @@
 
 > **Status:** 🧪 EM TESTES LOCAIS - Aguardando aprovação para deploy AWS  
 > **Versão:** 1.0.0  
-> **Última Atualização:** 2026-02-03  
+> **Última Atualização:** 2026-02-07  
 
 ---
 
@@ -12,9 +12,10 @@ SaaS completo para **FC Soluções Financeiras** gerenciar contratos de forma in
 
 ### Funcionalidades
 - ✅ **Contratos:** Templates pré-definidos (Bacen) com preenchimento dinâmico
-- ✅ **Clientes:** Cadastro automático e histórico completo
-- ✅ **Agenda:** Gestão de compromissos e eventos
-- ✅ **WhatsApp:** Integração Evolution API para envio de contratos
+- ✅ **Clientes:** Cadastro automático por contrato + cadastro manual + sincronização de órfãos
+- ✅ **Agenda:** Gestão mínima funcional (criar, listar, concluir e excluir)
+- ✅ **WhatsApp:** Integração Evolution API + webhook VIVA ativo
+- ✅ **VIVA Interna:** comando de agenda via chat (`agendar TITULO | DD/MM/AAAA HH:MM | descricao opcional`)
 
 ### Modelos de Contrato
 - ✅ **Bacen** (Remoção SCR) - Pronto para uso

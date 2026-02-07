@@ -23,7 +23,9 @@
 | BUG-022 | Média | Webhook WhatsApp | Intermitência de envio (`400 Text is required` e `exists:false`) por payload vazio/JID não entregável no retorno da IA | Resolvido |
 | BUG-023 | Alta | VIVA/OpenAI | `OPENAI_API_KEY` vazio no container por override do `docker-compose` bloqueava respostas da IA | Resolvido |
 | BUG-024 | Média | VIVA/OpenAI | Geração de imagem falhava com `Unknown parameter: response_format` no endpoint OpenAI Images | Resolvido |
-| BUG-025 | Alta | Contratos | Criação de contrato em `/contratos/novo` falha com `Network Error` porque `POST /api/v1/contratos` retorna `500` (`Template bacen não encontrado`) | Ativo |
+| BUG-025 | Alta | Contratos | Criação de contrato em `/contratos/novo` falhava com `Network Error` porque `POST /api/v1/contratos` retornava `500` (`Template bacen não encontrado`) | Resolvido |
+| BUG-027 | Alta | Clientes/Contratos | Contratos criados sem vínculo de cliente não apareciam na tela de clientes | Resolvido |
+| BUG-028 | Alta | Contratos | Geração de número por contagem anual permitia duplicidade (`ix_contratos_numero`) quando havia gaps | Resolvido |
 | BUG-026 | Alta | PDF | Endpoint `GET /api/v1/contratos/{id}/pdf` retorna `500` no container por dependência ausente (`ModuleNotFoundError: No module named 'playwright'`) | Ativo |
 
 ---
@@ -43,7 +45,9 @@
 - `BUG-019`: validação por código + endpoint:
   - front usa `api` compartilhada (`frontend/src/lib/api.ts`) com `access_token`;
   - `/whatsapp/conversas` consome rotas relativas (`/whatsapp-chat/*`) sem URL hardcoded local no arquivo da página.
-- `BUG-025` (novo): reproduzido `500` em `POST /api/v1/contratos` com `template_id=bacen`.
+- `BUG-025`: validado com `POST /api/v1/contratos` (`template_id=bacen`) retornando `200` após fallback de template + correção de numeração.
+- `BUG-027`: validado com criação de contrato e consulta `GET /api/v1/clientes?search=...`; cliente foi criado/vinculado automaticamente.
+- `BUG-028`: validado com nova criação de contrato sem colisão de índice único (`CNT-2026-0006` criado com sucesso).
 - `BUG-026` (novo): reproduzido `500` em `GET /api/v1/contratos/{id}/pdf`.
 
 ---
@@ -73,6 +77,9 @@
 | BUG-022 | Webhook WhatsApp | Blindagem contra resposta vazia e JID não entregável (`exists:false`) | 2026-02-07 |
 | BUG-023 | VIVA/OpenAI | Removido override vazio de `OPENAI_API_KEY` no compose | 2026-02-07 |
 | BUG-024 | VIVA/OpenAI | Ajustado payload OpenAI Images sem `response_format` incompatível | 2026-02-07 |
+| BUG-025 | Contratos | Criação de contrato estabilizada com fallback de template e numeração segura | 2026-02-07 |
+| BUG-027 | Clientes/Contratos | Reativado vínculo automático cliente<->contrato e endpoint de sincronização de órfãos | 2026-02-07 |
+| BUG-028 | Contratos | Numeração alterada para sequência por maior número do ano (sem colisão por gaps) | 2026-02-07 |
 
 ---
 

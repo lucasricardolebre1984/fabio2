@@ -13,9 +13,9 @@ Este é um **SaaS de gestão de contratos** para FC Soluções Financeiras.
 1. **Contratos:** Templates pré-definidos (Bacen, Serasa, Protesto) com preenchimento dinâmico
 2. **Visualização:** Preview do contrato com layout institucional
 3. **Edição:** Editar contratos existentes
-4. **Clientes:** Cadastro automático e histórico de contratos
-5. **Agenda:** Gestão de compromissos
-6. **WhatsApp:** Integração para envio de contratos (pendente)
+4. **Clientes:** Cadastro automático por contrato, sincronização de órfãos e cadastro manual
+5. **Agenda:** Gestão de compromissos (criar/listar/concluir/excluir)
+6. **WhatsApp:** Integração Evolution API com webhook ativo e atendimento VIVA
 
 ### Stack Tecnológica
 - **Backend:** FastAPI + PostgreSQL + Redis
@@ -171,4 +171,4 @@ Template:
 
 ---
 
-*Atualizado em: 2026-02-03 12:50*
+*Atualizado em: 2026-02-07 22:10*

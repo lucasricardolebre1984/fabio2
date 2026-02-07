@@ -45,7 +45,7 @@ class ClienteService:
         page_size: int = 20
     ) -> Dict[str, Any]:
         """List clients with pagination."""
-        query = select(Cliente).order_by(desc(Cliente.created_at))
+        query = select(Cliente)
         
         if search:
             query = query.where(
@@ -56,14 +56,17 @@ class ClienteService:
                 )
             )
         
-        # Count total
+        count_query = query.subquery()
         count_result = await self.db.execute(
-            select(func.count(Cliente.id)).select_from(query.subquery())
+            select(func.count()).select_from(count_query)
         )
         total = count_result.scalar()
-        
-        # Paginate
-        query = query.offset((page - 1) * page_size).limit(page_size)
+
+        query = (
+            query.order_by(desc(Cliente.created_at))
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
         result = await self.db.execute(query)
         items = result.scalars().all()
         
@@ -83,8 +86,7 @@ class ClienteService:
     
     async def get_by_documento(self, documento: str) -> Optional[Cliente]:
         """Get client by documento (CPF/CNPJ)."""
-        # Remove formatting for comparison
-        doc_clean = documento.replace(".", "").replace("-", "").replace("/", "").strip()
+        doc_clean = self._normalize_document(documento)
         
         result = await self.db.execute(
             select(Cliente).where(
@@ -142,6 +144,101 @@ class ClienteService:
             .order_by(desc(Contrato.created_at))
         )
         return list(result.scalars().all())
+
+    @staticmethod
+    def _normalize_document(documento: str) -> str:
+        return (
+            (documento or "")
+            .replace(".", "")
+            .replace("-", "")
+            .replace("/", "")
+            .strip()
+        )
+
+    async def sync_from_contracts(self) -> Dict[str, int]:
+        """
+        Backfill clients from contracts that were created without proper linkage.
+        """
+        result = await self.db.execute(
+            select(Contrato)
+            .where(Contrato.cliente_id.is_(None))
+            .order_by(desc(Contrato.created_at))
+        )
+        contratos_orfaos = list(result.scalars().all())
+
+        created = 0
+        linked = 0
+        skipped = 0
+        touched_client_ids = set()
+
+        for contrato in contratos_orfaos:
+            documento = self._normalize_document(contrato.contratante_documento or "")
+            if not documento:
+                skipped += 1
+                continue
+
+            cliente_result = await self.db.execute(
+                select(Cliente).where(
+                    func.replace(
+                        func.replace(
+                            func.replace(Cliente.documento, ".", ""),
+                            "-",
+                            "",
+                        ),
+                        "/",
+                        "",
+                    ) == documento
+                )
+            )
+            cliente = cliente_result.scalar_one_or_none()
+
+            if not cliente:
+                cliente = Cliente(
+                    nome=contrato.contratante_nome,
+                    tipo_pessoa="fisica" if len(documento) == 11 else "juridica",
+                    documento=documento,
+                    email=contrato.contratante_email,
+                    telefone=contrato.contratante_telefone,
+                    endereco=contrato.contratante_endereco,
+                    primeiro_contrato_em=contrato.created_at,
+                    ultimo_contrato_em=contrato.created_at,
+                    total_contratos=0,
+                )
+                self.db.add(cliente)
+                await self.db.flush()
+                created += 1
+
+            contrato.cliente_id = cliente.id
+            touched_client_ids.add(cliente.id)
+            linked += 1
+
+        if touched_client_ids:
+            for client_id in touched_client_ids:
+                count_result = await self.db.execute(
+                    select(
+                        func.count(Contrato.id),
+                        func.min(Contrato.created_at),
+                        func.max(Contrato.created_at),
+                    ).where(Contrato.cliente_id == client_id)
+                )
+                total, primeiro, ultimo = count_result.one()
+                cliente_result = await self.db.execute(
+                    select(Cliente).where(Cliente.id == client_id)
+                )
+                cliente = cliente_result.scalar_one_or_none()
+                if cliente:
+                    cliente.total_contratos = int(total or 0)
+                    cliente.primeiro_contrato_em = primeiro
+                    cliente.ultimo_contrato_em = ultimo
+
+        await self.db.commit()
+
+        return {
+            "contratos_orfaos": len(contratos_orfaos),
+            "clientes_criados": created,
+            "contratos_vinculados": linked,
+            "ignorados": skipped,
+        }
     
     async def get_historico(self, cliente_id: UUID) -> Dict[str, Any]:
         """Get complete client timeline."""

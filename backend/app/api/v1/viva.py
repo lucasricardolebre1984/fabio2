@@ -3,14 +3,20 @@ Chat direto com a VIVA - Assistente Virtual Interna
 Usa OpenAI para Chat, Visao, Audio e Imagem
 """
 from typing import List, Dict, Any, Optional
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 import base64
 import json
 import re
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_db
 from app.models.user import User
+from app.models.agenda import EventoTipo
+from app.schemas.agenda import EventoCreate
+from app.services.agenda_service import AgendaService
 from app.services.viva_local_service import viva_local_service
 from app.services.viva_model_service import viva_model_service
 from app.services.openai_service import openai_service
@@ -390,16 +396,123 @@ def _extract_subject(texto: str) -> str:
     return _sanitize_prompt(texto_limpo, 300)
 
 
+def _parse_datetime_input(raw: str) -> Optional[datetime]:
+    value = " ".join((raw or "").replace(",", " ").split())
+    formats = (
+        "%d/%m/%Y %H:%M",
+        "%d/%m/%y %H:%M",
+        "%Y-%m-%d %H:%M",
+        "%d-%m-%Y %H:%M",
+    )
+    for fmt in formats:
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _infer_event_type(title: str) -> EventoTipo:
+    text = (title or "").lower()
+    if "ligar" in text or "ligacao" in text or "ligação" in text:
+        return EventoTipo.LIGACAO
+    if "prazo" in text or "vencimento" in text:
+        return EventoTipo.PRAZO
+    if "reuniao" in text or "reunião" in text:
+        return EventoTipo.REUNIAO
+    return EventoTipo.OUTRO
+
+
+def _parse_agenda_command(message: str) -> Optional[Dict[str, Any]]:
+    text = (message or "").strip()
+    if not text:
+        return None
+
+    lower = text.lower()
+    if not (lower.startswith("agendar") or lower.startswith("agenda")):
+        return None
+
+    payload = re.sub(r"^(agendar|agenda)\s*:?\s*", "", text, flags=re.IGNORECASE).strip()
+    if not payload:
+        return {"error": "Formato vazio"}
+
+    title = ""
+    date_time_raw = ""
+    description = None
+
+    if "|" in payload:
+        parts = [p.strip() for p in payload.split("|") if p.strip()]
+        if len(parts) < 2:
+            return {"error": "Formato incompleto"}
+        title = parts[0]
+        date_time_raw = parts[1]
+        description = parts[2] if len(parts) >= 3 else None
+    else:
+        match = re.search(
+            r"(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\s+\d{1,2}:\d{2}|\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2})",
+            payload,
+        )
+        if not match:
+            return {"error": "Sem data/hora valida"}
+        date_time_raw = match.group(1)
+        title = payload.replace(date_time_raw, "").strip(" -")
+
+    date_time = _parse_datetime_input(date_time_raw)
+    if not date_time:
+        return {"error": "Data/hora invalida"}
+
+    if not title:
+        title = "Compromisso com cliente"
+
+    return {
+        "title": title,
+        "date_time": date_time,
+        "description": description,
+        "tipo": _infer_event_type(title),
+    }
+
+
 # ============================================
 # CHAT
 # ============================================
 @router.post("/chat", response_model=ChatResponse)
 async def chat_with_viva(
     request: ChatRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """Chat direto com a VIVA usando OpenAI como provedor institucional."""
     try:
+        agenda_command = _parse_agenda_command(request.mensagem)
+        if agenda_command:
+            if agenda_command.get("error"):
+                return ChatResponse(
+                    resposta=(
+                        "Para agendar, use: "
+                        "agendar TITULO | DD/MM/AAAA HH:MM | descricao opcional"
+                    )
+                )
+
+            service = AgendaService(db)
+            evento = await service.create(
+                EventoCreate(
+                    titulo=agenda_command["title"],
+                    descricao=agenda_command.get("description"),
+                    tipo=agenda_command["tipo"],
+                    data_inicio=agenda_command["date_time"],
+                    data_fim=None,
+                    cliente_id=None,
+                    contrato_id=None,
+                ),
+                current_user.id,
+            )
+            return ChatResponse(
+                resposta=(
+                    "Agendamento criado com sucesso: "
+                    f"{evento.titulo} em {evento.data_inicio.strftime('%d/%m/%Y %H:%M')}."
+                )
+            )
+
         modo = None
         for msg in reversed(request.contexto):
             if msg.get("modo"):

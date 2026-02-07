@@ -472,6 +472,48 @@ O atendimento WhatsApp e o chat da VIVA estavam com comportamento inconsistente 
 
 ---
 
+## DECISAO-013: fechamento de clientes/agenda minimo funcional e sincronizacao contratos->clientes
+
+### Data
+07/02/2026
+
+### Contexto
+Durante homologacao com cliente, foram identificados tres pontos operacionais:
+- contratos criados nem sempre apareciam na base de clientes;
+- tela de clientes precisava cadastro manual imediato;
+- agenda estava sem operacao minima e sem atalho via chat interno da VIVA.
+
+### Decisao
+- Backend:
+  - reforcar criacao/vinculo de cliente no `ContratoService.create`;
+  - adicionar sincronizacao de contratos orfaos em `ClienteService.sync_from_contracts`;
+  - expor endpoint `POST /api/v1/clientes/sincronizar-contratos`;
+  - ajustar numeração de contrato por maior sequencial do ano (evita colisao por gaps).
+- Frontend:
+  - substituir placeholders de `clientes` e `agenda` por CRUD minimo funcional.
+- VIVA interna:
+  - habilitar comando de agenda no chat `/viva/chat`:
+    - `agendar TITULO | DD/MM/AAAA HH:MM | descricao opcional`
+
+### Motivo
+- restabelecer fluxo comercial sem retrabalho manual;
+- garantir visibilidade dos clientes derivados de contratos;
+- entregar agenda operavel sem depender de nova rodada de arquitetura.
+
+### Rollback
+- `git revert <hash-da-decisao-013>`
+- se necessario, rollback pontual por arquivo:
+  - `backend/app/services/contrato_service.py`
+  - `backend/app/services/cliente_service.py`
+  - `frontend/src/app/(dashboard)/clientes/page.tsx`
+  - `frontend/src/app/(dashboard)/agenda/page.tsx`
+
+---
+
+*Documentado em: 07/02/2026*
+
+---
+
 ## DECISÃO-012: Governança operacional do Evolution API para produção local estável
 
 ### Data

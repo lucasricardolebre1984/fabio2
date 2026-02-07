@@ -188,6 +188,22 @@ docker exec c538ba33c880_fabio2-postgres psql -U fabio2_user -d fabio2 -c "selec
 - [ ] Teste real de mensagem ponta a ponta concluido
 - [ ] Logs sem `400 Bad Request` para conversas validas
 
+## 13. Comando de agenda via VIVA (chat interno)
+No chat interno `/viva`, a VIVA pode criar compromisso direto na agenda com:
+
+```text
+agendar TITULO | DD/MM/AAAA HH:MM | descricao opcional
+```
+
+Exemplo:
+```text
+agendar Follow-up Rezeta | 09/02/2026 15:00 | confirmar proposta
+```
+
+Resultado esperado:
+- endpoint `/api/v1/viva/chat` retorna confirmacao de criacao;
+- evento aparece em `/api/v1/agenda` e na tela `/agenda`.
+
 ---
 
 Atualizado em: 2026-02-07
