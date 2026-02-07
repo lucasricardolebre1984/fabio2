@@ -329,6 +329,14 @@ class WhatsAppService:
 
     async def send_text(self, numero: str, mensagem: str) -> Dict[str, Any]:
         """Send text message."""
+        mensagem = mensagem.strip() if isinstance(mensagem, str) else ""
+        if not mensagem:
+            return {
+                "sucesso": False,
+                "erro": "Mensagem vazia para envio",
+                "instance_name": self.instance_name,
+            }
+
         numero = self._format_number(numero)
 
         async with httpx.AsyncClient() as client:
@@ -349,19 +357,26 @@ class WhatsAppService:
                 )
 
                 if response.status_code in [400, 422]:
-                    legacy_payload = {
-                        "number": numero,
-                        "textMessage": {"text": mensagem},
-                    }
-                    legacy_response = await self._request(
-                        client,
-                        "POST",
-                        f"/message/sendText/{instance}",
-                        json=legacy_payload,
-                        timeout=30.0,
+                    error_text = (response.text or "").lower()
+                    should_try_legacy = (
+                        "text is required" in error_text
+                        or "textmessage" in error_text
+                        or "text message" in error_text
                     )
-                    if legacy_response.status_code in [200, 201]:
-                        response = legacy_response
+                    if should_try_legacy:
+                        legacy_payload = {
+                            "number": numero,
+                            "textMessage": {"text": mensagem},
+                        }
+                        legacy_response = await self._request(
+                            client,
+                            "POST",
+                            f"/message/sendText/{instance}",
+                            json=legacy_payload,
+                            timeout=30.0,
+                        )
+                        if legacy_response.status_code in [200, 201]:
+                            response = legacy_response
 
                 if response.status_code in [200, 201]:
                     return {
@@ -449,11 +464,122 @@ class WhatsAppService:
                     "instance_name": self.instance_name,
                 }
 
+    def _extract_media_base64(self, payload: Any) -> Optional[str]:
+        """Extract media base64 from different Evolution payload contracts."""
+        if isinstance(payload, str) and payload.strip():
+            return payload.strip()
+
+        if not isinstance(payload, dict):
+            return None
+
+        direct_keys = ("base64", "data", "media", "file", "content", "buffer")
+        for key in direct_keys:
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+
+        nested_keys = ("message", "response", "result", "data")
+        for key in nested_keys:
+            value = payload.get(key)
+            if isinstance(value, dict):
+                nested = self._extract_media_base64(value)
+                if nested:
+                    return nested
+
+        return None
+
+    async def get_media_base64(
+        self,
+        message_payload: Dict[str, Any],
+        instance_name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Fetch media base64 from Evolution chat endpoint for a message payload."""
+        async with httpx.AsyncClient() as client:
+            try:
+                instances = await self._fetch_instances(client)
+                instance = (
+                    instance_name
+                    if instance_name
+                    else self._resolve_instance_name(instances)
+                )
+                if not instance:
+                    return {
+                        "sucesso": False,
+                        "erro": "Instancia nao resolvida para buscar midia",
+                        "instance_name": self.instance_name,
+                    }
+
+                key = (
+                    message_payload.get("key")
+                    if isinstance(message_payload.get("key"), dict)
+                    else {}
+                )
+                inner_message = (
+                    message_payload.get("message")
+                    if isinstance(message_payload.get("message"), dict)
+                    else None
+                )
+
+                request_candidates: List[Dict[str, Any]] = [
+                    {"message": message_payload},
+                ]
+
+                if key and inner_message:
+                    request_candidates.append(
+                        {"message": {"key": key, "message": inner_message}}
+                    )
+
+                if key and not inner_message:
+                    request_candidates.append(
+                        {"message": {"key": key, "message": message_payload}}
+                    )
+
+                last_error: Optional[str] = None
+                for candidate in request_candidates:
+                    response = await self._request(
+                        client,
+                        "POST",
+                        f"/chat/getBase64FromMediaMessage/{instance}",
+                        json=candidate,
+                        timeout=30.0,
+                    )
+                    if response.status_code not in [200, 201]:
+                        last_error = f"Status {response.status_code}: {response.text}"
+                        continue
+
+                    payload: Any = {}
+                    try:
+                        payload = response.json()
+                    except Exception:
+                        payload = response.text
+
+                    media_base64 = self._extract_media_base64(payload)
+                    if media_base64:
+                        return {
+                            "sucesso": True,
+                            "base64": media_base64,
+                            "instance_name": instance,
+                        }
+
+                return {
+                    "sucesso": False,
+                    "erro": last_error or "Nao foi possivel extrair base64 da midia",
+                    "instance_name": instance,
+                }
+            except Exception as e:
+                return {
+                    "sucesso": False,
+                    "erro": str(e),
+                    "instance_name": instance_name or self.instance_name,
+                }
+
     def _format_number(self, numero: str) -> str:
         """Format phone number for WhatsApp API."""
         if "@" in numero:
             numero = numero.split("@")[0]
         numero = "".join(filter(str.isdigit, numero))
-        if not numero.startswith("55"):
+        # Prefixa 55 apenas quando vier numero local (DDD + numero, sem pais).
+        # Se ja vier internacional, preserva como chegou no webhook.
+        if len(numero) <= 11 and not numero.startswith("55"):
             numero = "55" + numero
         return numero

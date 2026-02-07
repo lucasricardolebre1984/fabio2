@@ -26,6 +26,49 @@ class ZAIService:
             "Content-Type": "application/json",
         }
 
+    def _coerce_message_content(self, value: Any) -> str:
+        """Normalize different content formats returned by chat providers."""
+        if isinstance(value, str):
+            return value.strip()
+
+        if isinstance(value, list):
+            parts: List[str] = []
+            for item in value:
+                text = self._coerce_message_content(item)
+                if text:
+                    parts.append(text)
+            return "\n".join(parts).strip()
+
+        if isinstance(value, dict):
+            for key in ("text", "content", "value"):
+                text = self._coerce_message_content(value.get(key))
+                if text:
+                    return text
+            return ""
+
+        return ""
+
+    def _extract_chat_content(self, payload: Dict[str, Any]) -> str:
+        """Extract assistant text from chat completion payload safely."""
+        choices = payload.get("choices")
+        if not isinstance(choices, list) or not choices:
+            return ""
+
+        first = choices[0] if isinstance(choices[0], dict) else {}
+        message = first.get("message") if isinstance(first.get("message"), dict) else {}
+
+        content = self._coerce_message_content(message.get("content"))
+        if content:
+            return content
+
+        # Some providers can return reasoning metadata when content is empty.
+        content = self._coerce_message_content(message.get("reasoning_content"))
+        if content:
+            return content
+
+        delta = first.get("delta") if isinstance(first.get("delta"), dict) else {}
+        return self._coerce_message_content(delta.get("content"))
+
     async def chat(
         self,
         messages: List[Dict[str, Any]],
@@ -53,7 +96,13 @@ class ZAIService:
 
         if response.status_code == 200:
             data = response.json()
-            return data["choices"][0]["message"]["content"]
+            content = self._extract_chat_content(data)
+            if content:
+                return content
+            return (
+                "Perfeito, recebi sua mensagem. "
+                "Pode me confirmar seu objetivo em uma frase para eu te atender melhor?"
+            )
 
         if response.status_code == 401:
             return "Erro: API key inválida ou não autorizada"

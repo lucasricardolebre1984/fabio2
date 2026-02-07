@@ -5,6 +5,7 @@ Integracao com GLM para atendimento de WhatsApp.
 from datetime import datetime, timezone
 import logging
 import re
+import unicodedata
 from typing import Dict, List, Optional
 
 from sqlalchemy import select
@@ -161,10 +162,21 @@ ESCALA PARA HUMANO:
         lead = dict(contexto.get("lead") or {})
         lead.setdefault("telefone", self._format_phone(numero))
 
+        nome_existente = str(lead.get("nome") or "").strip()
+        if nome_existente and not self._limpar_nome(nome_existente):
+            lead.pop("nome", None)
+            if contexto.get("fase") == "atendimento":
+                contexto["fase"] = "aguardando_nome"
+
         self._atualizar_dados_lead(lead=lead, texto_original=mensagem, texto_normalizado=texto)
         service_info = viva_knowledge_service.find_service_from_message(mensagem)
+        servico_inferido: Optional[str] = None
         if service_info:
             lead["servico"] = service_info.name
+        elif not str(lead.get("servico") or "").strip():
+            servico_inferido = self._inferir_servico_basico(texto)
+            if servico_inferido:
+                lead["servico"] = servico_inferido
 
         if self._eh_pergunta_identidade_ia(texto):
             resposta = self._resposta_identidade_variada(contexto)
@@ -257,7 +269,12 @@ ESCALA PARA HUMANO:
             service_info=service_info,
             faltantes=faltantes,
         )
-        return await self._chamar_glm(messages, formal=formal)
+        resposta_modelo = await self._chamar_glm(messages, formal=formal)
+        return self._garantir_resposta_texto(
+            resposta_modelo,
+            faltantes=faltantes,
+            lead=lead,
+        )
 
     def _normalizar(self, texto: str) -> str:
         return (texto or "").strip().lower()
@@ -319,6 +336,18 @@ ESCALA PARA HUMANO:
     def _eh_formal(self, texto: str) -> bool:
         return any(keyword in texto for keyword in self.formal_keywords)
 
+    def _inferir_servico_basico(self, texto_normalizado: str) -> Optional[str]:
+        mapping = (
+            ("Limpa Nome", ("limpa nome", "limpar meu nome", "nome sujo", "tirar nome", "tirar restricao")),
+            ("Aumento de Score", ("aumento de score", "aumentar score", "subir score")),
+            ("Rating", ("rating", "melhorar rating")),
+            ("Diagnostico 360", ("diagnostico 360", "diagnostico", "analise 360", "analise completa")),
+        )
+        for servico, keywords in mapping:
+            if any(keyword in texto_normalizado for keyword in keywords):
+                return servico
+        return None
+
     def _extrair_nome(self, texto: str) -> Optional[str]:
         if not texto:
             return None
@@ -360,9 +389,72 @@ ESCALA PARA HUMANO:
             "ola",
             "oi",
         }
-        if any(p.lower() in proibidos for p in palavras):
+        if any(self._remover_acentos(p).lower() in proibidos for p in palavras):
             return None
         return " ".join(p.capitalize() for p in palavras)
+
+    def _remover_acentos(self, texto: str) -> str:
+        if not texto:
+            return ""
+        normalized = unicodedata.normalize("NFKD", texto)
+        return "".join(ch for ch in normalized if not unicodedata.combining(ch))
+
+    def _garantir_resposta_texto(
+        self,
+        resposta: object,
+        faltantes: List[str],
+        lead: Dict[str, str],
+    ) -> str:
+        """Garante resposta textual valida para envio no WhatsApp."""
+        texto = resposta.strip() if isinstance(resposta, str) else ""
+        if texto and self._resposta_modelo_valida(texto):
+            return texto
+
+        if faltantes:
+            labels = {
+                "nome": "seu nome",
+                "telefone": "seu telefone com DDD",
+                "servico": "o servico desejado",
+                "cidade": "sua cidade",
+                "urgencia": "qual sua urgencia",
+            }
+            campo = labels.get(faltantes[0], faltantes[0])
+            servico = str(lead.get("servico") or "").strip()
+            if servico:
+                return (
+                    f"Perfeito. No seu caso de {servico}, "
+                    f"me confirma {campo}, por favor."
+                )
+            return f"Perfeito. Para seguir seu atendimento, me confirma {campo}, por favor."
+
+        return (
+            "Perfeito, recebi sua mensagem. "
+            "Me conta em uma frase seu objetivo para eu te orientar agora."
+        )
+
+    def _resposta_modelo_valida(self, texto: str) -> bool:
+        """Descarta saidas tecnicas/meta que nao devem ir para o cliente."""
+        if not texto:
+            return False
+
+        normalized = self._remover_acentos(texto).lower()
+        blocked_markers = (
+            "analyze the user",
+            "user says",
+            "context:",
+            "assistant response",
+            "chain of thought",
+            "step-by-step",
+            "system prompt",
+            "as an ai",
+            "i would like to",
+            "###",
+            "```",
+        )
+        if any(marker in normalized for marker in blocked_markers):
+            return False
+
+        return len(texto) <= 1200
 
     def _atualizar_dados_lead(
         self,
@@ -477,7 +569,13 @@ ESCALA PARA HUMANO:
 
         messages = [{"role": "system", "content": system}]
         messages.extend(historico)
-        messages.append({"role": "user", "content": mensagem_atual})
+        ultima_user_igual = (
+            bool(historico)
+            and historico[-1].get("role") == "user"
+            and str(historico[-1].get("content") or "").strip() == (mensagem_atual or "").strip()
+        )
+        if not ultima_user_igual:
+            messages.append({"role": "user", "content": mensagem_atual})
         return messages
 
     async def _chamar_glm(self, messages: List[Dict[str, str]], formal: bool) -> str:

@@ -57,7 +57,9 @@ services:
       - SERVER_URL=http://localhost:8080
       - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY:-default_key_change_in_production}
       - AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
-      - CONFIG_SESSION_PHONE_VERSION=2.3000.1015901307
+      - WEBSOCKET_ENABLED=true
+      - CONFIG_SESSION_PHONE_VERSION=2.3000.1032141294
+      - LOG_BAILEYS=error
       # Configuração do Banco PostgreSQL
       - DATABASE_ENABLED=true
       - DATABASE_PROVIDER=postgresql

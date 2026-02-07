@@ -112,6 +112,15 @@ Transferir quando houver:
 - Esta versao documenta o acordo final com o cliente e libera a
   implementacao da V1 de teste no backend.
 
+## Operacao e instalacao
+- Runbook completo: `docs/WHATSAPP_INSTALACAO_OPERACIONAL.md`
+- Ativacoes obrigatorias no Evolution:
+  - Ativo: ON
+  - URL: `http://backend:8000/api/v1/webhook/evolution`
+  - Webhook por Eventos: OFF
+  - Webhook Base64: ON
+  - Eventos ON: `MESSAGES_UPSERT`, `CONNECTION_UPDATE`
+
 ---
 
 Documento atualizado em: 07/02/2026

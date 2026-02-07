@@ -16,9 +16,11 @@
 | BUG-015 | Alta | VIVA | Fundo da imagem não respeita paleta/brief do prompt (resultado genérico) | Ativo |
 | BUG-016 | Média | VIVA | Arte final perde partes do texto (overlay truncado) | Ativo |
 | BUG-017 | Alta | WhatsApp Chat API | Endpoints `/api/v1/whatsapp-chat/*` retornam 500 por incompatibilidade de modelagem (`SQLEnum`) com schema real (`VARCHAR`) | Ativo |
-| BUG-018 | Alta | WhatsApp Evolution | Backend consulta instância/chave divergentes do runtime (instância ativa `Teste`), causando falso desconectado (`Status 404`) | Ativo |
+| BUG-018 | Alta | WhatsApp Evolution | Backend consulta instância/chave divergentes do runtime (instância ativa `Teste`), causando falso desconectado (`Status 404`) | Resolvido |
 | BUG-019 | Média | Frontend WhatsApp | `/whatsapp/conversas` usa token incorreto (`localStorage.token`) e base URL hardcoded em `localhost:8000` | Ativo |
-| BUG-020 | Alta | Webhook WhatsApp | Resposta da VIVA não é enviada ao WhatsApp no webhook (envio real marcado como TODO) | Ativo |
+| BUG-020 | Alta | Webhook WhatsApp | Resposta da VIVA não é enviada ao WhatsApp no webhook (envio real marcado como TODO) | Resolvido |
+| BUG-021 | Alta | Webhook WhatsApp | Mensagem de áudio recebida no WhatsApp não era transcrita para o fluxo da VIVA (áudio obrigatório) | Em validação |
+| BUG-022 | Média | Webhook WhatsApp | Intermitência de envio (`400 Text is required` e `exists:false`) por payload vazio/JID não entregável no retorno da IA | Resolvido |
 
 ---
 
@@ -43,6 +45,9 @@
 | BUG-008 | Frontend | Erros de API sem tratamento | 2026-02-03 |
 | BUG-009 | UI | Badge e Tabs faltando | 2026-02-03 |
 | BUG-011 | DB | JSONB/UUID incompatível | 2026-02-03 |
+| BUG-018 | WhatsApp Evolution | Instância e chave divergentes geravam falso desconectado | 2026-02-07 |
+| BUG-020 | Webhook WhatsApp | Resposta da VIVA não era enviada (TODO removido e envio ativo) | 2026-02-07 |
+| BUG-022 | Webhook WhatsApp | Blindagem contra resposta vazia e JID não entregável (`exists:false`) | 2026-02-07 |
 
 ---
 
