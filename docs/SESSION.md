@@ -1,7 +1,7 @@
 ﻿# SESSION - contexto atual da sessao
 
 Sessao ativa: 07/02/2026
-Status: alinhamento de negocio fechado com cliente; aguardando execucao tecnica
+Status: alinhamento fechado e V1 aplicada; aguardando homologacao em conversa real
 Branch: main
 
 ## Resumo executivo
@@ -35,8 +35,8 @@ conversao e controle de operacao.
 - `frontend/src/app/viva/REGRAS/tabela_precos_ia_01_planilha1.csv`
 
 ## Gate institucional atual
-Documentacao completa entregue conforme protocolo. Proximo passo e executar a
-V1 de teste no backend e validar o fluxo ponta a ponta.
+V1 tecnica aplicada com base de conhecimento carregada em container. Proximo
+passo e homologar com atendimento real e ajustes finos.
 
 ---
 

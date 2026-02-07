@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     # Evolution API (WhatsApp)
     # ==================================================================
     EVOLUTION_API_URL: str = "http://localhost:8080"
-    EVOLUTION_API_KEY: str = "default_key"
+    EVOLUTION_API_KEY: str = "default_key_change_in_production"
     WEBHOOK_URL: Optional[str] = None
     WA_INSTANCE_NAME: str = "fc-solucoes"
     WA_QR_TIMEOUT: int = 60000

@@ -404,3 +404,28 @@ Se o pacote precisar revisao:
 ---
 
 *Documentado em: 07/02/2026*
+
+## DECISÃO-010: carregamento de regras da Viviane por volume no container
+
+### Data
+07/02/2026
+
+### Contexto
+A base de regras e precos da Viviane foi definida em
+`frontend/src/app/viva/REGRAS`, mas o container do backend nao montava esse
+caminho, impedindo leitura em runtime.
+
+### Decisão
+- Criar `viva_knowledge_service.py` para ler regras/precos editaveis.
+- Montar volume `./frontend/src/app/viva/REGRAS:/app/viva_rules` no backend.
+- Definir `VIVA_RULES_DIR=/app/viva_rules` no backend.
+- Recarregar regras automaticamente quando arquivos mudarem.
+
+### Motivo
+- Permite manutencao continua de valores e roteiro sem rebuild.
+- Mantem operacao 100% dentro de container.
+- Reduz risco de desvio entre discurso comercial e tabela ativa.
+
+---
+
+*Documentado em: 07/02/2026*

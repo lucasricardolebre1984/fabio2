@@ -1,5 +1,6 @@
-"""WhatsApp service - Integration with Evolution API."""
-from typing import Optional, Dict, Any
+﻿"""WhatsApp service - Integration with Evolution API."""
+from typing import Any, Dict, List, Optional
+
 import httpx
 
 from app.config import settings
@@ -7,187 +8,452 @@ from app.config import settings
 
 class WhatsAppService:
     """Service for WhatsApp integration via Evolution API."""
-    
+
     def __init__(self):
         self.base_url = settings.EVOLUTION_API_URL.rstrip("/")
         self.api_key = settings.EVOLUTION_API_KEY
         self.instance_name = settings.WA_INSTANCE_NAME
         self.headers = {
             "apikey": self.api_key,
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
-    
+
+    def _auth_candidates(self) -> List[str]:
+        """Auth candidates for dev/prod compatibility."""
+        keys = [self.api_key, "default_key", "dev_evolution_key", "default_key_change_in_production"]
+        unique: List[str] = []
+        for key in keys:
+            if key and key not in unique:
+                unique.append(key)
+        return unique
+
+    async def _request(
+        self,
+        client: httpx.AsyncClient,
+        method: str,
+        path: str,
+        json: Optional[Dict[str, Any]] = None,
+        timeout: float = 10.0,
+    ) -> httpx.Response:
+        """Request helper with API key fallback when Evolution returns 401."""
+        last_response: Optional[httpx.Response] = None
+        for key in self._auth_candidates():
+            headers = {"apikey": key, "Content-Type": "application/json"}
+            response = await client.request(
+                method=method,
+                url=f"{self.base_url}{path}",
+                headers=headers,
+                json=json,
+                timeout=timeout,
+            )
+            last_response = response
+            if response.status_code != 401:
+                self.headers = headers
+                return response
+        assert last_response is not None
+        return last_response
+
+    def _normalize_instances_payload(self, data: Any) -> List[Dict[str, Any]]:
+        """Normalize fetchInstances payload across Evolution versions."""
+        if isinstance(data, list):
+            return [item for item in data if isinstance(item, dict)]
+        if isinstance(data, dict):
+            return [data]
+        return []
+
+    def _map_instance_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        """Map instance row from old/new Evolution contracts."""
+        nested = item.get("instance") if isinstance(item.get("instance"), dict) else {}
+
+        name = item.get("name") or nested.get("instanceName")
+        status = (
+            item.get("connectionStatus")
+            or item.get("status")
+            or nested.get("status")
+            or nested.get("state")
+        )
+        number = item.get("number")
+        profile_name = item.get("profileName") or nested.get("profileName")
+        owner_jid = item.get("ownerJid") or nested.get("owner")
+
+        return {
+            "name": name,
+            "status": status,
+            "number": number,
+            "profile_name": profile_name,
+            "owner_jid": owner_jid,
+        }
+
+    async def _fetch_instances(self, client: httpx.AsyncClient) -> List[Dict[str, Any]]:
+        """Fetch available instances from Evolution."""
+        try:
+            response = await self._request(client, "GET", "/instance/fetchInstances", timeout=10.0)
+            if response.status_code != 200:
+                return []
+            raw = self._normalize_instances_payload(response.json())
+            mapped = [self._map_instance_item(item) for item in raw]
+            return [item for item in mapped if item.get("name")]
+        except Exception:
+            return []
+
+    def _resolve_instance_name(self, instances: List[Dict[str, Any]]) -> str:
+        """Resolve effective instance name from config and available instances."""
+        configured = self.instance_name
+        if not instances:
+            return configured
+
+        names = [item.get("name") for item in instances if item.get("name")]
+        open_names = [
+            item["name"]
+            for item in instances
+            if item.get("name") and str(item.get("status", "")).lower() in {"open", "connected", "online"}
+        ]
+
+        if configured in names:
+            return configured
+        if len(open_names) == 1:
+            return open_names[0]
+        if len(names) == 1:
+            return names[0]
+        return configured
+
+    def _extract_state(self, payload: Any) -> Optional[str]:
+        """Extract connection state from old/new Evolution connection payloads."""
+        if not isinstance(payload, dict):
+            return None
+        instance_data = payload.get("instance")
+        if isinstance(instance_data, dict):
+            state = instance_data.get("state") or instance_data.get("status")
+            if state:
+                return str(state)
+        state = payload.get("state") or payload.get("status")
+        return str(state) if state else None
+
+    def _extract_qr_code(self, payload: Any) -> Optional[str]:
+        """Extract qr/base64/pairing code from connect payload."""
+        if not isinstance(payload, dict):
+            return None
+
+        direct_keys = ["base64", "qrcode", "code", "qrCode", "pairingCode", "pairing_code"]
+        for key in direct_keys:
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+
+        nested = payload.get("qrcode")
+        if isinstance(nested, dict):
+            for key in ["base64", "code", "qr", "pairingCode", "pairing_code"]:
+                value = nested.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+
+        return None
+
+    def _find_instance(self, instances: List[Dict[str, Any]], name: str) -> Optional[Dict[str, Any]]:
+        for item in instances:
+            if item.get("name") == name:
+                return item
+        return None
+
     async def get_status(self) -> Dict[str, Any]:
         """Get WhatsApp connection status."""
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.get(
-                    f"{self.base_url}/instance/connectionState/{self.instance_name}",
-                    headers=self.headers,
-                    timeout=10.0
+                instances = await self._fetch_instances(client)
+                instance = self._resolve_instance_name(instances)
+                response = await self._request(
+                    client,
+                    "GET",
+                    f"/instance/connectionState/{instance}",
+                    timeout=10.0,
                 )
-                
+
                 if response.status_code == 200:
-                    data = response.json()
+                    state = self._extract_state(response.json())
+                    details = self._find_instance(instances, instance) or {}
+                    owner = details.get("owner_jid")
+                    numero_owner = owner.split("@")[0] if isinstance(owner, str) and "@" in owner else owner
+                    numero = details.get("number") or numero_owner
+                    nome_perfil = details.get("profile_name")
                     return {
-                        "conectado": data.get("state") == "open",
-                        "estado": data.get("state"),
-                        "numero": data.get("user", {}).get("id", {}).get("user"),
-                        "nome_perfil": data.get("user", {}).get("name"),
+                        "conectado": str(state).lower() == "open",
+                        "estado": state,
+                        "numero": numero,
+                        "nome_perfil": nome_perfil,
+                        "instance_name": instance,
                     }
-                else:
+
+                if response.status_code == 404:
                     return {
                         "conectado": False,
-                        "erro": f"Status {response.status_code}"
+                        "erro": "Instancia nao encontrada",
+                        "instance_name": instance,
+                        "instance_name_configurada": self.instance_name,
+                        "instances_disponiveis": [item["name"] for item in instances if item.get("name")],
                     }
+
+                return {
+                    "conectado": False,
+                    "erro": f"Status {response.status_code}",
+                    "instance_name": instance,
+                }
             except Exception as e:
                 return {
                     "conectado": False,
-                    "erro": str(e)
+                    "erro": str(e),
+                    "instance_name": self.instance_name,
                 }
-    
+
     async def connect(self) -> Dict[str, Any]:
-        """Start WhatsApp connection (returns QR code)."""
+        """Start WhatsApp connection (returns QR code when available)."""
         async with httpx.AsyncClient() as client:
             try:
-                # Create instance if not exists
-                create_response = await client.post(
-                    f"{self.base_url}/instance/create",
-                    headers=self.headers,
-                    json={
-                        "instanceName": self.instance_name,
-                        "token": self.api_key,
-                        "qrcode": True
-                    },
-                    timeout=30.0
-                )
-                
-                if create_response.status_code in [200, 201]:
-                    data = create_response.json()
-                    return {
-                        "sucesso": True,
-                        "qr_code": data.get("qrcode"),
-                        "mensagem": "Escaneie o QR Code com seu WhatsApp"
-                    }
-                else:
+                instances = await self._fetch_instances(client)
+                if not instances:
                     return {
                         "sucesso": False,
-                        "erro": f"Erro ao criar instância: {create_response.status_code}"
+                        "erro": "Nenhuma instancia cadastrada no Evolution Manager",
+                        "instance_name": self.instance_name,
                     }
+
+                instance = self._resolve_instance_name(instances)
+                names = [item["name"] for item in instances if item.get("name")]
+                if instance not in names and len(names) == 1:
+                    instance = names[0]
+                elif instance not in names:
+                    return {
+                        "sucesso": False,
+                        "erro": "Instancia configurada nao encontrada",
+                        "instance_name": self.instance_name,
+                        "instances_disponiveis": names,
+                    }
+
+                state_resp = await self._request(
+                    client,
+                    "GET",
+                    f"/instance/connectionState/{instance}",
+                    timeout=10.0,
+                )
+                if state_resp.status_code == 200:
+                    current_state = self._extract_state(state_resp.json())
+                    if str(current_state).lower() == "open":
+                        return {
+                            "sucesso": True,
+                            "conectado": True,
+                            "mensagem": "WhatsApp ja conectado",
+                            "instance_name": instance,
+                        }
+
+                connect_response = await self._request(
+                    client,
+                    "GET",
+                    f"/instance/connect/{instance}",
+                    timeout=30.0,
+                )
+                if connect_response.status_code in [200, 201]:
+                    payload: Dict[str, Any] = {}
+                    try:
+                        payload = connect_response.json()
+                    except Exception:
+                        payload = {}
+
+                    qr_code = self._extract_qr_code(payload)
+                    if qr_code:
+                        return {
+                            "sucesso": True,
+                            "conectado": False,
+                            "qr_code": qr_code,
+                            "mensagem": "Escaneie o QR Code com seu WhatsApp",
+                            "instance_name": instance,
+                        }
+
+                    new_state = self._extract_state(payload)
+                    if str(new_state).lower() == "open":
+                        return {
+                            "sucesso": True,
+                            "conectado": True,
+                            "mensagem": "WhatsApp conectado",
+                            "instance_name": instance,
+                        }
+
+                    return {
+                        "sucesso": True,
+                        "conectado": False,
+                        "mensagem": "Conexao iniciada. Aguarde o QR Code no Evolution Manager",
+                        "instance_name": instance,
+                    }
+
+                return {
+                    "sucesso": False,
+                    "erro": f"Status {connect_response.status_code}: {connect_response.text}",
+                    "instance_name": instance,
+                }
             except Exception as e:
                 return {
                     "sucesso": False,
-                    "erro": str(e)
+                    "erro": str(e),
+                    "instance_name": self.instance_name,
                 }
-    
+
     async def disconnect(self) -> Dict[str, Any]:
         """Disconnect WhatsApp."""
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.delete(
-                    f"{self.base_url}/instance/logout/{self.instance_name}",
-                    headers=self.headers,
-                    timeout=10.0
+                instances = await self._fetch_instances(client)
+                instance = self._resolve_instance_name(instances)
+                response = await self._request(
+                    client,
+                    "DELETE",
+                    f"/instance/logout/{instance}",
+                    timeout=10.0,
                 )
-                
-                if response.status_code == 200:
+
+                if response.status_code in [200, 201]:
                     return {
                         "sucesso": True,
-                        "mensagem": "Desconectado com sucesso"
+                        "mensagem": "Desconectado com sucesso",
+                        "instance_name": instance,
                     }
-                else:
-                    return {
-                        "sucesso": False,
-                        "erro": f"Status {response.status_code}"
-                    }
+
+                return {
+                    "sucesso": False,
+                    "erro": f"Status {response.status_code}: {response.text}",
+                    "instance_name": instance,
+                }
             except Exception as e:
                 return {
                     "sucesso": False,
-                    "erro": str(e)
+                    "erro": str(e),
+                    "instance_name": self.instance_name,
                 }
-    
+
     async def send_text(self, numero: str, mensagem: str) -> Dict[str, Any]:
         """Send text message."""
-        # Format number (add country code if needed)
         numero = self._format_number(numero)
-        
+
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.post(
-                    f"{self.base_url}/message/sendText/{self.instance_name}",
-                    headers=self.headers,
-                    json={
-                        "number": numero,
-                        "text": mensagem,
-                        "delay": 1200
-                    },
-                    timeout=30.0
+                instances = await self._fetch_instances(client)
+                instance = self._resolve_instance_name(instances)
+
+                payload = {
+                    "number": numero,
+                    "text": mensagem,
+                }
+                response = await self._request(
+                    client,
+                    "POST",
+                    f"/message/sendText/{instance}",
+                    json=payload,
+                    timeout=30.0,
                 )
-                
-                if response.status_code == 201:
+
+                if response.status_code in [400, 422]:
+                    legacy_payload = {
+                        "number": numero,
+                        "textMessage": {"text": mensagem},
+                    }
+                    legacy_response = await self._request(
+                        client,
+                        "POST",
+                        f"/message/sendText/{instance}",
+                        json=legacy_payload,
+                        timeout=30.0,
+                    )
+                    if legacy_response.status_code in [200, 201]:
+                        response = legacy_response
+
+                if response.status_code in [200, 201]:
                     return {
                         "sucesso": True,
-                        "mensagem": "Mensagem enviada com sucesso"
+                        "mensagem": "Mensagem enviada com sucesso",
+                        "instance_name": instance,
                     }
-                else:
-                    return {
-                        "sucesso": False,
-                        "erro": f"Status {response.status_code}: {response.text}"
-                    }
+
+                return {
+                    "sucesso": False,
+                    "erro": f"Status {response.status_code}: {response.text}",
+                    "instance_name": instance,
+                }
             except Exception as e:
                 return {
                     "sucesso": False,
-                    "erro": str(e)
+                    "erro": str(e),
+                    "instance_name": self.instance_name,
                 }
-    
+
     async def send_document(
         self,
         numero: str,
         documento_url: str,
-        legenda: Optional[str] = None
+        legenda: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Send document/file."""
         numero = self._format_number(numero)
-        
+
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.post(
-                    f"{self.base_url}/message/sendMedia/{self.instance_name}",
-                    headers=self.headers,
-                    json={
-                        "number": numero,
-                        "media": documento_url,
-                        "caption": legenda or "",
-                        "mediatype": "document",
-                        "fileName": documento_url.split("/")[-1],
-                        "delay": 1200
-                    },
-                    timeout=60.0
+                instances = await self._fetch_instances(client)
+                instance = self._resolve_instance_name(instances)
+                payload = {
+                    "number": numero,
+                    "mediatype": "document",
+                    "fileName": documento_url.split("/")[-1],
+                    "caption": legenda or "",
+                    "media": documento_url,
+                }
+                response = await self._request(
+                    client,
+                    "POST",
+                    f"/message/sendMedia/{instance}",
+                    json=payload,
+                    timeout=60.0,
                 )
-                
-                if response.status_code == 201:
+
+                if response.status_code in [400, 422]:
+                    legacy_payload = {
+                        "number": numero,
+                        "mediaMessage": {
+                            "mediatype": "document",
+                            "fileName": documento_url.split("/")[-1],
+                            "caption": legenda or "",
+                            "media": documento_url,
+                        },
+                    }
+                    legacy_response = await self._request(
+                        client,
+                        "POST",
+                        f"/message/sendMedia/{instance}",
+                        json=legacy_payload,
+                        timeout=60.0,
+                    )
+                    if legacy_response.status_code in [200, 201]:
+                        response = legacy_response
+
+                if response.status_code in [200, 201]:
                     return {
                         "sucesso": True,
-                        "mensagem": "Documento enviado com sucesso"
+                        "mensagem": "Documento enviado com sucesso",
+                        "instance_name": instance,
                     }
-                else:
-                    return {
-                        "sucesso": False,
-                        "erro": f"Status {response.status_code}: {response.text}"
-                    }
+
+                return {
+                    "sucesso": False,
+                    "erro": f"Status {response.status_code}: {response.text}",
+                    "instance_name": instance,
+                }
             except Exception as e:
                 return {
                     "sucesso": False,
-                    "erro": str(e)
+                    "erro": str(e),
+                    "instance_name": self.instance_name,
                 }
-    
+
     def _format_number(self, numero: str) -> str:
         """Format phone number for WhatsApp API."""
-        # Remove non-digits
+        if "@" in numero:
+            numero = numero.split("@")[0]
         numero = "".join(filter(str.isdigit, numero))
-        
-        # Add Brazil country code if not present
         if not numero.startswith("55"):
             numero = "55" + numero
-        
         return numero

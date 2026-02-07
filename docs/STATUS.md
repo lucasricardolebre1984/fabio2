@@ -2,7 +2,7 @@
 
 Data: 07/02/2026
 Sessao: alinhamento final da operacao WhatsApp VIVA com cliente
-Status: documentacao institucional concluida; execucao V1 de teste autorizada
+Status: V1 de teste aplicada no backend; em validacao assistida
 
 ## Objetivo atual
 Consolidar operacao comercial da Viviane no WhatsApp com regras de negocio,
@@ -34,8 +34,8 @@ qualificacao de lead, politica de preco e governanca de atendimento humano.
 - Objecao financeira registrada para follow-up
 
 ## Proximo gate
-Aplicar V1 de teste no backend usando as regras documentadas e validar fluxo
-fim a fim no container.
+Homologar conversa real no WhatsApp com cliente piloto e ajustar detalhes de
+persona/roteiro conforme retorno operacional.
 
 ## Documentos de referencia
 - `docs/WHATSAPP_VIVA_PACOTE_DEFINITIVO.md`

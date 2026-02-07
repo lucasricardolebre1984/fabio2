@@ -2,7 +2,7 @@
 
 > Data: 07/02/2026
 > Versao: 1.3.0
-> Status: Base integrada e pacote operacional aprovado para V1 de teste
+> Status: V1 de teste aplicada e pronta para homologacao
 
 ## Visao geral
 Integracao entre WhatsApp (Evolution), backend FastAPI, frontend Next.js e
@@ -52,8 +52,8 @@ Conversas
 - `frontend/src/app/viva/REGRAS/tabela_precos_ia_01_planilha1.csv`
 
 ## Gate atual
-Documentacao institucional concluida. Proximo passo: aplicar a V1 de teste no
-backend e validar ponta a ponta.
+V1 aplicada no backend com leitura das regras/precos via volume no container.
+Proximo passo: homologacao com conversa real e ajuste fino do roteiro.
 
 ---
 

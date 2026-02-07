@@ -1,92 +1,410 @@
 """
 VIVA - Assistente Virtual Inteligente
-Integração com GLM-4 para atender clientes no WhatsApp
+Integracao com GLM para atendimento de WhatsApp.
 """
-from typing import Optional, List, Dict, Any
-from datetime import datetime
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from datetime import datetime, timezone
+import logging
+import re
+from typing import Dict, List, Optional
 
-from app.models.whatsapp_conversa import WhatsappConversa, WhatsappMensagem, TipoOrigem
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.whatsapp_conversa import TipoOrigem, WhatsappConversa, WhatsappMensagem
+from app.services.viva_knowledge_service import ServiceInfo, viva_knowledge_service
 from app.services.zai_service import zai_service
 
 
 class VivaIAService:
-    """
-    VIVA - A inteligência por trás do atendimento WhatsApp
-    Personalidade: Concierge profissional da FC Soluções/RezetaBrasil
-    """
-    
-    def __init__(self):
-        # Contexto base da personalidade VIVA
-        self.system_prompt = """Você é VIVA, a assistente virtual inteligente da FC Soluções Financeiras e RezetaBrasil.
+    """VIVA - atendimento comercial humanizado da Rezeta no WhatsApp."""
 
-SUA PERSONALIDADE:
-- Profissional, calorosa e eficiente
-- Você conhece profundamente os serviços das empresas
-- Fala de forma natural, como uma concierge experiente
-- Sempre oferece ajuda antes de direcionar
+    def __init__(self) -> None:
+        self.base_system_prompt = """Voce e Viviane, consultora de negocios da Rezeta.
+Nunca use linguagem robotica e nunca abra conversa dizendo que e IA.
 
-SOBRE AS EMPRESAS:
-**FC Soluções Financeiras**
-- Consultoria empresarial e serviços financeiros
-- Crédito empresarial, antecipação de recebíveis
-- Clientes: Pessoa jurídica, empresas
-- Tom: Profissional, corporativo, azul
+MODO DE OPERACAO: B
+- Conduza quase todo o atendimento.
+- Escale para humano apenas nas regras de excecao.
 
-**RezetaBrasil**
-- Soluções de crédito pessoal
-- Limpa nome, renegociação de dívidas
-- Clientes: Pessoa física
-- Tom: Acessível, promocional, verde
+PERSONA E TOM:
+- Tom hibrido: consultivo, direto, cordial, simples e acolhedor.
+- Evite cliches e respostas enlatadas.
+- Responda de forma curta (1 a 4 linhas), com uma pergunta por vez.
+- Se o cliente estiver formal, pode usar resposta mais completa com resumo.
 
-SERVIÇOS QUE VOCÊ PODE AJUDAR:
-1. Informações sobre produtos/serviços
-2. Agendar reuniões/consultas
-3. Enviar contratos/documentos
-4. Gerar imagens de campanha
-5. Responder dúvidas frequentes
-6. Direcionar para atendimento humano quando necessário
+FLUXO COMERCIAL OBRIGATORIO:
+1) Objetivo do cliente.
+2) Perfil e contexto.
+3) Urgencia.
+4) Proximo passo claro.
 
-REGRAS IMPORTANTES:
-- Nunca invente informações sobre valores ou prazos específicos
-- Quando não souber, ofereça agendar com um consultor
-- Seja prestativa mas não invada a privacidade
-- Mantenha respostas curtas (ideal para WhatsApp)
-- Use emojis ocasionalmente para humanizar
+DADOS OBRIGATORIOS DA QUALIFICACAO:
+- nome, telefone, servico desejado, cidade e urgencia.
+- Se faltar dado, faca uma pergunta objetiva para coletar.
 
-Você está em uma conversa real pelo WhatsApp. Responda de forma natural e útil."""
+REGRAS DE NEGOCIO:
+- Nao prometer taxa, prazo, aprovacao ou condicao sem validacao humana.
+- Nao inventar informacao juridica/financeira.
+- Em caso sensivel, orientar e escalar.
+- Se cliente perguntar se voce e IA, responda como Viviane de forma natural,
+  sem negar de forma seca e sem confirmar tecnicamente.
+
+REGRAS COMERCIAIS:
+- Recomendar Diagnostico 360 como primeiro passo padrao.
+- Excecao de venda direta: Limpa Nome, Aumento de Score e Rating.
+- Oferta inicial considera margem de 15% na tabela de referencia.
+- Negociacao final de desconto/condicao e com atendimento humano.
+- Quando cliente nao fecha por preco, registrar no contexto como financeiro.
+
+ESCALA PARA HUMANO:
+- pedido explicito de humano;
+- reclamacao;
+- urgencia critica;
+- duvida juridica/financeira sensivel;
+- negociacao de valor;
+- servico complexo em fechamento;
+- assunto fora do catalogo oficial.
+"""
+
+        self.identity_replies = [
+            "Sou a Viviane, consultora da Rezeta, e vou cuidar do seu atendimento.",
+            "Aqui e a Viviane, da Rezeta. Me conta seu objetivo que eu te ajudo.",
+            "Sou a Viviane, consultora de negocios da Rezeta. Vamos resolver isso juntas.",
+            "Viviane falando, da Rezeta. Pode me explicar seu caso que eu te oriento.",
+        ]
+
+        self.handoff_keywords = {
+            "quero falar com atendente",
+            "falar com humano",
+            "falar com gerente",
+            "reclamacao",
+            "reclamar",
+            "procon",
+            "processo",
+            "advogado",
+            "urgente",
+            "hoje ainda",
+            "agora",
+            "desconto",
+            "negociar valor",
+            "nao consigo pagar",
+            "duvida juridica",
+            "duvida financeira sensivel",
+        }
+
+        self.formal_keywords = {
+            "prezado",
+            "prezada",
+            "cordialmente",
+            "gostaria",
+            "solicito",
+            "informo",
+            "senhor",
+            "senhora",
+            "formalmente",
+        }
+
+        self.greeting_keywords = {
+            "oi",
+            "ola",
+            "opa",
+            "hello",
+            "e ai",
+            "bom dia",
+            "boa tarde",
+            "boa noite",
+        }
+
+        self.financial_objection_keywords = {
+            "caro",
+            "ta caro",
+            "está caro",
+            "sem dinheiro",
+            "nao consigo pagar",
+            "não consigo pagar",
+            "fora do meu orcamento",
+            "fora do meu orçamento",
+            "sem condicao",
+            "sem condição",
+            "preco alto",
+            "valor alto",
+        }
+
+        self.close_intent_keywords = {
+            "quero contratar",
+            "quero fechar",
+            "vamos fechar",
+            "vou contratar",
+            "quero pagar",
+            "como faco o pagamento",
+            "como faço o pagamento",
+            "vamos pagar",
+        }
+
+        self.urgency_patterns = {
+            "alta": ("urgente", "hoje", "agora", "imediato", "imediata"),
+            "media": ("essa semana", "rapido", "rápido", "breve"),
+            "baixa": ("sem pressa", "quando der", "pode ser depois"),
+        }
 
     async def processar_mensagem(
         self,
         numero: str,
         mensagem: str,
         conversa: WhatsappConversa,
-        db: AsyncSession
+        db: AsyncSession,
     ) -> str:
-        """
-        Processa mensagem do usuário e gera resposta da IA
-        """
-        # Busca histórico recente (últimas 10 mensagens)
+        """Processa mensagem do usuario e gera resposta da Viviane."""
+        viva_knowledge_service.refresh_if_changed()
+        texto = self._normalizar(mensagem)
+        contexto = dict(conversa.contexto_ia or {})
+        lead = dict(contexto.get("lead") or {})
+        lead.setdefault("telefone", self._format_phone(numero))
+
+        self._atualizar_dados_lead(lead=lead, texto_original=mensagem, texto_normalizado=texto)
+        service_info = viva_knowledge_service.find_service_from_message(mensagem)
+        if service_info:
+            lead["servico"] = service_info.name
+
+        if self._eh_pergunta_identidade_ia(texto):
+            resposta = self._resposta_identidade_variada(contexto)
+            contexto["lead"] = lead
+            conversa.contexto_ia = contexto
+            await db.commit()
+            return resposta
+
+        if self._deve_escalar_para_humano(texto):
+            contexto["lead"] = lead
+            contexto["ultima_escala"] = datetime.now(timezone.utc).isoformat()
+            conversa.contexto_ia = contexto
+            await db.commit()
+            return (
+                "Perfeito, vou te encaminhar para atendimento humano agora. "
+                "Se puder, me resume em uma frase o que precisa para agilizar."
+            )
+
+        fase = contexto.get("fase", "inicio")
+
+        if fase == "inicio":
+            contexto["fase"] = "aguardando_nome"
+            contexto["lead"] = lead
+            conversa.contexto_ia = contexto
+            await db.commit()
+
+            if self._eh_saudacao_curta(texto):
+                return f"{self._saudacao_horario()}! Tudo bem? Com quem eu falo?"
+            return (
+                f"{self._saudacao_horario()}! Para te atender de forma personalizada, "
+                "com quem eu falo?"
+            )
+
+        if fase == "aguardando_nome":
+            nome = self._extrair_nome(mensagem)
+            if nome:
+                lead["nome"] = nome
+                contexto["nome_cliente"] = nome
+                contexto["fase"] = "atendimento"
+                contexto["lead"] = lead
+                conversa.nome_contato = nome
+                conversa.contexto_ia = contexto
+                await db.commit()
+                return (
+                    f"Prazer, {nome}! Sou a Viviane, consultora de negocios da Rezeta. "
+                    "Me conta seu objetivo para eu te ajudar da melhor forma."
+                )
+            return "Me diz seu nome, por favor, para eu seguir com seu atendimento."
+
+        if self._tem_objeccao_financeira(texto):
+            contexto["motivo_nao_fechamento"] = "financeiro"
+            contexto["status_followup"] = "pendente"
+
+        if (
+            service_info
+            and service_info.should_handoff_when_closing
+            and self._tem_intencao_fechamento(texto)
+        ):
+            contexto["lead"] = lead
+            contexto["ultima_escala"] = datetime.now(timezone.utc).isoformat()
+            conversa.contexto_ia = contexto
+            await db.commit()
+            return (
+                f"Perfeito, para concluir {service_info.name} com seguranca, "
+                "vou te conectar com a consultoria humana para fechamento."
+            )
+
+        if "diagnostico 360" in texto and self._tem_intencao_fechamento(texto):
+            contexto["lead"] = lead
+            contexto["ultima_escala"] = datetime.now(timezone.utc).isoformat()
+            conversa.contexto_ia = contexto
+            await db.commit()
+            return (
+                "Excelente escolha. Vou te encaminhar para o atendimento humano "
+                "finalizar o Diagnostico 360 com voce agora."
+            )
+
+        faltantes = self._lead_missing_fields(lead)
+        contexto["lead"] = lead
+        conversa.contexto_ia = contexto
+        await db.commit()
+
         historico = await self._get_historico(conversa, db)
-        
-        # Monta contexto completo
-        messages = self._montar_contexto(historico, mensagem)
-        
-        # Chama API GLM-4
-        resposta = await self._chamar_glm4(messages)
-        
+        formal = self._eh_formal(texto)
+        messages = self._montar_contexto(
+            historico=historico,
+            mensagem_atual=mensagem,
+            nome_cliente=contexto.get("nome_cliente"),
+            lead=lead,
+            service_info=service_info,
+            faltantes=faltantes,
+        )
+        return await self._chamar_glm(messages, formal=formal)
+
+    def _normalizar(self, texto: str) -> str:
+        return (texto or "").strip().lower()
+
+    def _format_phone(self, numero: str) -> str:
+        digits = "".join(ch for ch in (numero or "") if ch.isdigit())
+        if digits and not digits.startswith("55"):
+            digits = "55" + digits
+        return digits
+
+    def _saudacao_horario(self) -> str:
+        hora = datetime.now().hour
+        if hora < 12:
+            return "Bom dia"
+        if hora < 18:
+            return "Boa tarde"
+        return "Boa noite"
+
+    def _eh_saudacao_curta(self, texto: str) -> bool:
+        if not texto:
+            return False
+        if texto in self.greeting_keywords:
+            return True
+        return len(texto) <= 15 and any(item in texto for item in self.greeting_keywords)
+
+    def _eh_pergunta_identidade_ia(self, texto: str) -> bool:
+        patterns = (
+            "voce e ia",
+            "você é ia",
+            "voce e um robo",
+            "você é um robô",
+            "e robo",
+            "é robô",
+            "atendimento automatico",
+            "atendimento automático",
+            "chatgpt",
+            "inteligencia artificial",
+            "inteligência artificial",
+        )
+        return any(pattern in texto for pattern in patterns)
+
+    def _resposta_identidade_variada(self, contexto: Dict[str, object]) -> str:
+        index = int(contexto.get("identity_reply_index", 0) or 0)
+        resposta = self.identity_replies[index % len(self.identity_replies)]
+        contexto["identity_reply_index"] = index + 1
         return resposta
-    
+
+    def _deve_escalar_para_humano(self, texto: str) -> bool:
+        if not texto:
+            return False
+        return any(keyword in texto for keyword in self.handoff_keywords)
+
+    def _tem_objeccao_financeira(self, texto: str) -> bool:
+        return any(keyword in texto for keyword in self.financial_objection_keywords)
+
+    def _tem_intencao_fechamento(self, texto: str) -> bool:
+        return any(keyword in texto for keyword in self.close_intent_keywords)
+
+    def _eh_formal(self, texto: str) -> bool:
+        return any(keyword in texto for keyword in self.formal_keywords)
+
+    def _extrair_nome(self, texto: str) -> Optional[str]:
+        if not texto:
+            return None
+
+        padroes = [
+            r"meu nome e\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+            r"eu sou\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+            r"sou\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+            r"aqui e\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+        ]
+        for padrao in padroes:
+            match = re.search(padrao, texto, flags=re.IGNORECASE)
+            if match:
+                return self._limpar_nome(match.group(1))
+        return self._limpar_nome(texto)
+
+    def _limpar_nome(self, valor: str) -> Optional[str]:
+        nome = re.sub(r"[^a-zA-ZÀ-ÿ\s]", " ", valor or "")
+        nome = re.sub(r"\s+", " ", nome).strip()
+        if not nome:
+            return None
+
+        palavras = nome.split(" ")
+        if len(palavras) > 4:
+            return None
+        if any(len(p) < 2 for p in palavras):
+            return None
+
+        proibidos = {
+            "quero",
+            "preciso",
+            "ajuda",
+            "sim",
+            "nao",
+            "bom",
+            "dia",
+            "tarde",
+            "noite",
+            "ola",
+            "oi",
+        }
+        if any(p.lower() in proibidos for p in palavras):
+            return None
+        return " ".join(p.capitalize() for p in palavras)
+
+    def _atualizar_dados_lead(
+        self,
+        lead: Dict[str, str],
+        texto_original: str,
+        texto_normalizado: str,
+    ) -> None:
+        phone_match = re.search(r"(\+?55)?\s*\(?\d{2}\)?\s*9?\d{4}-?\d{4}", texto_original)
+        if phone_match and not lead.get("telefone"):
+            lead["telefone"] = self._format_phone(phone_match.group(0))
+
+        city_patterns = [
+            r"(?:sou de|moro em|cidade[:\s]+)\s*([A-Za-zÀ-ÿ\s]{2,40})",
+        ]
+        for pattern in city_patterns:
+            city_match = re.search(pattern, texto_original, flags=re.IGNORECASE)
+            if city_match:
+                city = re.sub(r"\s+", " ", city_match.group(1)).strip(" .,-")
+                if city:
+                    lead["cidade"] = city.title()
+                    break
+
+        if "urgencia" in texto_normalizado and "urgencia" not in lead:
+            lead["urgencia"] = "nao informada"
+
+        if not lead.get("urgencia"):
+            for label, keywords in self.urgency_patterns.items():
+                if any(word in texto_normalizado for word in keywords):
+                    lead["urgencia"] = label
+                    break
+
+    def _lead_missing_fields(self, lead: Dict[str, str]) -> List[str]:
+        required = ["nome", "telefone", "servico", "cidade", "urgencia"]
+        return [field for field in required if not str(lead.get(field, "")).strip()]
+
     async def _get_historico(
         self,
         conversa: WhatsappConversa,
         db: AsyncSession,
-        limite: int = 10
+        limite: int = 12,
     ) -> List[Dict[str, str]]:
-        """Busca histórico recente da conversa"""
-        from sqlalchemy import select
-        
+        """Busca historico recente da conversa."""
         stmt = (
             select(WhatsappMensagem)
             .where(WhatsappMensagem.conversa_id == conversa.id)
@@ -94,46 +412,86 @@ Você está em uma conversa real pelo WhatsApp. Responda de forma natural e úti
             .limit(limite)
         )
         result = await db.execute(stmt)
-        mensagens = result.scalars().all()
-        
-        # Inverte para ordem cronológica
-        mensagens = list(reversed(mensagens))
-        
-        historico = []
+        mensagens = list(reversed(result.scalars().all()))
+
+        historico: List[Dict[str, str]] = []
         for msg in mensagens:
             role = "user" if msg.tipo_origem == TipoOrigem.USUARIO else "assistant"
             historico.append({"role": role, "content": msg.conteudo})
-        
         return historico
-    
+
     def _montar_contexto(
         self,
         historico: List[Dict[str, str]],
-        mensagem_atual: str
+        mensagem_atual: str,
+        nome_cliente: Optional[str],
+        lead: Dict[str, str],
+        service_info: Optional[ServiceInfo],
+        faltantes: List[str],
     ) -> List[Dict[str, str]]:
-        """Monta o contexto completo para a IA"""
-        messages = [
-            {"role": "system", "content": self.system_prompt}
-        ]
-        
-        # Adiciona histórico
+        """Monta contexto completo para o modelo."""
+        contexto_cliente = f"Cliente em atendimento: {nome_cliente}." if nome_cliente else ""
+        lead_block = (
+            "Lead coletado: "
+            f"nome={lead.get('nome') or '-'}, "
+            f"telefone={lead.get('telefone') or '-'}, "
+            f"servico={lead.get('servico') or '-'}, "
+            f"cidade={lead.get('cidade') or '-'}, "
+            f"urgencia={lead.get('urgencia') or '-'}."
+        )
+        faltantes_block = (
+            "Dados faltantes obrigatorios: " + ", ".join(faltantes) + "."
+            if faltantes
+            else "Todos os dados obrigatorios foram coletados."
+        )
+
+        selected_service_block = ""
+        if service_info:
+            tipo = "simples" if service_info.is_simple else "complexo"
+            selected_service_block = (
+                f"Servico citado: {service_info.name}. "
+                f"Faixa inicial para oferta: {service_info.price_label}. "
+                f"Tipo do servico: {tipo}."
+            )
+
+        dynamic_rules = (
+            "TABELA DE SERVICOS (faixa inicial com margem de 15%):\n"
+            f"{viva_knowledge_service.prices_prompt_block()}\n\n"
+            "Diretriz de proposta:\n"
+            "- Para servicos simples (Limpa Nome, Score, Rating), pode conduzir venda direta.\n"
+            "- Para servicos complexos, orientar e encaminhar fechamento humano no momento certo.\n"
+            "- Diagnostico 360 deve ser sugerido como primeiro passo, salvo excecao de servico simples."
+        )
+        if viva_knowledge_service.services_text:
+            dynamic_rules = (
+                f"{dynamic_rules}\n\n"
+                "Contexto institucional resumido da Rezeta:\n"
+                f"{viva_knowledge_service.services_text}"
+            )
+
+        system = (
+            f"{self.base_system_prompt}\n\n"
+            f"{dynamic_rules}\n\n"
+            f"{contexto_cliente}\n{lead_block}\n{faltantes_block}\n{selected_service_block}"
+        )
+
+        messages = [{"role": "system", "content": system}]
         messages.extend(historico)
-        
-        # Adiciona mensagem atual
         messages.append({"role": "user", "content": mensagem_atual})
-        
         return messages
-    
-    async def _chamar_glm4(self, messages: List[Dict[str, str]]) -> str:
-        """Chama API Z.AI / GLM-4 para gerar resposta"""
+
+    async def _chamar_glm(self, messages: List[Dict[str, str]], formal: bool) -> str:
+        """Chama o modelo de chat."""
         try:
-            resposta = await zai_service.chat(messages, temperature=0.7, max_tokens=800)
-            return resposta
-        except Exception as e:
-            import logging
-            logging.error(f"Erro ao chamar Z.AI: {repr(e)}")
-            return "Ops! Tive um probleminha técnico. Tente novamente ou digite 'atendente' para falar com uma pessoa."
+            if formal:
+                return await zai_service.chat(messages, temperature=0.45, max_tokens=520)
+            return await zai_service.chat(messages, temperature=0.58, max_tokens=360)
+        except Exception as exc:
+            logging.error("Erro ao chamar Z.AI: %r", exc)
+            return (
+                "Tive uma instabilidade agora. "
+                "Posso continuar por aqui ou te encaminho para um atendente humano."
+            )
 
 
-# Instância global
 viva_service = VivaIAService()
