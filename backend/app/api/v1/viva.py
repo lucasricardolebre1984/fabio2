@@ -444,9 +444,9 @@ async def chat_with_viva(
                 )
             url = _extract_image_url(resultado)
             if url:
-                media = MediaItem(tipo="imagem", url=url)
-                if campaign_copy:
-                    media.meta = {"overlay": campaign_copy}
+                # Passa meta diretamente no construtor para garantir serialização
+                media_meta = {"overlay": campaign_copy} if campaign_copy else None
+                media = MediaItem(tipo="imagem", url=url, meta=media_meta)
                 return ChatResponse(
                     resposta="Imagem gerada com sucesso.",
                     midia=[media],
