@@ -1,8 +1,8 @@
-﻿# 🤖 Integração WhatsApp + IA VIVA
+# Integração WhatsApp + IA VIVA
 
-> **Data:** 2026-02-05  
-> **Versão:** 1.1.0  
-> **Status:** ✅ Implementado e testado
+> **Data:** 2026-02-07  
+> **Versão:** 1.2.0  
+> **Status:** ⚠️ Parcial - estabilização em execução
 
 ---
 
@@ -14,27 +14,23 @@ Integração entre:
 - Frontend (Next.js)
 - IA VIVA (Z.AI / OpenRouter / modo local)
 
-A VIVA atende automaticamente clientes via WhatsApp e também opera como chat interno no frontend (`/viva`).
+A VIVA atende clientes via WhatsApp e também opera como chat interno no frontend (`/viva`).
 
 ---
 
 ## Arquitetura
 
-```
-WhatsApp → Evolution API → Webhook (/api/v1/webhook/evolution)
-                        ↓
-             EvolutionWebhookService
-                        ↓
-                  VivaIAService
-                        ↓
-                 PostgreSQL (logs)
-                        ↓
-             Frontend /whatsapp/conversas
+```text
+WhatsApp -> Evolution API -> Webhook (/api/v1/webhook/evolution)
+                         -> EvolutionWebhookService
+                         -> VivaIAService
+                         -> PostgreSQL (logs/historico)
+                         -> Frontend /whatsapp/conversas
 ```
 
 Chat interno (web)
-```
-Frontend /viva → API /api/v1/viva/* → VIVA (Z.AI/OpenRouter/local)
+```text
+Frontend /viva -> API /api/v1/viva/* -> VIVA (Z.AI/OpenRouter/local)
 ```
 
 ---
@@ -44,6 +40,13 @@ Frontend /viva → API /api/v1/viva/* → VIVA (Z.AI/OpenRouter/local)
 Webhook (Evolution)
 - POST `/api/v1/webhook/evolution`
 - GET `/api/v1/webhook/evolution`
+
+WhatsApp (Conexão/Envio)
+- GET `/api/v1/whatsapp/status`
+- POST `/api/v1/whatsapp/conectar`
+- POST `/api/v1/whatsapp/desconectar`
+- POST `/api/v1/whatsapp/enviar-texto`
+- POST `/api/v1/whatsapp/enviar-arquivo`
 
 Chat WhatsApp (Frontend)
 - GET `/api/v1/whatsapp-chat/conversas`
@@ -62,24 +65,31 @@ Chat VIVA (Interno)
 
 ---
 
-## Modelos Z.AI (Configuração Oficial)
+## Diagnóstico Atual (2026-02-07)
 
-- Chat: `GLM-4.7`
-- Visão: `GLM-4.6V`
-- Imagem: `GLM-Image`
-- Áudio: `GLM-ASR-2512`
-- Vídeo: `CogVideoX-3`
-
-A configuração é feita via `.env` no backend. Não expor chaves em documentação.
+- Evolution API está ativa em `http://localhost:8080`.
+- Instância ativa detectada: `Teste` (estado `open`).
+- Backend reporta desconectado em `/whatsapp/status` quando há divergência entre `WA_INSTANCE_NAME`/`EVOLUTION_API_KEY` e runtime da Evolution.
+- Serviço backend de envio está defasado em relação ao contrato atual da Evolution v1.8.
+- Webhook ainda não envia de fato a resposta da VIVA para o WhatsApp (somente persiste no banco).
+- Endpoints `/whatsapp-chat/*` com erro 500 no estado atual.
+- Frontend `/whatsapp` está em placeholder e `/whatsapp/conversas` tem inconsistência de token/base URL.
 
 ---
 
-## Status Operacional (Validação Manual)
+## Plano de Aplicação
 
-- Chat: OK
-- Visão: OK (upload + prompt)
-- Imagem: OK (geração/edição)
-- Áudio: NÃO funciona (botão)
+1. Alinhamento de configuração
+   - Padronizar `EVOLUTION_API_KEY`, `WA_INSTANCE_NAME` e webhook da instância.
+2. Correção do backend WhatsApp
+   - Ajustar leitura de status e payloads de envio para Evolution v1.8.
+3. Correção de persistência/conversas
+   - Resolver incompatibilidade ORM/schema que gera erro 500.
+4. Conexão do frontend
+   - Implementar painel real de conexão WhatsApp (`/whatsapp`).
+   - Ajustar `/whatsapp/conversas` para API client padrão e `access_token`.
+5. Validação ponta a ponta
+   - Entrada no WhatsApp -> webhook -> resposta VIVA -> envio real -> histórico no frontend.
 
 ---
 
@@ -89,16 +99,15 @@ Tabelas principais
 - `whatsapp_conversas`
 - `whatsapp_mensagens`
 
-As conversas ficam registradas no banco e exibidas no painel `/whatsapp/conversas`.
+---
+
+## Referências
+
+- `docs/STATUS.md`
+- `docs/SESSION.md`
+- `docs/DECISIONS.md`
+- `docs/BUGSREPORT.md`
 
 ---
 
-## Observações
-
-- O chat interno usa OpenRouter quando configurado, senão modo local.
-- O WhatsApp usa `VivaIAService` para gerar respostas automáticas.
-- O envio real de resposta ao WhatsApp deve ser ativado conforme evolução do fluxo.
-
----
-
-*Documento atualizado em: 2026-02-05*
+*Documento atualizado em: 2026-02-07*

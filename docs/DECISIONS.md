@@ -326,3 +326,37 @@ Adicionalmente, padronizar saudação da VIVA com nome do cliente: **"Olá Fabio
 ---
 
 *Documentado em: 2026-02-06*
+
+---
+
+## DECISÃO-008: Estabilização da integração WhatsApp (Evolution v1.8) e conexão definitiva com frontend
+
+### Data
+2026-02-07
+
+### Contexto
+O diagnóstico operacional identificou que a infraestrutura estava ativa, porém o fluxo funcional estava quebrado por divergência de configuração (instância/chave), contrato de payload defasado com a Evolution v1.8, erro 500 na API de conversas e frontend parcialmente desconectado.
+
+### Decisão
+Executar a integração em cinco frentes técnicas, nesta ordem:
+1. Alinhar configuração de ambiente (`EVOLUTION_API_KEY`, `WA_INSTANCE_NAME`, webhook da instância).
+2. Atualizar `whatsapp_service.py` para o contrato atual da Evolution (`status`, `sendText`, `sendMedia`).
+3. Corrigir falha 500 de `/whatsapp-chat/*` por incompatibilidade ORM/schema.
+4. Conectar telas `/whatsapp` e `/whatsapp/conversas` com autenticação e API client padrão.
+5. Validar fluxo completo com evidências de envio e persistência.
+
+### Motivo
+- Remove falso negativo de conexão no backend.
+- Elimina regressão de contrato entre backend e Evolution.
+- Restabelece confiabilidade da API consumida pelo frontend.
+- Fecha o ciclo ponta a ponta (mensagem recebida -> resposta VIVA -> envio real WhatsApp).
+
+### Rollback
+- Estratégia primária: `git revert <hash-da-implementacao-whatsapp>`
+- Contingência (somente aprovação dupla):
+  - `git reset --hard <commit-anterior>`
+  - `git push --force origin main`
+
+---
+
+*Documentado em: 2026-02-07*

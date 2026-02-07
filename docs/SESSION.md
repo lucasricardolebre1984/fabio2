@@ -1,7 +1,7 @@
 # SESSION - Contexto Atual da Sessão
 
-> **Sessão Ativa:** 2026-02-06  
-> **Status:** ✅ Sistema estável - VIVA e contratos operacionais  
+> **Sessão Ativa:** 2026-02-07  
+> **Status:** ⚠️ Diagnóstico concluído, execução técnica WhatsApp pendente  
 > **Branch:** main
 
 ---
@@ -13,9 +13,8 @@ Funcionalidades principais
 - Criação, edição e visualização institucional
 - PDF via impressão do navegador
 - Clientes e agenda funcionando
-- WhatsApp integrado via Evolution API
 - VIVA chat interno em `/viva`
-- Conversas WhatsApp em `/whatsapp/conversas`
+- Módulo WhatsApp com backend/frontend parcialmente conectado
 
 VIVA (modelos)
 - Chat: GLM-4.7
@@ -26,58 +25,41 @@ VIVA (modelos)
 
 ---
 
-## Rotas Importantes
+## Evidências Técnicas da Sessão
 
-- Frontend: http://localhost:3000
-- Backend: http://localhost:8000
-- Docs API: http://localhost:8000/docs
-- VIVA: http://localhost:3000/viva
-
----
-
-## Observações
-
-- PDF é gerado no frontend com `window.print()`
-- Chat interno usa OpenRouter quando configurado, senão modo local
-- WhatsApp usa webhook para alimentar conversas no banco
-- Roteiro de deploy Ubuntu 100% Docker documentado em `docs/DEPLOY_UBUNTU_DOCKER.md`
-- Erro ativo: `StackOverflowError` na geração de imagens com prompt extra longo (REZETA/FC)
-- Erro ativo: upload de imagem falha com PNG (MIME assumido como JPEG)
-- Erro ativo: fundo da imagem não respeita paleta/brief do prompt (BUG-015)
-- Erro ativo: arte final perde partes do texto (overlay truncado) (BUG-016)
-
-## Ajustes desta sessão
-
-- Persona simples da VIVA adicionada ao prompt principal (contexto de servidor, empresas FC/Rezeta e capacidades de imagem/áudio/vídeo)
-- Prompts secundários continuam em `frontend/src/app/viva/PROMPTS` para modos específicos
-- Roteiro de deploy 100% Docker criado com etapas de produção
-- Roteamento de intenção de imagem no backend (`/viva/chat`) com retorno de mídia estruturada
-- Prompts laterais enviados como `prompt_extra` para o backend
-- Geração de fundo sem texto + overlay no front (arte final), ainda com perdas de conteúdo e paleta
+- `localhost:8080` ativo com Evolution e instância `Teste` em estado `open`.
+- `/api/v1/whatsapp/status` no backend reporta desconectado por divergência de instância/chave.
+- `/api/v1/whatsapp-chat/*` retorna erro 500 no estado atual.
+- Webhook `/api/v1/webhook/evolution` responde health, porém envio real da resposta da VIVA ao WhatsApp ainda não foi implementado.
+- Frontend `/whatsapp` está em placeholder e `/whatsapp/conversas` usa token/key incompatível com login atual.
 
 ---
 
-## Protocolo GODMOD aplicado nesta sessão
+## Proposta Registrada para Execução
 
-Fluxo aplicado
-- Mapeamento completo do frontend `/viva` e backend `/api/v1/viva/*`
-- Diagnóstico com causa-raiz (prompt longo + overlay parcial)
-- Arquitetura de correção definida para FC e Rezeta
-- Registro formal em `STATUS` e `DECISIONS`
-- Rollback obrigatório documentado
+1. Alinhar configuração Evolution/Backend (`EVOLUTION_API_KEY`, `WA_INSTANCE_NAME`, webhook).
+2. Corrigir `whatsapp_service.py` para contrato atual da Evolution v1.8.
+3. Corrigir erro 500 de `whatsapp-chat` (modelagem ORM x schema).
+4. Ligar frontend WhatsApp aos endpoints reais com autenticação correta.
+5. Validar fluxo ponta a ponta com evidências de envio/recebimento.
 
-Critério institucional da sessão
-- Nenhuma entrega sem plano de rollback
-- Toda comunicação e evidência em pt-BR
+---
+
+## Bugs Abertos nesta Sessão
+
+- BUG-017: erro 500 em `/whatsapp-chat/*`
+- BUG-018: divergência de instância/chave Evolution
+- BUG-019: token incorreto e URL hardcoded no frontend WhatsApp
+- BUG-020: webhook sem envio real de resposta ao WhatsApp
 
 ---
 
 ## Plano de Etapas (Ubuntu)
 
 - Etapa 1: Roteiro de deploy 100% Docker (concluída)
-- Etapa 2: WhatsApp funcional e integrado ao backend (pendente)
+- Etapa 2: WhatsApp funcional e integrado ao backend/frontend (em execução)
 - Etapa 3: Protocolo final com DNS, SSL e hardening (pendente)
 
 ---
 
-*Atualizado em: 2026-02-06*
+*Atualizado em: 2026-02-07*

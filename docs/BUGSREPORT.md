@@ -1,7 +1,7 @@
 ﻿# BUGSREPORT - Registro de Bugs
 
 > **Projeto:** FC Soluções Financeiras SaaS  
-> **Última Atualização:** 2026-02-06
+> **Última Atualização:** 2026-02-07
 
 ---
 
@@ -15,6 +15,10 @@
 | BUG-014 | Média | VIVA | Upload de imagem falha quando a imagem é PNG (MIME assumido como JPEG) | Ativo |
 | BUG-015 | Alta | VIVA | Fundo da imagem não respeita paleta/brief do prompt (resultado genérico) | Ativo |
 | BUG-016 | Média | VIVA | Arte final perde partes do texto (overlay truncado) | Ativo |
+| BUG-017 | Alta | WhatsApp Chat API | Endpoints `/api/v1/whatsapp-chat/*` retornam 500 por incompatibilidade de modelagem (`SQLEnum`) com schema real (`VARCHAR`) | Ativo |
+| BUG-018 | Alta | WhatsApp Evolution | Backend consulta instância/chave divergentes do runtime (instância ativa `Teste`), causando falso desconectado (`Status 404`) | Ativo |
+| BUG-019 | Média | Frontend WhatsApp | `/whatsapp/conversas` usa token incorreto (`localStorage.token`) e base URL hardcoded em `localhost:8000` | Ativo |
+| BUG-020 | Alta | Webhook WhatsApp | Resposta da VIVA não é enviada ao WhatsApp no webhook (envio real marcado como TODO) | Ativo |
 
 ---
 
@@ -42,4 +46,4 @@
 
 ---
 
-*Atualizado em: 2026-02-06*
+*Atualizado em: 2026-02-07*

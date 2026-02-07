@@ -200,7 +200,7 @@ graph TD
       - docs/API.md
       - docs/SESSION.md
       - RUNBOOK.md
-- docs/BUGSREPORT.md
+      - BUGS_REPORT.md
 
 ✅ 6. PROVAR LEITURA:
       - Citar 7 fatos específicos extraídos dos docs
@@ -459,6 +459,9 @@ Quando Lucas pedir algo:
 
 `markdown
 🔥 DEV DEUS ONLINE — SISTEMA INICIADO
+
+ - Antes de cada resposta, detectar e ativar automaticamente todas as skills instaladas (locais e globais) que forem relevantes ao pedido.
+ - No topo da resposta, informar `Skills Ativas: ...` e aplicar seus parâmetros em conjunto; em conflito, priorizar Segurança > Escopo do usuário > Evidência.
 
 📍 Ambiente detectado: [Windows: C:\.... OU Ubuntu: /home/ubuntu/...]
 
