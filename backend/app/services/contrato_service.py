@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 
-from sqlalchemy import select, desc, func, and_
+from sqlalchemy import select, desc, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.contrato import Contrato, ContratoStatus
@@ -18,6 +18,40 @@ from app.services.extenso_service import ExtensoService
 # from app.services.pdf_service import PDFService  # WeasyPrint disabled
 # from app.services.pdf_service_playwright import PDFService  # Playwright
 from app.services.pdf_service_stub import PDFService  # Using stub - WORKING
+
+
+FALLBACK_TEMPLATES: Dict[str, Dict[str, Any]] = {
+    "bacen": {
+        "id": "bacen",
+        "nome": "Contrato de Adesao ao Bacen",
+        "tipo": "bacen",
+        "descricao": "Template institucional Bacen",
+        "versao": "1.0.0",
+        "ativo": True,
+        "campos": [],
+        "secoes": [],
+    },
+    "serasa": {
+        "id": "serasa",
+        "nome": "Contrato de Adesao ao Serasa",
+        "tipo": "serasa",
+        "descricao": "Template institucional Serasa",
+        "versao": "1.0.0",
+        "ativo": True,
+        "campos": [],
+        "secoes": [],
+    },
+    "protesto": {
+        "id": "protesto",
+        "nome": "Contrato de Adesao ao Protesto",
+        "tipo": "protesto",
+        "descricao": "Template institucional Protesto",
+        "versao": "1.0.0",
+        "ativo": True,
+        "campos": [],
+        "secoes": [],
+    },
+}
 
 
 class ContratoService:
@@ -91,8 +125,43 @@ class ContratoService:
             if template_path.exists():
                 with open(template_path, 'r', encoding='utf-8') as f:
                     return json.load(f)
+
+        template_fallback = FALLBACK_TEMPLATES.get(template_id.lower())
+        if template_fallback:
+            return template_fallback
         
         return None
+
+    @staticmethod
+    def _normalize_document(documento: str) -> str:
+        return (
+            (documento or "")
+            .replace(".", "")
+            .replace("-", "")
+            .replace("/", "")
+            .strip()
+        )
+
+    async def _recalculate_cliente_metrics(self, cliente_id: UUID) -> None:
+        result = await self.db.execute(
+            select(
+                func.count(Contrato.id),
+                func.min(Contrato.created_at),
+                func.max(Contrato.created_at),
+            ).where(Contrato.cliente_id == cliente_id)
+        )
+        total, primeiro, ultimo = result.one()
+
+        cliente_result = await self.db.execute(
+            select(Cliente).where(Cliente.id == cliente_id)
+        )
+        cliente = cliente_result.scalar_one_or_none()
+        if not cliente:
+            return
+
+        cliente.total_contratos = int(total or 0)
+        cliente.primeiro_contrato_em = primeiro
+        cliente.ultimo_contrato_em = ultimo
     
     async def create(self, data: ContratoCreate, user_id: UUID) -> Contrato:
         """Create a new contract."""

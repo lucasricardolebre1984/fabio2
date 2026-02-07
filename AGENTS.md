@@ -141,6 +141,7 @@ npm run dev
 ## 🐛 Bug Reports
 
 Registrar em `docs/BUGSREPORT.md` antes de corrigir.
+Após qualquer mudança de código que impacte bug, atualizar o status correspondente em `docs/BUGSREPORT.md` na mesma entrega (bug novo, bug resolvido ou bug reaberto).
 
 Template:
 ```markdown

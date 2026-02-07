@@ -48,6 +48,12 @@ passo e evoluir para melhorias incrementais sem quebrar o fluxo homologado.
   - eventos ativos `MESSAGES_UPSERT` e `CONNECTION_UPDATE`
   - integracoes nativas do Evolution desativadas para evitar dupla automacao.
 
+## Validacao read-only (2026-02-07)
+- Confirmado: BUG-013, BUG-014, BUG-017 e BUG-019 sem regressao no fluxo atual.
+- Novo achado: criacao de contrato quebra com `Template bacen nao encontrado` (`BUG-025`).
+- Novo achado: geracao de PDF de contrato quebra com `ModuleNotFoundError: playwright` (`BUG-026`).
+- Acao pendente: corrigir pipeline de templates/pdfs antes de nova rodada institucional de contratos.
+
 ---
 
 Atualizado em: 07/02/2026

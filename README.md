@@ -64,6 +64,10 @@ npm run dev
 | [DEPLOY_AWS.md](./DEPLOY_AWS.md) | Guia deploy AWS EC2 |
 | [docs/ARCHITECTURE/OVERVIEW.md](./docs/ARCHITECTURE/OVERVIEW.md) | Arquitetura do sistema |
 
+### Regra Institucional de Bugs
+- Sempre registrar bug novo em `docs/BUGSREPORT.md` antes da correção.
+- Sempre atualizar o status em `docs/BUGSREPORT.md` na mesma entrega quando um bug for resolvido, reaberto ou reclassificado.
+
 ---
 
 ## 🏗️ Tecnologias
