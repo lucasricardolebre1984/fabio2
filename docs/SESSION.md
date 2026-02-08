@@ -1,7 +1,7 @@
 ﻿# SESSION - contexto atual da sessao
 
-Sessao ativa: 07/02/2026
-Status: alinhamento fechado e V1.5 homologada localmente com cliente
+Sessao ativa: 08/02/2026
+Status: V1.6 homologada localmente com cliente apos estabilizacao de PDF
 Branch: main
 
 ## Resumo executivo
@@ -67,8 +67,18 @@ passo e evoluir para melhorias incrementais sem quebrar o fluxo homologado.
 - VIVA (chat interno com Fabio) integrada com agenda:
   - comando suportado: `agendar TITULO | DD/MM/AAAA HH:MM | descricao opcional`;
   - cria evento real no backend e retorna confirmacao.
-- `BUG-026` permanece pendente (PDF via Playwright nao instalado no container).
+- `BUG-026` corrigido:
+  - fallback robusto de geracao PDF no backend (Playwright -> WeasyPrint);
+  - dependencia `pydyf` fixada para versao compativel (`0.10.0`);
+  - validacao real da rota `GET /api/v1/contratos/{id}/pdf` com retorno `200`.
+
+## Validacao read-only adicional (2026-02-08)
+- `GET /health`: `200` (`healthy`).
+- `GET /api/v1/whatsapp/status`: `200`.
+- `GET /api/v1/whatsapp-chat/status`: `200`.
+- `GET /api/v1/whatsapp-chat/conversas?limit=5`: `200`.
+- `GET /api/v1/contratos/{id}/pdf`: `200` com `application/pdf`.
 
 ---
 
-Atualizado em: 07/02/2026
+Atualizado em: 08/02/2026

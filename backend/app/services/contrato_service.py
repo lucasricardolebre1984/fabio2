@@ -1,6 +1,7 @@
 """Contrato service - Business logic for contracts."""
 import json
 import os
+import logging
 from datetime import datetime
 from pathlib import Path
 from decimal import Decimal
@@ -15,9 +16,6 @@ from app.models.cliente import Cliente
 from app.models.contrato_template import ContratoTemplate
 from app.schemas.contrato import ContratoCreate, ContratoUpdate
 from app.services.extenso_service import ExtensoService
-# from app.services.pdf_service import PDFService  # WeasyPrint disabled
-# from app.services.pdf_service_playwright import PDFService  # Playwright
-from app.services.pdf_service_stub import PDFService  # Using stub - WORKING
 
 
 FALLBACK_TEMPLATES: Dict[str, Dict[str, Any]] = {
@@ -53,6 +51,8 @@ FALLBACK_TEMPLATES: Dict[str, Dict[str, Any]] = {
     },
 }
 
+logger = logging.getLogger(__name__)
+
 
 class ContratoService:
     """Service for contract management."""
@@ -60,7 +60,6 @@ class ContratoService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.extenso = ExtensoService()
-        self.pdf = PDFService()
     
     async def list_templates(self) -> List[Dict[str, Any]]:
         """List available contract templates."""
@@ -375,22 +374,72 @@ class ContratoService:
         contrato = await self.get_by_id(contrato_id)
         if not contrato:
             return None
-        
-        # Prepare data for PDF
-        dados = {
+
+        pdf_path = self._generate_pdf_via_weasy(contrato)
+        if not pdf_path:
+            return None
+
+        # Update contract with PDF URL
+        relative_path = f"/storage/{os.path.basename(pdf_path)}"
+        await self.update(contrato_id, ContratoUpdate(pdf_url=relative_path))
+
+        return relative_path
+
+    async def generate_pdf_bytes(self, contrato_id: UUID) -> Optional[bytes]:
+        """Generate PDF bytes for contract (Playwright first, WeasyPrint fallback)."""
+        contrato = await self.get_by_id(contrato_id)
+        if not contrato:
+            return None
+
+        # Primary path: Playwright renderer.
+        try:
+            from app.services.pdf_service_playwright import PDFService as PlaywrightPDFService
+
+            pdf_service = PlaywrightPDFService(self.db)
+            pdf_bytes = await pdf_service.generate_contrato_pdf(contrato_id)
+            if pdf_bytes:
+                logger.info("PDF gerado via Playwright para contrato %s", contrato_id)
+                return pdf_bytes
+        except ModuleNotFoundError:
+            # Playwright dependency may be absent in some containers.
+            logger.info("Playwright indisponivel no runtime. Usando fallback WeasyPrint.")
+        except Exception:
+            # Any Playwright runtime issue should not block contract download.
+            logger.exception("Falha no Playwright para contrato %s. Tentando WeasyPrint.", contrato_id)
+
+        # Fallback path: WeasyPrint renderer.
+        pdf_path = self._generate_pdf_via_weasy(contrato)
+        if not pdf_path:
+            logger.error("Falha no fallback WeasyPrint para contrato %s", contrato_id)
+            return None
+
+        try:
+            with open(pdf_path, "rb") as pdf_file:
+                logger.info("PDF gerado via WeasyPrint para contrato %s em %s", contrato_id, pdf_path)
+                return pdf_file.read()
+        except OSError:
+            logger.exception("Nao foi possivel ler arquivo PDF gerado para contrato %s", contrato_id)
+            return None
+
+    @staticmethod
+    def _format_brl(value: Any) -> str:
+        return f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    def _build_pdf_data(self, contrato: Contrato) -> Dict[str, Any]:
+        return {
             "numero": contrato.numero,
             "contratante_nome": contrato.contratante_nome,
             "contratante_documento": contrato.contratante_documento,
             "contratante_email": contrato.contratante_email,
             "contratante_telefone": contrato.contratante_telefone,
             "contratante_endereco": contrato.contratante_endereco,
-            "valor_total": f"{contrato.valor_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+            "valor_total": self._format_brl(contrato.valor_total),
             "valor_total_extenso": contrato.valor_total_extenso,
-            "valor_entrada": f"{contrato.valor_entrada:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+            "valor_entrada": self._format_brl(contrato.valor_entrada),
             "valor_entrada_extenso": contrato.valor_entrada_extenso,
             "qtd_parcelas": contrato.qtd_parcelas,
             "qtd_parcelas_extenso": contrato.qtd_parcelas_extenso,
-            "valor_parcela": f"{contrato.valor_parcela:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+            "valor_parcela": self._format_brl(contrato.valor_parcela),
             "valor_parcela_extenso": contrato.valor_parcela_extenso,
             "prazo_1": contrato.prazo_1,
             "prazo_1_extenso": contrato.prazo_1_extenso,
@@ -399,22 +448,16 @@ class ContratoService:
             "local_assinatura": contrato.local_assinatura,
             "data_assinatura": contrato.data_assinatura,
         }
-        
-        # Generate PDF
-        pdf_path = self.pdf.generate_contrato_bacen(contrato.id, dados)
-        
-        # Update contract with PDF URL
-        relative_path = f"/storage/{os.path.basename(pdf_path)}"
-        await self.update(contrato_id, ContratoUpdate(pdf_url=relative_path))
-        
-        return relative_path
-    
-    async def generate_pdf_bytes(self, contrato_id: UUID) -> Optional[bytes]:
-        """Generate PDF bytes for contract using Playwright."""
-        from app.services.pdf_service_playwright import PDFService as PlaywrightPDFService
-        
-        pdf_service = PlaywrightPDFService(self.db)
-        pdf_bytes = await pdf_service.generate_contrato_pdf(contrato_id)
-        return pdf_bytes
+
+    def _generate_pdf_via_weasy(self, contrato: Contrato) -> Optional[str]:
+        try:
+            from app.services.pdf_service import PDFService as WeasyPDFService
+
+            pdf_service = WeasyPDFService()
+            dados = self._build_pdf_data(contrato)
+            return pdf_service.generate_contrato_bacen(contrato.id, dados)
+        except Exception:
+            logger.exception("WeasyPrint falhou na geracao do contrato %s", contrato.id)
+            return None
 
 

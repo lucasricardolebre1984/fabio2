@@ -1,8 +1,8 @@
 ﻿# STATUS do projeto - FC Solucoes Financeiras
 
-Data: 07/02/2026
-Sessao: alinhamento final da operacao WhatsApp VIVA com cliente
-Status: V1.5 homologada localmente com cliente (OpenAI + Evolution estável)
+Data: 08/02/2026
+Sessao: estabilizacao tecnica de PDF + alinhamento documental institucional
+Status: V1.6 homologada localmente com cliente (OpenAI + Evolution estavel)
 
 ## Objetivo atual
 Consolidar operacao comercial da Viviane no WhatsApp com regras de negocio,
@@ -22,6 +22,11 @@ qualificacao de lead, politica de preco e governanca de atendimento humano.
 - Fontes de conhecimento organizadas em `frontend/src/app/viva/REGRAS`
 - Provedor IA ativo: OpenAI (`gpt-5-mini`)
 
+## Estado Contratos/PDF
+- `GET /api/v1/contratos/{id}/pdf` reabilitado com sucesso (sem `500`)
+- Fallback de renderizacao aplicado: Playwright -> WeasyPrint
+- Dependencia fixada: `pydyf==0.10.0` (compatibilidade com WeasyPrint 60.2)
+
 ## Decisoes validadas com cliente
 - Modo B (VIVA conduz; humano por excecao)
 - Tom hibrido (consultivo + acolhedor)
@@ -36,7 +41,8 @@ qualificacao de lead, politica de preco e governanca de atendimento humano.
 
 ## Proximo gate
 Iniciar ciclo de melhoria incremental (etiquetas de lead, scripts PF/PJ e painel de metricas),
-mantendo observabilidade do webhook e taxa de conversao.
+fechando os bugs ativos de experiencia da VIVA (`BUG-012`, `BUG-015`, `BUG-016`)
+sem regressao no fluxo comercial homologado.
 
 ## Documentos de referencia
 - `docs/WHATSAPP_VIVA_PACOTE_DEFINITIVO.md`
@@ -47,4 +53,4 @@ mantendo observabilidade do webhook e taxa de conversao.
 
 ---
 
-Atualizado em: 07/02/2026
+Atualizado em: 08/02/2026

@@ -1,6 +1,6 @@
 ﻿# 📋 Mudanças: Integração WhatsApp + IA VIVA
 
-> **Data:** 2026-02-05  
+> **Data:** 2026-02-08  
 > **Branch:** main  
 > **Status:** Em uso local
 
@@ -21,7 +21,9 @@ Chat IA VIVA (Web)
 - UI estilo chat com anexos
 - Prompts laterais: Landing Pages, Logos & Brand, Imagens FC, Imagens Rezeta
 - Upload de imagem para análise
-- Upload de áudio (botão presente, operação pendente)
+- Upload de áudio:
+  - WhatsApp/webhook: ativo (transcricao)
+  - chat interno `/viva`: botao ainda pendente (`BUG-012`)
 
 WhatsApp
 - Webhook para Evolution API
@@ -44,7 +46,9 @@ WhatsApp
 - Chat: OK
 - Visão: OK
 - Imagem: OK
-- Audio: OK (transcricao ativa no webhook e endpoint)
+- Audio: parcial
+  - webhook e endpoint: OK
+  - botao do chat interno: pendente
 
 ---
 
@@ -86,3 +90,12 @@ WhatsApp
 - Corrigido bug de chave OpenAI vazia por override no compose.
 
 Status do ciclo: OpenAI ativo e backend saudável.
+
+## Ciclo 2026-02-08 (madrugada) - estabilizacao de PDF de contratos
+
+- Corrigido `BUG-026` no backend:
+  - fallback de renderizacao `Playwright -> WeasyPrint`;
+  - pin de dependencia `pydyf==0.10.0` para compatibilidade com WeasyPrint.
+- Validado endpoint:
+  - `GET /api/v1/contratos/{id}/pdf` retornando `200` com `application/pdf`.
+- Documentacao institucional alinhada (`STATUS`, `SESSION`, `DECISIONS`, `BUGSREPORT`, `MANUAL`).

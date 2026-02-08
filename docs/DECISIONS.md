@@ -472,6 +472,41 @@ O atendimento WhatsApp e o chat da VIVA estavam com comportamento inconsistente 
 
 ---
 
+## DECISAO-014: estabilizacao do endpoint de PDF de contratos no backend
+
+### Data
+08/02/2026
+
+### Contexto
+O endpoint `GET /api/v1/contratos/{id}/pdf` estava retornando `500` no
+container por combinacao de fatores:
+- Playwright ausente no runtime;
+- cadeia WeasyPrint/PyDyf incompatível na imagem em uso.
+
+### Decisao
+- manter estrategia de fallback no `ContratoService.generate_pdf_bytes`:
+  - caminho primario: Playwright;
+  - fallback automatico: WeasyPrint.
+- fixar dependencia `pydyf==0.10.0` para compatibilidade com `weasyprint==60.2`.
+- registrar logs tecnicos de fallback para diagnostico operacional.
+
+### Motivo
+- remove erro `500` no download de PDF sem travar operacao de contratos;
+- evita dependencia unica de Playwright em ambiente de container;
+- preserva compatibilidade com fluxo atual de browser print no frontend.
+
+### Rollback
+- `git revert <hash-da-decisao-014>`
+- opcional emergencial:
+  - restaurar comportamento anterior somente se validado em homologacao;
+  - manter browser print como contingencia no frontend.
+
+---
+
+*Documentado em: 08/02/2026*
+
+---
+
 ## DECISAO-013: fechamento de clientes/agenda minimo funcional e sincronizacao contratos->clientes
 
 ### Data

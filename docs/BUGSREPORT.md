@@ -1,7 +1,7 @@
 ﻿# BUGSREPORT - Registro de Bugs
 
 > **Projeto:** FC Soluções Financeiras SaaS  
-> **Última Atualização:** 2026-02-07
+> **Última Atualização:** 2026-02-08
 
 ---
 
@@ -26,7 +26,7 @@
 | BUG-025 | Alta | Contratos | Criação de contrato em `/contratos/novo` falhava com `Network Error` porque `POST /api/v1/contratos` retornava `500` (`Template bacen não encontrado`) | Resolvido |
 | BUG-027 | Alta | Clientes/Contratos | Contratos criados sem vínculo de cliente não apareciam na tela de clientes | Resolvido |
 | BUG-028 | Alta | Contratos | Geração de número por contagem anual permitia duplicidade (`ix_contratos_numero`) quando havia gaps | Resolvido |
-| BUG-026 | Alta | PDF | Endpoint `GET /api/v1/contratos/{id}/pdf` retorna `500` no container por dependência ausente (`ModuleNotFoundError: No module named 'playwright'`) | Ativo |
+| BUG-026 | Alta | PDF | Endpoint `GET /api/v1/contratos/{id}/pdf` falhava com `500` por cadeia de dependencias inconsistente (Playwright ausente + incompatibilidade WeasyPrint/PyDyf) | Resolvido |
 
 ---
 
@@ -34,10 +34,11 @@
 
 - Autenticação em dev aceita senha `1234` (`security_stub.py`)
 - PDF via browser print no frontend (`frontend/src/lib/pdf.ts`)
+- Download de PDF pelo backend reabilitado em `GET /api/v1/contratos/{id}/pdf`
 
 ---
 
-## Validacao Read-only (2026-02-07)
+## Validacao Read-only (2026-02-08)
 
 - `BUG-013`: validado com `POST /api/v1/viva/chat` usando `prompt_extra` longo; endpoint respondeu `200` e retornou `resposta` + `midia`, sem `StackOverflowError`.
 - `BUG-014`: validado com `POST /api/v1/viva/vision/upload` enviando arquivo `image/png`; endpoint respondeu `200` com análise da imagem.
@@ -48,7 +49,7 @@
 - `BUG-025`: validado com `POST /api/v1/contratos` (`template_id=bacen`) retornando `200` após fallback de template + correção de numeração.
 - `BUG-027`: validado com criação de contrato e consulta `GET /api/v1/clientes?search=...`; cliente foi criado/vinculado automaticamente.
 - `BUG-028`: validado com nova criação de contrato sem colisão de índice único (`CNT-2026-0006` criado com sucesso).
-- `BUG-026` (novo): reproduzido `500` em `GET /api/v1/contratos/{id}/pdf`.
+- `BUG-026`: validado com autenticacao real em `GET /api/v1/contratos/{id}/pdf`; retorno `200`, `Content-Type: application/pdf` e bytes iniciando com `%PDF-`.
 
 ---
 
@@ -78,9 +79,10 @@
 | BUG-023 | VIVA/OpenAI | Removido override vazio de `OPENAI_API_KEY` no compose | 2026-02-07 |
 | BUG-024 | VIVA/OpenAI | Ajustado payload OpenAI Images sem `response_format` incompatível | 2026-02-07 |
 | BUG-025 | Contratos | Criação de contrato estabilizada com fallback de template e numeração segura | 2026-02-07 |
+| BUG-026 | PDF | Endpoint `/contratos/{id}/pdf` estabilizado com fallback Playwright->WeasyPrint e pin de `pydyf==0.10.0` | 2026-02-08 |
 | BUG-027 | Clientes/Contratos | Reativado vínculo automático cliente<->contrato e endpoint de sincronização de órfãos | 2026-02-07 |
 | BUG-028 | Contratos | Numeração alterada para sequência por maior número do ano (sem colisão por gaps) | 2026-02-07 |
 
 ---
 
-*Atualizado em: 2026-02-07*
+*Atualizado em: 2026-02-08*

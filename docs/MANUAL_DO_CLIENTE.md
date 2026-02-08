@@ -1,7 +1,7 @@
 ﻿# 📘 MANUAL DO CLIENTE - FC Soluções Financeiras SaaS
 
-> **Versão:** 1.1  
-> **Última atualização:** 2026-02-05  
+> **Versão:** 1.2  
+> **Última atualização:** 2026-02-08  
 > **Sistema:** FC Soluções Financeiras - Gestão de Contratos  
 > **Público-alvo:** Fábio (Administrador) e Operadores
 
@@ -32,7 +32,9 @@ Funcionalidades
 - Chat com respostas automáticas
 - Menu de prompts laterais
 - Análise de imagens
-- Upload de áudio (botão presente, operação pendente)
+- Audio:
+  - WhatsApp (webhook): transcricao ativa
+  - Chat interno `/viva`: botao presente, operacao pendente
 
 Prompts laterais
 - Landing Pages
@@ -56,7 +58,8 @@ Visualizar e editar
 - Botão de edição na página do contrato
 
 PDF
-- Gerado via impressão do navegador (Ctrl+P → Salvar como PDF)
+- Gerado via impressão do navegador (Ctrl+P -> Salvar como PDF)
+- Download backend tambem disponivel na lista (`/api/v1/contratos/{id}/pdf`)
 
 ---
 
@@ -116,7 +119,9 @@ PDF não aparece
 - Verifique popups liberados no navegador
 
 Áudio no VIVA não funciona
-- Status conhecido: botão presente, operação pendente
+- Status conhecido:
+  - WhatsApp: audio com transcricao funciona
+  - Chat interno `/viva`: botao de audio ainda pendente
 
 ---
 
