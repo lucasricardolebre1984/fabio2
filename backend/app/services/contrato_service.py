@@ -50,6 +50,16 @@ FALLBACK_TEMPLATES: Dict[str, Dict[str, Any]] = {
         "campos": [],
         "secoes": [],
     },
+    "cadin": {
+        "id": "cadin",
+        "nome": "Instrumento de PrestaÃ§Ã£o de ServiÃ§os - CADIN PF/PJ",
+        "tipo": "cadin",
+        "descricao": "Template institucional CADIN PF/PJ",
+        "versao": "1.0.0",
+        "ativo": True,
+        "campos": [],
+        "secoes": [],
+    },
 }
 
 logger = logging.getLogger(__name__)
@@ -167,7 +177,7 @@ class ContratoService:
         """Create a new contract."""
         template = await self.get_template(data.template_id)
         if not template:
-            raise ValueError(f"Template {data.template_id} não encontrado")
+            raise ValueError(f"Template {data.template_id} nÃ£o encontrado")
 
         documento_limpo = self._normalize_document(data.contratante_documento)
 
@@ -421,6 +431,8 @@ class ContratoService:
     def _build_pdf_data(self, contrato: Contrato) -> Dict[str, Any]:
         return {
             "numero": contrato.numero,
+            "template_id": contrato.template_id,
+            "template_nome": contrato.template_nome,
             "contratante_nome": contrato.contratante_nome,
             "contratante_documento": contrato.contratante_documento,
             "contratante_email": contrato.contratante_email,

@@ -1,4 +1,4 @@
-﻿# STATUS do projeto - FC Solucoes Financeiras
+# STATUS do projeto - FC Solucoes Financeiras
 
 Data: 09/02/2026
 Sessao: estabilizacao de unicidade clientes + fluxo de contratos (cpf/cnpj)
@@ -66,3 +66,32 @@ sem regressao no fluxo comercial homologado.
 ---
 
 Atualizado em: 09/02/2026
+
+## Estado Contratos/Layout (2026-02-09)
+- Logo oficial `logo2.png` padronizada no fluxo de contratos (preview + PDF frontend + PDF backend).
+- Novo template operacional `CADIN PF/PJ` adicionado ao sistema.
+- Menu de contratos com CADIN habilitado.
+- Tela de novo contrato agora respeita `template` na URL (`/contratos/novo?template=cadin`).
+- Template base criado em `contratos/templates/cadin.json`.
+
+
+## Estado Contratos/Layout (2026-02-09 - logo transparente + CADIN completo)
+- Logo oficial do cabecalho atualizada para `logo2.png` (transparente) no preview e nos dois fluxos de PDF.
+- Template CADIN corrigido com clausulas completas e acentuacao conforme `cadinpfpjmodelo.docx`.
+- Pipeline backend Playwright ajustado para usar marca transparente e subtitulo/template CADIN com texto canonico.
+
+## Estado Contratos/Layout (2026-02-09 - acentuacao e legibilidade)
+- Corrigido bug de acentuacao corrompida (mojibake) na visualizacao de contratos.
+- Corrigido texto no PDF frontend/backend para manter acentos institucionais.
+- Layout ampliado levemente (preview + PDF) para melhorar leitura operacional.
+
+## Estado Contratos/Layout (2026-02-09 - ajuste final de assinatura)
+- Rollback local adicional registrado:
+  - `docs/ROLLBACK/rollback-20260209-131517.patch`
+- Normalizacao de `local_assinatura` legado aplicada em:
+  - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`
+  - `frontend/src/lib/pdf.ts`
+  - `backend/app/services/pdf_service_playwright.py`
+- Correcao preventiva no cadastro de novo contrato:
+  - `frontend/src/app/(dashboard)/contratos/novo/page.tsx` agora usa `Ribeirao Preto/SP` no default de `local_assinatura`.
+- Resultado esperado: rodape da assinatura com local exibido corretamente para registros novos e legados.

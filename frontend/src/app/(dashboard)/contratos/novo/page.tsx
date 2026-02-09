@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,12 @@ import { api } from '@/lib/api'
 
 export default function NovoContratoPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const templateQuery = (searchParams.get('template') || 'bacen').toLowerCase()
+  const selectedTemplate = templateQuery === 'cadin' ? 'cadin' : 'bacen'
+  const tituloTemplate = selectedTemplate === 'cadin'
+    ? 'Instrumento de PrestaÃ§Ã£o de ServiÃ§os - CADIN PF/PJ'
+    : 'Contrato de Adesao ao Bacen'
   const [loading, setLoading] = useState(false)
   const [checkingCliente, setCheckingCliente] = useState(false)
   const [error, setError] = useState('')
@@ -83,7 +89,7 @@ export default function NovoContratoPage() {
 
     try {
       const contratoData = {
-        template_id: 'bacen',
+        template_id: selectedTemplate,
         contratante_nome: formData.contratante_nome,
         contratante_documento: formData.contratante_documento,
         contratante_email: formData.contratante_email,
@@ -103,6 +109,11 @@ export default function NovoContratoPage() {
         valor_parcela_extenso: null,
         prazo_1_extenso: null,
         prazo_2_extenso: null,
+        dados_extras: selectedTemplate === 'cadin'
+          ? {
+              forma_pagamento: `Entrada ${formData.valor_entrada || '0'} + ${formData.qtd_parcelas || '0'} parcelas`,
+            }
+          : null,
       }
 
       console.log('Enviando dados:', contratoData)
@@ -120,7 +131,7 @@ export default function NovoContratoPage() {
         const { status, data } = err.response
         
         if (status === 422 && data?.detail) {
-          // Erro de validação do Pydantic
+          // Erro de validaÃ§Ã£o do Pydantic
           if (Array.isArray(data.detail)) {
             // Pydantic v2 retorna array de erros
             errorMessage = data.detail.map((e: any) => {
@@ -162,7 +173,7 @@ export default function NovoContratoPage() {
 
       <Card className="max-w-2xl">
         <CardHeader>
-          <CardTitle>Contrato de Adesão ao Bacen</CardTitle>
+          <CardTitle>{tituloTemplate}</CardTitle>
         </CardHeader>
         <CardContent>
           {error && (
@@ -225,10 +236,10 @@ export default function NovoContratoPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="contratante_endereco">Endereço Completo</Label>
+              <Label htmlFor="contratante_endereco">EndereÃ§o Completo</Label>
               <Input 
                 id="contratante_endereco" 
-                placeholder="Rua, número, bairro, cidade - Estado, CEP" 
+                placeholder="Rua, nÃºmero, bairro, cidade - Estado, CEP" 
                 required 
                 value={formData.contratante_endereco}
                 onChange={handleChange}

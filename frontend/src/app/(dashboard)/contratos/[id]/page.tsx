@@ -42,6 +42,19 @@ interface Contrato {
   cliente_nome?: string
 }
 
+function normalizeMojibakeText(value?: string | null): string {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  if (!/[\u00C3\u00C2]/.test(text)) return text
+
+  try {
+    const bytes = Uint8Array.from(text, (char) => char.charCodeAt(0))
+    return new TextDecoder('utf-8').decode(bytes)
+  } catch {
+    return text
+  }
+}
+
 export default function VisualizarContratoPage() {
   const params = useParams()
   const router = useRouter()
@@ -118,31 +131,31 @@ export default function VisualizarContratoPage() {
     )
   }
 
+  const templateId = (contrato.template_id || '').toLowerCase()
+  const isCadin = templateId === 'cadin'
+  const localAssinatura = normalizeMojibakeText(contrato.local_assinatura) || 'Ribeir\u00E3o Preto/SP'
+  const contractSubtitle = isCadin
+    ? 'CADIN - Regularização de pendências federais'
+    : 'Bacen - Remoção SCR'
+
   // Layout institucional conforme modelo
   const renderContratoPreview = () => {
     return (
-      <div className="bg-white p-8 min-h-[1100px] shadow-sm [font-family:'Times_New_Roman',Times,serif_!important]">
+      <div className="bg-white p-10 min-h-[1120px] shadow-sm [font-family:'Times_New_Roman',Times,serif_!important]">
         
         {/* Cabeçalho Institucional - Faixa Azul com Logo */}
-        <div className="bg-[#1e3a5f] text-white py-4 px-6 mb-6 -mx-8 -mt-8">
+        <div className="bg-[#1e3a5f] text-white py-5 px-8 mb-8 -mx-10 -mt-10">
           <div className="flex items-center gap-4">
             {/* Logo Institucional */}
             <div className="flex-shrink-0">
-              <svg width="60" height="60" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                {/* Balança */}
-                <circle cx="50" cy="50" r="45" stroke="white" strokeWidth="3" fill="none"/>
-                <line x1="50" y1="15" x2="50" y2="85" stroke="white" strokeWidth="3"/>
-                <line x1="25" y1="35" x2="75" y2="35" stroke="white" strokeWidth="2"/>
-                <line x1="15" y1="35" x2="35" y2="35" stroke="white" strokeWidth="2"/>
-                <line x1="65" y1="35" x2="85" y2="35" stroke="white" strokeWidth="2"/>
-                <line x1="25" y1="35" x2="20" y2="50" stroke="white" strokeWidth="2"/>
-                <line x1="75" y1="35" x2="80" y2="50" stroke="white" strokeWidth="2"/>
-                <text x="42" y="58" fill="white" fontSize="24" fontWeight="bold" fontFamily="serif">F</text>
-                <text x="54" y="58" fill="white" fontSize="24" fontWeight="bold" fontFamily="serif">C</text>
-              </svg>
+              <img
+                src="/logo2.png"
+                alt="FC Soluções Financeiras"
+                className="h-[92px] w-auto object-contain"
+              />
             </div>
             <div className="flex-1">
-              <h1 className="text-2xl font-bold tracking-wide">
+              <h1 className="text-[2rem] font-bold tracking-wide">
                 F C Soluções Financeiras
               </h1>
             </div>
@@ -151,18 +164,18 @@ export default function VisualizarContratoPage() {
 
         {/* Título */}
         <div className="text-center mb-8">
-          <h2 className="text-xl font-bold uppercase tracking-wider text-gray-900 border-b-2 border-gray-800 pb-2 inline-block">
+          <h2 className="text-2xl font-bold uppercase tracking-wider text-gray-900 border-b-2 border-gray-800 pb-2 inline-block">
             Contrato de Prestação de Serviços
           </h2>
-          <p className="text-gray-600 mt-2 font-semibold">Bacen - Remoção SCR</p>
-          <div className="mt-4 flex justify-center gap-8 text-sm">
+          <p className="text-gray-600 mt-2 font-semibold">{contractSubtitle}</p>
+          <div className="mt-5 flex justify-center gap-10 text-base">
             <span><strong>Nº:</strong> {contrato.numero}</span>
             <span><strong>Data:</strong> {contrato.data_assinatura || formatDate(contrato.created_at)}</span>
           </div>
         </div>
 
         {/* Dados das Partes - Layout em duas colunas */}
-        <div className="grid grid-cols-2 gap-6 mb-6 text-sm">
+        <div className="grid grid-cols-2 gap-6 mb-7 text-base">
           <div className="border-2 border-gray-800 p-4">
             <h3 className="font-bold text-gray-900 uppercase mb-3 border-b border-gray-400 pb-1">Contratante</h3>
             <p><strong>Nome:</strong> {contrato.contratante_nome}</p>
@@ -185,14 +198,119 @@ export default function VisualizarContratoPage() {
         </div>
 
         {/* Texto introdutório */}
-        <p className="text-sm text-justify mb-6 leading-relaxed">
+        <p className="text-base text-justify mb-7 leading-relaxed">
           As partes acima identificadas têm, entre si, justo e acertado o presente Contrato de Prestação de Serviços, 
           que se regerá pelas cláusulas seguintes e pelas condições descritas no presente.
         </p>
 
         {/* CLÁUSULAS */}
-        <div className="space-y-4 text-sm text-justify leading-relaxed">
-          
+        <div className="space-y-4 text-base text-justify leading-relaxed">
+          {isCadin ? (
+            <>
+              <p>
+                <strong className="text-gray-900 uppercase">CLÁUSULA PRIMEIRA - DO OBJETO</strong><br />
+                <strong>1.1.</strong> O presente instrumento tem por objeto a prestação de serviços de assessoria administrativa para a
+                regularização de pendências do(a) CONTRATANTE junto ao Cadastro Informativo de Créditos não Quitados do Setor Público
+                Federal (CADIN), visando à adoção dos procedimentos necessários para obtenção da Certidão Negativa de Débitos (CND)
+                ou documento equivalente, referente às dívidas federais constatadas até a data de assinatura deste contrato.
+              </p>
+              <p>
+                <strong>§1º.</strong> O serviço inclui análise dos débitos, negociação junto aos órgãos credores para obtenção de descontos e
+                formalização de parcelamentos, conforme as condições e programas de anistia disponibilizados pelo governo.
+              </p>
+              <p>
+                <strong>§2º.</strong> Fica expressamente claro que a CONTRATADA não se responsabiliza pela quitação das dívidas do(a)
+                CONTRATANTE, mas sim pela prestação de serviços de assessoria para negociação e regularização dos apontamentos no CADIN.
+              </p>
+              <p>
+                <strong>§3º.</strong> Débitos que surgirem ou forem inscritos no CADIN após a data de assinatura deste contrato não estarão
+                cobertos por este instrumento.
+              </p>
+              <p>
+                <strong>1.2.</strong> Os serviços contratados não representam garantia de aprovação de crédito para o(a) CONTRATANTE,
+                mas um meio para regularização da situação fiscal perante os órgãos federais.
+              </p>
+              <p>
+                <strong className="text-gray-900 uppercase">CLÁUSULA SEGUNDA - DAS DESPESAS E HONORÁRIOS</strong><br />
+                <strong>2.1.</strong> Como contraprestação pelos serviços descritos na Cláusula 1ª, o(a) CONTRATANTE pagará à CONTRATADA
+                o valor total de <strong>{formatCurrency(contrato.valor_total)}</strong> ({contrato.valor_total_extenso}), sendo entrada de{' '}
+                <strong>{formatCurrency(contrato.valor_entrada)}</strong> ({contrato.valor_entrada_extenso})
+                {contrato.qtd_parcelas > 0 ? (
+                  <> e o saldo em {contrato.qtd_parcelas} ({contrato.qtd_parcelas_extenso}) parcelas de {formatCurrency(contrato.valor_parcela)} ({contrato.valor_parcela_extenso}).</>
+                ) : (
+                  <> com pagamento integral na assinatura.</>
+                )}
+              </p>
+              <p>
+                <strong>2.2.</strong> Em caso de atraso superior a 30 (trinta) dias no pagamento de qualquer parcela, o serviço será
+                suspenso. Persistindo a inadimplência, o(a) CONTRATANTE perderá o direito à continuidade do serviço e aos valores já pagos,
+                e as demais parcelas em aberto poderão ser protestadas.
+              </p>
+              <p>
+                <strong>2.3.</strong> No caso de solicitação de cancelamento pelo(a) CONTRATANTE, será cobrada multa de 30% (trinta por cento)
+                sobre o valor total das parcelas em aberto.
+              </p>
+              <p>
+                <strong>2.4.</strong> A execução dos serviços terá início imediato após a assinatura deste contrato e confirmação do pagamento
+                da primeira parcela ou do valor integral, conforme modalidade escolhida.
+              </p>
+              <p>
+                <strong>2.5.</strong> Havendo parcelamento, o não pagamento de qualquer parcela acarretará acréscimo de juros de 2% (dois por cento)
+                ao mês, multa de 10% (dez por cento) e correção monetária.
+              </p>
+              <p>
+                <strong>2.6.</strong> O não pagamento de uma parcela acarreta vencimento antecipado das vincendas, podendo a CONTRATADA
+                promover cobrança e protesto dos títulos em aberto perante o foro da comarca de Ribeirão Preto/SP.
+              </p>
+              <p>
+                <strong>2.7.</strong> A rescisão solicitada pelo(a) CONTRATANTE após o início da prestação dos serviços implica multa compensatória
+                de 30% (trinta por cento) do valor acordado, sem direito a ressarcimento dos valores já pagos.
+              </p>
+              <p>
+                <strong className="text-gray-900 uppercase">CLÁUSULA TERCEIRA - DO PRAZO E GARANTIA</strong><br />
+                <strong>3.1.</strong> A CONTRATADA realizará os procedimentos no prazo de até 45 (quarenta e cinco) dias úteis, contados da
+                confirmação do pagamento e assinatura deste contrato, podendo ser prorrogado conforme complexidade dos débitos ou prazos dos órgãos.
+              </p>
+              <p>
+                <strong>§1º - GARANTIA DE RESULTADO:</strong> caso o serviço não seja executado no prazo estabelecido, a CONTRATADA garantirá
+                devolução integral do valor pago em até 30 (trinta) dias úteis após o término do prazo.
+              </p>
+              <p>
+                <strong>3.2.</strong> A CONTRATADA oferece garantia de acompanhamento por 1 (um) ano, contado da data de efetiva regularização dos apontamentos.
+                Se os apontamentos das dívidas tratadas neste contrato retornarem ao CADIN nesse período, o processo será refeito sem custo adicional.
+              </p>
+              <p>
+                <strong>§2º - ABRANGÊNCIA DA GARANTIA:</strong> a garantia aplica-se exclusivamente às dívidas e restrições identificadas e tratadas
+                no âmbito deste contrato. Dívidas ou restrições posteriores não estão cobertas.
+              </p>
+              <p>
+                <strong className="text-gray-900 uppercase">CLÁUSULA QUARTA - DA PROTEÇÃO DE DADOS (LGPD)</strong><br />
+                <strong>4.1.</strong> Em conformidade com a Lei nº 13.709/2018 (LGPD), a CONTRATADA tratará os dados pessoais do(a) CONTRATANTE
+                com finalidade exclusiva de execução contratual, nos termos do art. 7º, incisos II, V e X.
+              </p>
+              <p>
+                <strong>§1º.</strong> A CONTRATADA adota medidas de segurança para proteger os dados e os eliminará após o término do serviço,
+                ressalvadas as obrigações legais de guarda.
+              </p>
+              <p>
+                <strong>§2º.</strong> O(A) CONTRATANTE pode exercer direitos de titular (acesso, correção, eliminação etc.) pelo e-mail:
+                contato@fcsolucoesfinanceiras.com.
+              </p>
+              <p>
+                <strong className="text-gray-900 uppercase">CLÁUSULA QUINTA - DO FORO</strong><br />
+                <strong>5.1.</strong> Para dirimir controvérsias oriundas deste contrato, as partes elegem o foro da comarca de Ribeirão Preto/SP,
+                ressalvada a faculdade do(a) CONTRATANTE de propor ação no foro de seu domicílio, conforme o Código de Defesa do Consumidor.
+              </p>
+              <p className="mt-6">
+                E, por estarem assim justas e contratadas, as partes assinam o presente instrumento em 2 (duas) vias de igual teor e forma,
+                juntamente com 2 (duas) testemunhas.
+              </p>
+              <p className="mt-4 font-semibold">
+                {localAssinatura}, {contrato.data_assinatura || formatDate(contrato.created_at)}.
+              </p>
+            </>
+          ) : (
+            <>
           <p>
             <strong className="text-gray-900 uppercase">CLÁUSULA PRIMEIRA - DO OBJETO</strong><br />
             O presente contrato tem como objeto a prestação de serviços de consultoria e intermediação administrativa 
@@ -310,23 +428,24 @@ export default function VisualizarContratoPage() {
           </p>
 
           <p className="mt-4 font-semibold">
-            {contrato.local_assinatura || 'Ribeirão Preto/SP'}, {contrato.data_assinatura || formatDate(contrato.created_at)}.
+            {localAssinatura}, {contrato.data_assinatura || formatDate(contrato.created_at)}.
           </p>
-
+            </>
+          )}
         </div>
 
         {/* Assinaturas */}
         <div className="mt-12 grid grid-cols-2 gap-8">
           <div className="text-center">
             <div className="border-t-2 border-black pt-2 mt-16">
-              <p className="font-bold text-sm">{contrato.contratante_nome}</p>
+              <p className="font-bold text-base">{contrato.contratante_nome}</p>
               <p className="text-xs text-gray-600">CPF: {formatCPF(contrato.contratante_documento)}</p>
               <p className="text-xs text-gray-500 uppercase mt-1 font-semibold">CONTRATANTE</p>
             </div>
           </div>
           <div className="text-center">
             <div className="border-t-2 border-black pt-2 mt-16">
-              <p className="font-bold text-sm">FC SERVIÇOS E SOLUÇÕES ADMINISTRATIVAS LTDA</p>
+              <p className="font-bold text-base">FC SERVIÇOS E SOLUÇÕES ADMINISTRATIVAS LTDA</p>
               <p className="text-xs text-gray-600">CNPJ: 57.815.628/0001-62</p>
               <p className="text-xs text-gray-500 uppercase mt-1 font-semibold">CONTRATADA</p>
             </div>
@@ -334,7 +453,7 @@ export default function VisualizarContratoPage() {
         </div>
 
         {/* Testemunhas */}
-        <div className="mt-8 text-sm">
+        <div className="mt-8 text-base">
           <p className="font-bold mb-2">Testemunhas:</p>
           <div className="grid grid-cols-2 gap-8">
             <div>
@@ -484,3 +603,4 @@ export default function VisualizarContratoPage() {
     </div>
   )
 }
+

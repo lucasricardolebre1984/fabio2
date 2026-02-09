@@ -1,4 +1,4 @@
-﻿# SESSION - contexto atual da sessao
+# SESSION - contexto atual da sessao
 
 Sessao ativa: 09/02/2026
 Status: V1.7 local com fluxo de clientes/contratos saneado (unicidade CPF/CNPJ)
@@ -111,3 +111,47 @@ passo e evoluir para melhorias incrementais sem quebrar o fluxo homologado.
 ---
 
 Atualizado em: 09/02/2026
+
+## Atualizacao tecnica (2026-02-09 - layout contratos + CADIN)
+- Rollback snapshot criado antes desta fase:
+  - `rollback-20260209-layout-cadin-pre`
+- Correcao institucional de branding em contratos:
+  - logo oficial `logo2.png` aplicada no preview de contrato;
+  - logo oficial aplicada na geracao PDF frontend (`frontend/src/lib/pdf.ts`);
+  - logo oficial aplicada na geracao PDF backend (Playwright).
+- Inclusao do novo contrato CADIN PF/PJ:
+  - template `contratos/templates/cadin.json` criado com base em `contratos/cadinpfpjmodelo.docx`;
+  - menu de contratos passou a exibir card ativo de CADIN;
+  - `/contratos/novo` passou a aceitar `?template=cadin` e enviar `template_id` correto;
+  - visualizacao `/contratos/[id]` com subtitulo e clausulas base para CADIN.
+
+
+## Atualizacao tecnica (2026-02-09 - logo transparente + CADIN canonico)
+- Rollback local do estado atual registrado em `docs/ROLLBACK/rollback-20260209-122338.patch`.
+- Marca de contrato trocada para `logo2.png` (transparente) no preview e nos dois pipelines de PDF.
+- Contrato CADIN alinhado ao `cadinpfpjmodelo.docx` com clausulas 1a-5a completas e acentuacao correta em:
+  - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`
+  - `frontend/src/lib/pdf.ts`
+  - `backend/app/services/pdf_service_playwright.py`
+  - `contratos/templates/cadin.json`
+- Documentacao atualizada para refletir logo oficial e conteudo juridico canonico do CADIN.
+
+## Atualizacao tecnica (2026-02-09 - fix de acentuacao + escala de layout)
+- Rollback local adicional criado antes do ajuste:
+  - `docs/ROLLBACK/rollback-20260209-124435.patch`
+- Correcao de texto corrompido (mojibake) no fluxo de contrato:
+  - preview (`frontend/src/app/(dashboard)/contratos/[id]/page.tsx`)
+  - PDF frontend (`frontend/src/lib/pdf.ts`)
+  - PDF backend (`backend/app/services/pdf_service_playwright.py`)
+- Ajuste leve de tamanho do layout para melhorar legibilidade no preview e no PDF.
+
+## Atualizacao tecnica (2026-02-09 - fix pontual local_assinatura legado)
+- Rollback local adicional criado antes deste ajuste:
+  - `docs/ROLLBACK/rollback-20260209-131517.patch`
+- Correcao pontual para valor legado em `local_assinatura`:
+  - preview (`frontend/src/app/(dashboard)/contratos/[id]/page.tsx`)
+  - PDF frontend (`frontend/src/lib/pdf.ts`)
+  - PDF backend (`backend/app/services/pdf_service_playwright.py`)
+- Correcao preventiva na origem do dado:
+  - default de `local_assinatura` em `frontend/src/app/(dashboard)/contratos/novo/page.tsx` para `Ribeirao Preto/SP`.
+- Resultado: assinatura final nao exibe mais `Ribeirao` corrompido quando o registro vem com encoding legado.

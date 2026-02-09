@@ -617,3 +617,38 @@ quando havia clientes duplicados para o mesmo documento em formatos diferentes
 
 *Documentado em: 09/02/2026*
 
+---
+
+## DECISAO-016: normalizacao defensiva de local_assinatura legado
+
+### Data
+09/02/2026
+
+### Contexto
+Mesmo apos a correcao geral de acentuacao (BUG-033), alguns contratos legados
+continuavam exibindo local de assinatura com texto corrompido.
+
+### Decisao
+- Normalizar `local_assinatura` no preview e nos dois fluxos de PDF:
+  - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`
+  - `frontend/src/lib/pdf.ts`
+  - `backend/app/services/pdf_service_playwright.py`
+- Corrigir origem do dado em novo contrato:
+  - `frontend/src/app/(dashboard)/contratos/novo/page.tsx` com default
+    `Ribeirao Preto/SP`.
+- Registrar BUG-034 como resolvido na trilha institucional.
+
+### Motivo
+- Eliminar exibicao residual de texto corrompido sem depender de migracao
+  imediata da base legada.
+- Garantir consistencia juridica e visual em preview/PDF.
+- Evitar reincidencia em novos contratos.
+
+### Rollback
+- `docs/ROLLBACK/rollback-20260209-131517.patch`
+- `git revert <hash-do-commit>`
+
+---
+
+*Documentado em: 09/02/2026*
+

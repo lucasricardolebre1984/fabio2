@@ -1,4 +1,4 @@
-﻿# BUGSREPORT - Registro de Bugs
+# BUGSREPORT - Registro de Bugs
 
 > **Projeto:** FC Soluções Financeiras SaaS  
 > **Última Atualização:** 2026-02-09
@@ -29,6 +29,10 @@
 | BUG-026 | Alta | PDF | Endpoint `GET /api/v1/contratos/{id}/pdf` falhava com `500` por cadeia de dependencias inconsistente (Playwright ausente + incompatibilidade WeasyPrint/PyDyf) | Resolvido |
 | BUG-029 | Alta | Clientes/Contratos | Duplicidade de cliente por CPF/CNPJ normalizado gerava `500` em `POST /api/v1/contratos` (`MultipleResultsFound`) e quebrava fluxo de fechamento de contrato | Resolvido |
 | BUG-030 | Média | Clientes/Contratos | Campo `total_contratos` em `/clientes` ficava desatualizado após excluir contratos, mesmo após sincronização de órfãos | Resolvido |
+| BUG-031 | Média | Contratos/Layout | Cabeçalho institucional do contrato estava com logo desatualizada/arte inadequada para faixa azul no preview e nos geradores de PDF, divergindo da marca oficial `logo2.png` | Resolvido |
+| BUG-032 | Alta | Contratos/CADIN | Texto jurídico do CADIN estava incompleto (cláusulas ausentes) e com perda de acentuação no preview/PDF/template, divergindo do `cadinpfpjmodelo.docx` | Resolvido |
+| BUG-033 | Alta | Contratos/Layout | Texto do preview de contrato apresentou caracteres corrompidos de acentuação (mojibake), afetando leitura jurídica e identidade visual | Resolvido |
+| BUG-034 | Baixa | Contratos/Layout | Campo `local_assinatura` legado (ex.: texto com encoding quebrado) ainda aparecia quebrado no rodapé da assinatura em preview/PDF | Resolvido |
 
 ---
 
@@ -61,6 +65,23 @@
   - exclusão real de contrato e atualização imediata de `total_contratos` no cliente vinculado;
   - `POST /api/v1/clientes/sincronizar-contratos` retornando `clientes_recalculados` e reconciliando cache x contagem real;
   - consulta SQL de conferência (`cache == real`) para os clientes ativos.
+- `BUG-031`: validado em 2026-02-09 com:
+  - troca da marca para `logo2.png` no preview (`/contratos/[id]`);
+  - troca da marca para `logo2.png` na geração PDF frontend (`frontend/src/lib/pdf.ts`);
+  - troca da marca para `logo2.png` na geração PDF backend (`backend/app/services/pdf_service_playwright.py`).
+- `BUG-032`: validado em 2026-02-09 com:
+  - cláusulas 1ª a 5ª completas no preview (`/contratos/[id]`) para template CADIN;
+  - texto com acentuação correta no PDF frontend (`frontend/src/lib/pdf.ts`) e backend (`backend/app/services/pdf_service_playwright.py`);
+  - `contratos/templates/cadin.json` alinhado ao conteúdo jurídico da fonte DOCX.
+- `BUG-033`: validado em 2026-02-09 com:
+  - preview de contrato sem mojibake (acentuação correta em cabeçalho, cláusulas e dados das partes);
+  - geração de PDF frontend e backend com acentuação correta e sem caracteres quebrados;
+  - aumento leve de escala visual do layout para melhor legibilidade.
+- `BUG-034`: validado em 2026-02-09 com:
+  - preview (`/contratos/[id]`) normalizando `local_assinatura` legado no rodapé da assinatura;
+  - PDF frontend (`frontend/src/lib/pdf.ts`) normalizando `local_assinatura` antes de montar HTML;
+  - PDF backend (`backend/app/services/pdf_service_playwright.py`) normalizando `local_assinatura` no render Playwright.
+  - cadastro de novo contrato (`/contratos/novo`) persistindo `Ribeirao Preto/SP` como valor padrão correto.
 
 ---
 
@@ -95,7 +116,12 @@
 | BUG-028 | Contratos | Numeração alterada para sequência por maior número do ano (sem colisão por gaps) | 2026-02-07 |
 | BUG-029 | Clientes/Contratos | Unicidade por CPF/CNPJ normalizado estabilizada com saneamento de duplicados e fim do `500` na criação de contrato | 2026-02-09 |
 | BUG-030 | Clientes/Contratos | Recalculo de métricas de clientes após exclusão de contrato e sincronização global de contagens | 2026-02-09 |
+| BUG-031 | Contratos/Layout | Marca oficial `logo2.png` padronizada no preview e nos pipelines de PDF | 2026-02-09 |
+| BUG-032 | Contratos/CADIN | Texto do CADIN alinhado ao modelo oficial (cláusulas completas + acentuação) em preview/PDF/template | 2026-02-09 |
+| BUG-033 | Contratos/Layout | Correção de acentuação corrompida (mojibake) + ajuste leve de escala visual no preview/PDF | 2026-02-09 |
+| BUG-034 | Contratos/Layout | Normalização de `local_assinatura` legado para evitar texto corrompido no rodapé da assinatura (preview + PDF frontend/backend) | 2026-02-09 |
 
 ---
 
 *Atualizado em: 2026-02-09*
+

@@ -1,0 +1,165 @@
+{
+  "id": "cadin",
+  "nome": "Instrumento de Prestação de Serviços - CADIN PF/PJ",
+  "tipo": "cadin",
+  "categoria": "CADIN",
+  "descricao": "Regularização administrativa de pendências no Cadastro Informativo de Créditos não Quitados do Setor Público Federal (CADIN).",
+  "versao": "1.1.0",
+  "ativo": true,
+  "layout": "institucional",
+  "origem_modelo": "contratos/cadinpfpjmodelo.docx",
+  "logo_oficial": "contratos/logo2.png",
+  "contratada": {
+    "nome": "FC SERVIÇOS E SOLUÇÕES ADMINISTRATIVAS LTDA",
+    "cnpj": "57.815.628/0001-62",
+    "email": "contato@fcsolucoesfinanceiras.com",
+    "telefone": "(16) 99301-7396",
+    "endereco": "Rua Maria das Graças de Negreiros Bonilha, nº 30, sala 3, Jardim Nova Aliança Sul, Ribeirão Preto/SP, CEP 14022-100"
+  },
+  "campos": [
+    {
+      "nome": "contratante_nome",
+      "label": "Nome Completo",
+      "tipo": "texto",
+      "obrigatorio": true,
+      "secao": "dados_contratante"
+    },
+    {
+      "nome": "contratante_documento",
+      "label": "CPF/CNPJ",
+      "tipo": "cpf_cnpj",
+      "obrigatorio": true,
+      "secao": "dados_contratante"
+    },
+    {
+      "nome": "contratante_email",
+      "label": "E-mail",
+      "tipo": "email",
+      "obrigatorio": true,
+      "secao": "dados_contratante"
+    },
+    {
+      "nome": "contratante_telefone",
+      "label": "Telefone",
+      "tipo": "telefone",
+      "obrigatorio": false,
+      "secao": "dados_contratante"
+    },
+    {
+      "nome": "contratante_endereco",
+      "label": "Endereço Completo",
+      "tipo": "texto",
+      "obrigatorio": true,
+      "secao": "dados_contratante"
+    },
+    {
+      "nome": "valor_total",
+      "label": "Valor Total",
+      "tipo": "moeda",
+      "obrigatorio": true,
+      "secao": "valores"
+    },
+    {
+      "nome": "valor_entrada",
+      "label": "Entrada",
+      "tipo": "moeda",
+      "obrigatorio": true,
+      "secao": "valores"
+    },
+    {
+      "nome": "qtd_parcelas",
+      "label": "Quantidade de Parcelas",
+      "tipo": "numero",
+      "obrigatorio": true,
+      "secao": "valores"
+    },
+    {
+      "nome": "valor_parcela",
+      "label": "Valor da Parcela",
+      "tipo": "moeda",
+      "obrigatorio": true,
+      "secao": "valores"
+    },
+    {
+      "nome": "prazo_1",
+      "label": "Prazo 1 (dias)",
+      "tipo": "numero",
+      "obrigatorio": true,
+      "secao": "valores"
+    },
+    {
+      "nome": "prazo_2",
+      "label": "Prazo 2 (dias)",
+      "tipo": "numero",
+      "obrigatorio": true,
+      "secao": "valores"
+    },
+    {
+      "nome": "local_assinatura",
+      "label": "Local da Assinatura",
+      "tipo": "texto",
+      "obrigatorio": true,
+      "secao": "assinatura"
+    },
+    {
+      "nome": "data_assinatura",
+      "label": "Data da Assinatura",
+      "tipo": "data",
+      "obrigatorio": true,
+      "secao": "assinatura"
+    }
+  ],
+  "secoes": [
+    {
+      "id": "dados_contratante",
+      "titulo": "Dados do Contratante",
+      "ordem": 1
+    },
+    {
+      "id": "valores",
+      "titulo": "Valores e Pagamento",
+      "ordem": 2
+    },
+    {
+      "id": "assinatura",
+      "titulo": "Assinatura",
+      "ordem": 3
+    }
+  ],
+  "clausulas": [
+    {
+      "numero": "PRIMEIRA",
+      "titulo": "DO OBJETO",
+      "conteudo": "1.1. O presente instrumento tem por objeto a prestação de serviços de assessoria administrativa para regularização de pendências do(a) CONTRATANTE junto ao CADIN, visando à obtenção de CND ou documento equivalente referente às dívidas federais existentes até a assinatura. §1º O serviço inclui análise de débitos, negociação com órgãos credores para descontos e formalização de parcelamentos. §2º A CONTRATADA não quita dívidas do(a) CONTRATANTE, atuando na assessoria de negociação e regularização. §3º Débitos inscritos após a assinatura não são cobertos por este instrumento. 1.2. Os serviços não representam garantia de aprovação de crédito."
+    },
+    {
+      "numero": "SEGUNDA",
+      "titulo": "DAS DESPESAS E HONORÁRIOS",
+      "conteudo": "2.1. O(a) CONTRATANTE pagará o valor total de R$ [valor_total] ([valor_total_extenso]), na forma pactuada entre as partes. 2.2. Atraso superior a 30 dias suspende o serviço e pode ensejar perda de continuidade e protesto de parcelas em aberto. 2.3. Cancelamento pelo(a) CONTRATANTE gera multa de 30% sobre parcelas em aberto. 2.4. A execução inicia após assinatura e confirmação do pagamento inicial. 2.5. Em parcelamento, atraso gera juros de 2% ao mês, multa de 10% e correção monetária. 2.6. Inadimplência pode antecipar vencimento das parcelas vincendas e protesto dos títulos. 2.7. Rescisão após início da execução gera multa compensatória de 30%, sem ressarcimento dos valores já pagos."
+    },
+    {
+      "numero": "TERCEIRA",
+      "titulo": "DO PRAZO E GARANTIA",
+      "conteudo": "3.1. A CONTRATADA executará os procedimentos em até 45 dias úteis, contados da confirmação de pagamento e assinatura, admitindo prorrogação por complexidade dos débitos ou prazos dos órgãos. §1º Garantia de resultado: se não houver execução no prazo, devolução integral em até 30 dias úteis após o termo final. 3.2. Garantia de acompanhamento por 1 ano após regularização efetiva; se os apontamentos tratados retornarem ao CADIN nesse período, haverá novo processo sem custo adicional. §2º A garantia cobre apenas dívidas/restrições tratadas neste contrato."
+    },
+    {
+      "numero": "QUARTA",
+      "titulo": "DA PROTEÇÃO DE DADOS (LGPD)",
+      "conteudo": "4.1. Em conformidade com a Lei nº 13.709/2018 (LGPD), os dados pessoais do(a) CONTRATANTE serão tratados exclusivamente para execução deste contrato, com base no art. 7º, incisos II, V e X. §1º A CONTRATADA adota medidas de segurança e elimina os dados após o término do serviço, observadas obrigações legais de guarda. §2º O(A) CONTRATANTE poderá exercer direitos de titular pelo e-mail contato@fcsolucoesfinanceiras.com."
+    },
+    {
+      "numero": "QUINTA",
+      "titulo": "DO FORO",
+      "conteudo": "5.1. Para dirimir controvérsias oriundas deste contrato, as partes elegem o foro da comarca de Ribeirão Preto/SP, ressalvada a faculdade do(a) CONTRATANTE de propor ação no foro de seu domicílio, conforme o Código de Defesa do Consumidor."
+    }
+  ],
+  "layout_config": {
+    "orientacao": "portrait",
+    "formato": "A4",
+    "fonte_principal": "Times New Roman",
+    "tamanho_fonte": 12,
+    "cor_fonte": "#000000",
+    "logo_cabecalho": true,
+    "logo_caminho": "C:/projetos/fabio2/contratos/logo2.png"
+  }
+}

@@ -37,22 +37,30 @@ export default function ContratosMenuPage() {
 
   const loadTemplates = async () => {
     try {
-      // Por enquanto, templates mockados até o backend ter endpoint
+      // Por enquanto, templates mockados atÃ© o backend ter endpoint
       // Depois: const response = await api.get('/contratos/templates')
       const templatesMock: Template[] = [
         {
           id: 'bacen',
           nome: 'Contrato Bacen',
           categoria: 'Bacen',
-          descricao: 'Remoção de apontamentos de prejuízo no Sistema de Informações de Crédito (SCR) do Banco Central',
+          descricao: 'RemoÃ§Ã£o de apontamentos de prejuÃ­zo no Sistema de InformaÃ§Ãµes de CrÃ©dito (SCR) do Banco Central',
           icone: 'landmark',
+          ativo: true
+        },
+        {
+          id: 'cadin',
+          nome: 'Contrato CADIN PF/PJ',
+          categoria: 'CADIN',
+          descricao: 'RegularizaÃ§Ã£o administrativa de pendÃªncias no CADIN.',
+          icone: 'file',
           ativo: true
         },
         {
           id: 'serasa',
           nome: 'Contrato Serasa',
           categoria: 'Serasa',
-          descricao: 'Limpeza de nome e regularização de dívidas no Serasa',
+          descricao: 'Limpeza de nome e regularizaÃ§Ã£o de dÃ­vidas no Serasa',
           icone: 'building',
           ativo: false // Em breve
         },
@@ -60,7 +68,7 @@ export default function ContratosMenuPage() {
           id: 'protesto',
           nome: 'Contrato Protesto',
           categoria: 'Protesto',
-          descricao: 'Cancelamento de protestos de títulos',
+          descricao: 'Cancelamento de protestos de tÃ­tulos',
           icone: 'scale',
           ativo: false // Em breve
         }
@@ -78,13 +86,14 @@ export default function ContratosMenuPage() {
       case 'landmark': return <Landmark className="w-12 h-12" />
       case 'building': return <Building2 className="w-12 h-12" />
       case 'scale': return <Scale className="w-12 h-12" />
+      case 'file': return <FileText className="w-12 h-12" />
       default: return <FileText className="w-12 h-12" />
     }
   }
 
   const handleSelecionarTemplate = (templateId: string, ativo: boolean) => {
     if (!ativo) {
-      alert('Este contrato estará disponível em breve!')
+      alert('Este contrato estarÃ¡ disponÃ­vel em breve!')
       return
     }
     router.push(`/contratos/novo?template=${templateId}`)
@@ -108,7 +117,7 @@ export default function ContratosMenuPage() {
         </Link>
       </div>
 
-      {/* Seção: Criar Novo Contrato */}
+      {/* SeÃ§Ã£o: Criar Novo Contrato */}
       <div>
         <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
           <Plus className="w-5 h-5" />
@@ -161,7 +170,7 @@ export default function ContratosMenuPage() {
 
                   <div className="mt-4 flex items-center text-sm font-medium">
                     <span className={template.ativo ? 'text-blue-600' : 'text-gray-400'}>
-                      {template.ativo ? 'Preencher contrato' : 'Indisponível'}
+                      {template.ativo ? 'Preencher contrato' : 'IndisponÃ­vel'}
                     </span>
                     <ChevronRight className={`w-4 h-4 ml-1 transition-transform group-hover:translate-x-1 ${
                       template.ativo ? 'text-blue-600' : 'text-gray-400'
@@ -174,10 +183,10 @@ export default function ContratosMenuPage() {
         )}
       </div>
 
-      {/* Seção: Ações Rápidas */}
+      {/* SeÃ§Ã£o: AÃ§Ãµes RÃ¡pidas */}
       <div className="bg-gray-50 rounded-xl p-6">
         <h2 className="text-lg font-semibold text-gray-800 mb-4">
-          Ações Rápidas
+          AÃ§Ãµes RÃ¡pidas
         </h2>
         <div className="flex flex-wrap gap-4">
           <Link href="/contratos/lista">
@@ -208,7 +217,7 @@ export default function ContratosMenuPage() {
             <p className="text-sm text-blue-700 mt-1">
               1. Selecione o tipo de contrato acima<br/>
               2. Preencha os dados do cliente e valores<br/>
-              3. O contrato é gerado automaticamente com cálculo de extensos<br/>
+              3. O contrato Ã© gerado automaticamente com cÃ¡lculo de extensos<br/>
               4. Salve e gere o PDF para assinatura
             </p>
           </div>
