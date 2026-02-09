@@ -1,7 +1,8 @@
 'use client'
 
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { Loader2, Pencil, RefreshCw, Save, ShieldAlert, Trash2, UserPlus, X } from 'lucide-react'
+import Link from 'next/link'
+import { FileClock, Loader2, Pencil, RefreshCw, Save, ShieldAlert, Trash2, UserPlus, X } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -23,6 +24,15 @@ interface Cliente {
   cep?: string | null
   observacoes?: string | null
   total_contratos: number
+  created_at: string
+}
+
+interface ContratoHistorico {
+  id: string
+  numero: string
+  template_nome: string
+  status: string
+  valor_total: string | number
   created_at: string
 }
 
@@ -66,6 +76,9 @@ export default function ClientesPage() {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState<ClienteForm>(emptyForm)
   const [editForm, setEditForm] = useState<Partial<ClienteForm>>({})
+  const [openHistoryId, setOpenHistoryId] = useState<string | null>(null)
+  const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null)
+  const [contractsHistory, setContractsHistory] = useState<Record<string, ContratoHistorico[]>>({})
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -90,6 +103,33 @@ export default function ClientesPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const formatCurrency = (value: string | number) => {
+    const numeric = typeof value === 'number' ? value : Number(value)
+    if (Number.isNaN(numeric)) return 'R$ 0,00'
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(numeric)
+  }
+
+  const formatDate = (value: string) => {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return '--/--/----'
+    return new Intl.DateTimeFormat('pt-BR').format(date)
+  }
+
+  const getStatusLabel = (status: string) => {
+    const map: Record<string, string> = {
+      rascunho: 'Rascunho',
+      finalizado: 'Finalizado',
+      enviado: 'Enviado',
+      cancelado: 'Cancelado',
+    }
+    return map[status] || status
   }
 
   useEffect(() => {
@@ -220,6 +260,29 @@ export default function ClientesPage() {
       } else {
         setError(err?.response?.data?.detail || 'Falha ao excluir cliente.')
       }
+    }
+  }
+
+  const toggleHistory = async (clienteId: string) => {
+    if (openHistoryId === clienteId) {
+      setOpenHistoryId(null)
+      return
+    }
+
+    setOpenHistoryId(clienteId)
+    if (contractsHistory[clienteId]) return
+
+    setHistoryLoadingId(clienteId)
+    try {
+      const response = await clientesApi.getContratos(clienteId)
+      setContractsHistory((prev) => ({
+        ...prev,
+        [clienteId]: Array.isArray(response) ? response : [],
+      }))
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || 'Falha ao carregar historico de contratos.')
+    } finally {
+      setHistoryLoadingId(null)
     }
   }
 
@@ -423,6 +486,19 @@ export default function ClientesPage() {
                       type="button"
                       variant="outline"
                       size="sm"
+                      onClick={() => toggleHistory(cliente.id)}
+                    >
+                      {historyLoadingId === cliente.id ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileClock className="mr-2 h-4 w-4" />
+                      )}
+                      {openHistoryId === cliente.id ? 'Ocultar historico' : 'Ver historico'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
                       onClick={() => startEdit(cliente)}
                     >
                       <Pencil className="mr-2 h-4 w-4" />
@@ -439,6 +515,40 @@ export default function ClientesPage() {
                       Excluir
                     </Button>
                   </div>
+
+                  {openHistoryId === cliente.id && (
+                    <div className="mt-3 rounded-md border bg-gray-50 p-3">
+                      <p className="text-sm font-semibold text-gray-700">Historico de contratos</p>
+                      {historyLoadingId === cliente.id ? (
+                        <div className="mt-2 flex items-center text-sm text-gray-500">
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Carregando historico...
+                        </div>
+                      ) : (contractsHistory[cliente.id] || []).length === 0 ? (
+                        <p className="mt-2 text-sm text-gray-500">Cliente sem contratos vinculados.</p>
+                      ) : (
+                        <div className="mt-2 space-y-2">
+                          {(contractsHistory[cliente.id] || []).map((contrato) => (
+                            <div key={contrato.id} className="flex items-center justify-between rounded border bg-white p-2">
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{contrato.numero}</p>
+                                <p className="text-xs text-gray-500">{contrato.template_nome}</p>
+                                <p className="text-xs text-gray-500">
+                                  {formatDate(contrato.created_at)} | {getStatusLabel(contrato.status)}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-semibold text-gray-900">{formatCurrency(contrato.valor_total)}</p>
+                                <Link href={`/contratos/${contrato.id}`} className="text-xs text-blue-600 hover:underline">
+                                  Abrir contrato
+                                </Link>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {editingId === cliente.id && (
                     <form onSubmit={submitEdit} className="mt-4 grid gap-3 rounded-md border bg-gray-50 p-3 md:grid-cols-2">

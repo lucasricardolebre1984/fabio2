@@ -24,6 +24,44 @@ class ClienteService:
     def _document_expression():
         return func.regexp_replace(Cliente.documento, r"[^0-9]", "", "g")
 
+    @staticmethod
+    def _serialize_cliente(
+        cliente: Cliente,
+        total_contratos: Optional[int] = None,
+        primeiro_contrato_em=None,
+        ultimo_contrato_em=None,
+    ) -> Dict[str, Any]:
+        return {
+            "id": cliente.id,
+            "nome": cliente.nome,
+            "tipo_pessoa": cliente.tipo_pessoa,
+            "documento": cliente.documento,
+            "email": cliente.email,
+            "telefone": cliente.telefone,
+            "endereco": cliente.endereco,
+            "cidade": cliente.cidade,
+            "estado": cliente.estado,
+            "cep": cliente.cep,
+            "observacoes": cliente.observacoes,
+            "total_contratos": int(
+                total_contratos
+                if total_contratos is not None
+                else (cliente.total_contratos or 0)
+            ),
+            "primeiro_contrato_em": (
+                primeiro_contrato_em
+                if primeiro_contrato_em is not None
+                else cliente.primeiro_contrato_em
+            ),
+            "ultimo_contrato_em": (
+                ultimo_contrato_em
+                if ultimo_contrato_em is not None
+                else cliente.ultimo_contrato_em
+            ),
+            "created_at": cliente.created_at,
+            "updated_at": cliente.updated_at,
+        }
+
     async def create(self, data: ClienteCreate) -> Cliente:
         """Create a new client."""
         documento_normalizado = self._normalize_document(data.documento)
@@ -54,7 +92,29 @@ class ClienteService:
         page_size: int = 20
     ) -> Dict[str, Any]:
         """List clients with pagination."""
-        query = select(Cliente)
+        metrics_subquery = (
+            select(
+                Contrato.cliente_id.label("cliente_id"),
+                func.count(Contrato.id).label("total_contratos_calculado"),
+                func.min(Contrato.created_at).label("primeiro_contrato_em_calculado"),
+                func.max(Contrato.created_at).label("ultimo_contrato_em_calculado"),
+            )
+            .where(Contrato.cliente_id.is_not(None))
+            .group_by(Contrato.cliente_id)
+            .subquery()
+        )
+
+        query = (
+            select(
+                Cliente,
+                func.coalesce(metrics_subquery.c.total_contratos_calculado, 0).label(
+                    "total_contratos_calculado"
+                ),
+                metrics_subquery.c.primeiro_contrato_em_calculado,
+                metrics_subquery.c.ultimo_contrato_em_calculado,
+            )
+            .outerjoin(metrics_subquery, metrics_subquery.c.cliente_id == Cliente.id)
+        )
         
         if search:
             query = query.where(
@@ -77,10 +137,24 @@ class ClienteService:
             .limit(page_size)
         )
         result = await self.db.execute(query)
-        items = result.scalars().all()
+        rows = result.all()
+        items = [
+            self._serialize_cliente(
+                cliente=cliente,
+                total_contratos=total_contratos_calculado,
+                primeiro_contrato_em=primeiro_contrato_em_calculado,
+                ultimo_contrato_em=ultimo_contrato_em_calculado,
+            )
+            for (
+                cliente,
+                total_contratos_calculado,
+                primeiro_contrato_em_calculado,
+                ultimo_contrato_em_calculado,
+            ) in rows
+        ]
         
         return {
-            "items": list(items),
+            "items": items,
             "total": total,
             "page": page,
             "page_size": page_size

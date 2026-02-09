@@ -125,3 +125,28 @@
 
 *Atualizado em: 2026-02-09*
 
+
+## Atualizacao 2026-02-09 (rodada clientes + contratos)
+
+### BUG-035: Mojibake na tela de contratos
+**Data:** 2026-02-09
+**Severidade:** Media
+**Descricao:** textos da tela `/contratos` estavam com encoding quebrado (mojibake) em cards e acoes rapidas.
+**Passos:** 1. Abrir `/contratos` 2. Ler descricoes dos cards 3. Validar bloco de acoes.
+**Esperado:** textos com acentuacao legivel e consistente.
+**Atual:** caracteres quebrados (`AÃ§Ãµes`, `RemoÃ§Ã£o`, etc.).
+**Status:** Resolvido
+
+### BUG-036: Contagem/visibilidade de historico por cliente
+**Data:** 2026-02-09
+**Severidade:** Media
+**Descricao:** no modulo clientes, contagem podia divergir em base legada e nao havia campo para visualizar historico de contratos por cliente.
+**Passos:** 1. Excluir/criar contratos em sequencia 2. Comparar `/contratos/lista` x `/clientes` 3. Buscar historico no card do cliente.
+**Esperado:** contagem coerente com contratos reais e historico visivel por cliente.
+**Atual:** sem historico no card; risco de divergencia por metrica persistida antiga.
+**Status:** Resolvido
+
+### Validacao adicional (2026-02-09)
+- `BUG-035`: `/contratos` renderizando descricoes e labels sem mojibake.
+- `BUG-036`: `GET /api/v1/clientes` com total calculado por agregacao real de contratos.
+- `BUG-036`: `/clientes` com botao `Ver historico` exibindo numero, template, status, valor e link do contrato.

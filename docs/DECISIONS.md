@@ -652,3 +652,29 @@ continuavam exibindo local de assinatura com texto corrompido.
 
 *Documentado em: 09/02/2026*
 
+
+---
+
+## DECISAO-017: total de contratos por agregacao real + historico sob demanda no modulo clientes
+
+### Data
+09/02/2026
+
+### Contexto
+A tela de clientes precisava refletir com confiabilidade o total de contratos apos operacoes legadas e tambem oferecer visibilidade do historico por cliente sem navegar para outra tela.
+
+### Decisao
+- Backend (`ClienteService.list`): calcular `total_contratos`, `primeiro_contrato_em` e `ultimo_contrato_em` por agregacao direta em `contratos`.
+- Frontend (`/clientes`): adicionar botao `Ver historico` no card, carregando contratos vinculados sob demanda.
+
+### Motivo
+- Remove dependencia exclusiva de metrica persistida sujeita a defasagem historica.
+- Entrega rastreabilidade operacional no mesmo contexto da gestao de clientes.
+
+### Rollback
+- `docs/ROLLBACK/rollback-20260209-164001.patch`
+- `git revert <hash-do-commit>`
+
+---
+
+*Documentado em: 09/02/2026*

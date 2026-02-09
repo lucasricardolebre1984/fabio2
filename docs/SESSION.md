@@ -155,3 +155,15 @@ Atualizado em: 09/02/2026
 - Correcao preventiva na origem do dado:
   - default de `local_assinatura` em `frontend/src/app/(dashboard)/contratos/novo/page.tsx` para `Ribeirao Preto/SP`.
 - Resultado: assinatura final nao exibe mais `Ribeirao` corrompido quando o registro vem com encoding legado.
+
+## Atualizacao tecnica (2026-02-09 - contratos menu + historico clientes)
+- Rollback local adicional criado antes desta rodada:
+  - `docs/ROLLBACK/rollback-20260209-164001.patch`
+  - `docs/ROLLBACK/rollback-20260209-164001-staged.patch`
+  - `docs/ROLLBACK/rollback-20260209-164001-untracked.txt`
+- Correcao de frontend em `/contratos`:
+  - eliminacao de mojibake em descricoes de cards e bloco de acoes rapidas.
+- Correcao de backend em `/api/v1/clientes`:
+  - `total_contratos` passa a ser calculado por agregacao real da tabela `contratos`.
+- Evolucao de UX em `/clientes`:
+  - novo campo de historico por cliente (botao `Ver historico`) com lista de contratos vinculados.

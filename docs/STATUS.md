@@ -95,3 +95,9 @@ Atualizado em: 09/02/2026
 - Correcao preventiva no cadastro de novo contrato:
   - `frontend/src/app/(dashboard)/contratos/novo/page.tsx` agora usa `Ribeirao Preto/SP` no default de `local_assinatura`.
 - Resultado esperado: rodape da assinatura com local exibido corretamente para registros novos e legados.
+
+## Estado Clientes/Contratos (2026-02-09 - fechamento rodada)
+- `/contratos` sem texto corrompido no menu de templates.
+- `/clientes` com historico de contratos por cliente no proprio card.
+- Contagem exibida em `/clientes` calculada por agregacao real de contratos no backend.
+- Rollback desta rodada registrado em `docs/ROLLBACK/rollback-20260209-164001.patch`.
