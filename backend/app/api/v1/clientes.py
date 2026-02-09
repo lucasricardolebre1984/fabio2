@@ -60,6 +60,16 @@ async def sincronizar_clientes_por_contratos(
     return await service.sync_from_contracts()
 
 
+@router.post("/deduplicar-documentos", response_model=Dict[str, int])
+async def deduplicar_clientes_documento(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Merge duplicate clients that share the same normalized document."""
+    service = ClienteService(db)
+    return await service.deduplicate_documentos()
+
+
 @router.get("/documento/{documento}", response_model=ClienteResponse)
 async def get_cliente_by_documento(
     documento: str,

@@ -1,7 +1,7 @@
 ﻿# SESSION - contexto atual da sessao
 
-Sessao ativa: 08/02/2026
-Status: V1.6 homologada localmente com cliente apos estabilizacao de PDF
+Sessao ativa: 09/02/2026
+Status: V1.7 local com fluxo de clientes/contratos saneado (unicidade CPF/CNPJ)
 Branch: main
 
 ## Resumo executivo
@@ -79,6 +79,35 @@ passo e evoluir para melhorias incrementais sem quebrar o fluxo homologado.
 - `GET /api/v1/whatsapp-chat/conversas?limit=5`: `200`.
 - `GET /api/v1/contratos/{id}/pdf`: `200` com `application/pdf`.
 
+## Atualizacao tecnica (2026-02-09 - clientes/contratos)
+- Rollback snapshot criado antes do fix:
+  - `rollback-20260209-clientes-unicos-pre-fix`
+- Correcao do bug de fechamento de contrato por duplicidade de cliente:
+  - causa raiz: `MultipleResultsFound` em `POST /api/v1/contratos` quando havia
+    mais de um cliente para o mesmo CPF/CNPJ normalizado.
+- Backend:
+  - `ClienteService.get_by_documento` passou a selecionar cliente canonico de
+    forma deterministica (sem `scalar_one_or_none` em base legada duplicada);
+  - novo saneamento institucional:
+    - `POST /api/v1/clientes/deduplicar-documentos` (admin),
+    - relink de contratos/agenda para cliente canonico,
+    - remocao de duplicados.
+  - `ContratoService.create` passou a reutilizar busca canonica de cliente.
+- Frontend:
+  - `/clientes` com acoes de editar/excluir;
+  - botao para saneamento de duplicados CPF/CNPJ;
+  - `/contratos/novo` busca cliente por documento e preenche dados automaticamente.
+
+## Validacao read-only adicional (2026-02-09)
+- `GET /api/v1/clientes/documento/334.292.588-47`: `200`.
+- `POST /api/v1/contratos` com CPF historicamente duplicado: `201`.
+- `POST /api/v1/clientes` com mesmo CPF: `409` (bloqueio correto).
+- `POST /api/v1/clientes/deduplicar-documentos`: `200`.
+- Consulta SQL de duplicidade normalizada em `clientes`: `0` linhas duplicadas.
+- Correcao adicional de metricas:
+  - `total_contratos` agora atualiza no delete de contrato;
+  - `POST /api/v1/clientes/sincronizar-contratos` passou a recalcular metricas de todos os clientes (`clientes_recalculados`).
+
 ---
 
-Atualizado em: 08/02/2026
+Atualizado em: 09/02/2026

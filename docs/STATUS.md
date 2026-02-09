@@ -1,8 +1,8 @@
 ﻿# STATUS do projeto - FC Solucoes Financeiras
 
-Data: 08/02/2026
-Sessao: estabilizacao tecnica de PDF + alinhamento documental institucional
-Status: V1.6 homologada localmente com cliente (OpenAI + Evolution estavel)
+Data: 09/02/2026
+Sessao: estabilizacao de unicidade clientes + fluxo de contratos (cpf/cnpj)
+Status: V1.7 local com contratos/clientes saneados (OpenAI + Evolution estavel)
 
 ## Objetivo atual
 Consolidar operacao comercial da Viviane no WhatsApp com regras de negocio,
@@ -26,6 +26,18 @@ qualificacao de lead, politica de preco e governanca de atendimento humano.
 - `GET /api/v1/contratos/{id}/pdf` reabilitado com sucesso (sem `500`)
 - Fallback de renderizacao aplicado: Playwright -> WeasyPrint
 - Dependencia fixada: `pydyf==0.10.0` (compatibilidade com WeasyPrint 60.2)
+
+## Estado Clientes/Contratos (2026-02-09)
+- Unicidade operacional por CPF/CNPJ normalizado estabilizada.
+- Bug de `500` ao criar contrato com cliente duplicado eliminado.
+- Endpoint admin para saneamento de base:
+  - `POST /api/v1/clientes/deduplicar-documentos`
+- Tela `/clientes` com acoes de:
+  - cadastro manual
+  - edicao
+  - exclusao (admin)
+  - saneamento de duplicados
+- Tela `/contratos/novo` com busca de cliente por documento e autopreenchimento.
 
 ## Decisoes validadas com cliente
 - Modo B (VIVA conduz; humano por excecao)
@@ -53,4 +65,4 @@ sem regressao no fluxo comercial homologado.
 
 ---
 
-Atualizado em: 08/02/2026
+Atualizado em: 09/02/2026

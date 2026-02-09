@@ -1,7 +1,7 @@
 ﻿# BUGSREPORT - Registro de Bugs
 
 > **Projeto:** FC Soluções Financeiras SaaS  
-> **Última Atualização:** 2026-02-08
+> **Última Atualização:** 2026-02-09
 
 ---
 
@@ -27,6 +27,8 @@
 | BUG-027 | Alta | Clientes/Contratos | Contratos criados sem vínculo de cliente não apareciam na tela de clientes | Resolvido |
 | BUG-028 | Alta | Contratos | Geração de número por contagem anual permitia duplicidade (`ix_contratos_numero`) quando havia gaps | Resolvido |
 | BUG-026 | Alta | PDF | Endpoint `GET /api/v1/contratos/{id}/pdf` falhava com `500` por cadeia de dependencias inconsistente (Playwright ausente + incompatibilidade WeasyPrint/PyDyf) | Resolvido |
+| BUG-029 | Alta | Clientes/Contratos | Duplicidade de cliente por CPF/CNPJ normalizado gerava `500` em `POST /api/v1/contratos` (`MultipleResultsFound`) e quebrava fluxo de fechamento de contrato | Resolvido |
+| BUG-030 | Média | Clientes/Contratos | Campo `total_contratos` em `/clientes` ficava desatualizado após excluir contratos, mesmo após sincronização de órfãos | Resolvido |
 
 ---
 
@@ -50,6 +52,15 @@
 - `BUG-027`: validado com criação de contrato e consulta `GET /api/v1/clientes?search=...`; cliente foi criado/vinculado automaticamente.
 - `BUG-028`: validado com nova criação de contrato sem colisão de índice único (`CNT-2026-0006` criado com sucesso).
 - `BUG-026`: validado com autenticacao real em `GET /api/v1/contratos/{id}/pdf`; retorno `200`, `Content-Type: application/pdf` e bytes iniciando com `%PDF-`.
+- `BUG-029`: validado em 2026-02-09 com:
+  - `GET /api/v1/clientes/documento/334.292.588-47` retornando `200`;
+  - `POST /api/v1/contratos` com CPF duplicado historico retornando `201` (sem `500`);
+  - `POST /api/v1/clientes` para mesmo CPF retornando `409`;
+  - `POST /api/v1/clientes/deduplicar-documentos` executado com sucesso e base saneada para 1 cliente por CPF/CNPJ.
+- `BUG-030`: validado em 2026-02-09 com:
+  - exclusão real de contrato e atualização imediata de `total_contratos` no cliente vinculado;
+  - `POST /api/v1/clientes/sincronizar-contratos` retornando `clientes_recalculados` e reconciliando cache x contagem real;
+  - consulta SQL de conferência (`cache == real`) para os clientes ativos.
 
 ---
 
@@ -82,7 +93,9 @@
 | BUG-026 | PDF | Endpoint `/contratos/{id}/pdf` estabilizado com fallback Playwright->WeasyPrint e pin de `pydyf==0.10.0` | 2026-02-08 |
 | BUG-027 | Clientes/Contratos | Reativado vínculo automático cliente<->contrato e endpoint de sincronização de órfãos | 2026-02-07 |
 | BUG-028 | Contratos | Numeração alterada para sequência por maior número do ano (sem colisão por gaps) | 2026-02-07 |
+| BUG-029 | Clientes/Contratos | Unicidade por CPF/CNPJ normalizado estabilizada com saneamento de duplicados e fim do `500` na criação de contrato | 2026-02-09 |
+| BUG-030 | Clientes/Contratos | Recalculo de métricas de clientes após exclusão de contrato e sincronização global de contagens | 2026-02-09 |
 
 ---
 
-*Atualizado em: 2026-02-08*
+*Atualizado em: 2026-02-09*

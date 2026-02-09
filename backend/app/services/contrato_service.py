@@ -15,6 +15,7 @@ from app.models.contrato import Contrato, ContratoStatus
 from app.models.cliente import Cliente
 from app.models.contrato_template import ContratoTemplate
 from app.schemas.contrato import ContratoCreate, ContratoUpdate
+from app.services.cliente_service import ClienteService
 from app.services.extenso_service import ExtensoService
 
 
@@ -191,20 +192,8 @@ class ContratoService:
         if not data.prazo_2_extenso:
             data.prazo_2_extenso = self.extenso.numero_por_extenso(data.prazo_2)
 
-        result = await self.db.execute(
-            select(Cliente).where(
-                func.replace(
-                    func.replace(
-                        func.replace(Cliente.documento, ".", ""),
-                        "-",
-                        "",
-                    ),
-                    "/",
-                    "",
-                ) == documento_limpo
-            )
-        )
-        cliente = result.scalar_one_or_none()
+        cliente_service = ClienteService(self.db)
+        cliente = await cliente_service.get_by_documento(documento_limpo)
 
         if not cliente:
             cliente = Cliente(
@@ -363,8 +352,12 @@ class ContratoService:
         
         if not contrato:
             return False
-        
+
+        cliente_id = contrato.cliente_id
         await self.db.delete(contrato)
+        await self.db.flush()
+        if cliente_id:
+            await self._recalculate_cliente_metrics(cliente_id)
         await self.db.commit()
         
         return True

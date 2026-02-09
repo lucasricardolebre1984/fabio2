@@ -1,13 +1,17 @@
 """Cliente service - Business logic for clients."""
 from typing import List, Optional, Dict, Any
 from uuid import UUID
+import logging
 
-from sqlalchemy import select, desc, func, or_
+from sqlalchemy import select, desc, func, or_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.cliente import Cliente
 from app.models.contrato import Contrato
+from app.models.agenda import Agenda
 from app.schemas.cliente import ClienteCreate, ClienteUpdate
+
+logger = logging.getLogger(__name__)
 
 
 class ClienteService:
@@ -15,13 +19,18 @@ class ClienteService:
     
     def __init__(self, db: AsyncSession):
         self.db = db
-    
+
+    @staticmethod
+    def _document_expression():
+        return func.regexp_replace(Cliente.documento, r"[^0-9]", "", "g")
+
     async def create(self, data: ClienteCreate) -> Cliente:
         """Create a new client."""
+        documento_normalizado = self._normalize_document(data.documento)
         cliente = Cliente(
             nome=data.nome,
             tipo_pessoa=data.tipo_pessoa,
-            documento=data.documento,
+            documento=documento_normalizado,
             email=data.email,
             telefone=data.telefone,
             endereco=data.endereco,
@@ -87,19 +96,26 @@ class ClienteService:
     async def get_by_documento(self, documento: str) -> Optional[Cliente]:
         """Get client by documento (CPF/CNPJ)."""
         doc_clean = self._normalize_document(documento)
-        
+
         result = await self.db.execute(
-            select(Cliente).where(
-                func.replace(
-                    func.replace(
-                        func.replace(Cliente.documento, ".", ""),
-                        "-", ""
-                    ),
-                    "/", ""
-                ) == doc_clean
+            select(Cliente)
+            .where(self._document_expression() == doc_clean)
+            .order_by(
+                desc(Cliente.total_contratos),
+                Cliente.created_at.asc(),
+                Cliente.id.asc(),
             )
         )
-        return result.scalar_one_or_none()
+        clientes = list(result.scalars().all())
+
+        if len(clientes) > 1:
+            logger.warning(
+                "Duplicidade de cliente detectada para documento %s (%s registros).",
+                doc_clean,
+                len(clientes),
+            )
+
+        return clientes[0] if clientes else None
     
     async def update(self, cliente_id: UUID, data: ClienteUpdate) -> Optional[Cliente]:
         """Update client."""
@@ -169,7 +185,6 @@ class ClienteService:
         created = 0
         linked = 0
         skipped = 0
-        touched_client_ids = set()
 
         for contrato in contratos_orfaos:
             documento = self._normalize_document(contrato.contratante_documento or "")
@@ -177,20 +192,7 @@ class ClienteService:
                 skipped += 1
                 continue
 
-            cliente_result = await self.db.execute(
-                select(Cliente).where(
-                    func.replace(
-                        func.replace(
-                            func.replace(Cliente.documento, ".", ""),
-                            "-",
-                            "",
-                        ),
-                        "/",
-                        "",
-                    ) == documento
-                )
-            )
-            cliente = cliente_result.scalar_one_or_none()
+            cliente = await self.get_by_documento(documento)
 
             if not cliente:
                 cliente = Cliente(
@@ -209,27 +211,9 @@ class ClienteService:
                 created += 1
 
             contrato.cliente_id = cliente.id
-            touched_client_ids.add(cliente.id)
             linked += 1
 
-        if touched_client_ids:
-            for client_id in touched_client_ids:
-                count_result = await self.db.execute(
-                    select(
-                        func.count(Contrato.id),
-                        func.min(Contrato.created_at),
-                        func.max(Contrato.created_at),
-                    ).where(Contrato.cliente_id == client_id)
-                )
-                total, primeiro, ultimo = count_result.one()
-                cliente_result = await self.db.execute(
-                    select(Cliente).where(Cliente.id == client_id)
-                )
-                cliente = cliente_result.scalar_one_or_none()
-                if cliente:
-                    cliente.total_contratos = int(total or 0)
-                    cliente.primeiro_contrato_em = primeiro
-                    cliente.ultimo_contrato_em = ultimo
+        recalculados = await self._rebuild_all_metrics()
 
         await self.db.commit()
 
@@ -238,7 +222,128 @@ class ClienteService:
             "clientes_criados": created,
             "contratos_vinculados": linked,
             "ignorados": skipped,
+            "clientes_recalculados": recalculados,
         }
+
+    async def deduplicate_documentos(self) -> Dict[str, int]:
+        """
+        Merge clients with the same normalized document and relink references.
+        """
+        doc_expr = self._document_expression()
+        duplicates_result = await self.db.execute(
+            select(
+                doc_expr.label("documento_normalizado"),
+                func.count(Cliente.id).label("total"),
+            )
+            .group_by(doc_expr)
+            .having(func.count(Cliente.id) > 1)
+        )
+        duplicates = duplicates_result.all()
+
+        grupos = 0
+        removidos = 0
+        contratos_relinkados = 0
+        agenda_relinkada = 0
+
+        for row in duplicates:
+            documento_normalizado = row.documento_normalizado
+            clientes_result = await self.db.execute(
+                select(Cliente)
+                .where(doc_expr == documento_normalizado)
+                .order_by(
+                    desc(Cliente.total_contratos),
+                    Cliente.created_at.asc(),
+                    Cliente.id.asc(),
+                )
+            )
+            clientes = list(clientes_result.scalars().all())
+            if len(clientes) <= 1:
+                continue
+
+            grupos += 1
+            canonical = clientes[0]
+            duplicates_to_remove = clientes[1:]
+
+            for duplicate in duplicates_to_remove:
+                # Preserve the richest available contact data on canonical record.
+                if not canonical.telefone and duplicate.telefone:
+                    canonical.telefone = duplicate.telefone
+                if not canonical.endereco and duplicate.endereco:
+                    canonical.endereco = duplicate.endereco
+                if not canonical.cidade and duplicate.cidade:
+                    canonical.cidade = duplicate.cidade
+                if not canonical.estado and duplicate.estado:
+                    canonical.estado = duplicate.estado
+                if not canonical.cep and duplicate.cep:
+                    canonical.cep = duplicate.cep
+                if not canonical.observacoes and duplicate.observacoes:
+                    canonical.observacoes = duplicate.observacoes
+
+                contratos_update = await self.db.execute(
+                    update(Contrato)
+                    .where(Contrato.cliente_id == duplicate.id)
+                    .values(cliente_id=canonical.id)
+                )
+                contratos_relinkados += int(contratos_update.rowcount or 0)
+
+                agenda_update = await self.db.execute(
+                    update(Agenda)
+                    .where(Agenda.cliente_id == duplicate.id)
+                    .values(cliente_id=canonical.id)
+                )
+                agenda_relinkada += int(agenda_update.rowcount or 0)
+
+                await self.db.delete(duplicate)
+                removidos += 1
+
+            metrics_result = await self.db.execute(
+                select(
+                    func.count(Contrato.id),
+                    func.min(Contrato.created_at),
+                    func.max(Contrato.created_at),
+                ).where(Contrato.cliente_id == canonical.id)
+            )
+            total, primeiro, ultimo = metrics_result.one()
+            canonical.total_contratos = int(total or 0)
+            canonical.primeiro_contrato_em = primeiro
+            canonical.ultimo_contrato_em = ultimo
+
+        await self.db.commit()
+
+        return {
+            "grupos_duplicados": grupos,
+            "clientes_removidos": removidos,
+            "contratos_relinkados": contratos_relinkados,
+            "agenda_relinkada": agenda_relinkada,
+        }
+
+    async def _rebuild_all_metrics(self) -> int:
+        """Recalculate contract metrics for every client."""
+        result = await self.db.execute(select(Cliente.id))
+        client_ids = [row[0] for row in result.all()]
+
+        for client_id in client_ids:
+            count_result = await self.db.execute(
+                select(
+                    func.count(Contrato.id),
+                    func.min(Contrato.created_at),
+                    func.max(Contrato.created_at),
+                ).where(Contrato.cliente_id == client_id)
+            )
+            total, primeiro, ultimo = count_result.one()
+
+            cliente_result = await self.db.execute(
+                select(Cliente).where(Cliente.id == client_id)
+            )
+            cliente = cliente_result.scalar_one_or_none()
+            if not cliente:
+                continue
+
+            cliente.total_contratos = int(total or 0)
+            cliente.primeiro_contrato_em = primeiro
+            cliente.ultimo_contrato_em = ultimo
+
+        return len(client_ids)
     
     async def get_historico(self, cliente_id: UUID) -> Dict[str, Any]:
         """Get complete client timeline."""

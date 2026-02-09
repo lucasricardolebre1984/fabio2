@@ -581,3 +581,39 @@ Durante a homologação com cliente, o comportamento intermitente do WhatsApp ex
 
 *Documentado em: 07/02/2026*
 
+---
+
+## DECISAO-015: cliente canonico por CPF/CNPJ normalizado no fluxo de contratos
+
+### Data
+09/02/2026
+
+### Contexto
+O fluxo de `POST /api/v1/contratos` podia falhar com `500` (`MultipleResultsFound`)
+quando havia clientes duplicados para o mesmo documento em formatos diferentes
+(com mascara, sem mascara ou com espacos).
+
+### Decisao
+- Tratar documento de cliente por forma normalizada (somente digitos) nas buscas.
+- Selecionar cliente canonico de forma deterministica quando existir legado duplicado.
+- Adicionar saneamento administrativo:
+  - `POST /api/v1/clientes/deduplicar-documentos`
+  - relink de `contratos` e `agenda` para o cliente canonico
+  - remocao dos duplicados
+- No frontend:
+  - `/contratos/novo` consulta cliente por documento e preenche dados automaticamente;
+  - `/clientes` passa a expor editar/excluir e acao de saneamento.
+
+### Motivo
+- Remove erro 500 no fechamento/criacao de contrato.
+- Formaliza regra institucional de 1 cliente por CPF/CNPJ.
+- Evita regressao por inconsistencias de mascara no documento.
+
+### Rollback
+- `git checkout rollback-20260209-clientes-unicos-pre-fix`
+- ou `git reset --hard rollback-20260209-clientes-unicos-pre-fix` (somente com aprovacao explicita).
+
+---
+
+*Documentado em: 09/02/2026*
+

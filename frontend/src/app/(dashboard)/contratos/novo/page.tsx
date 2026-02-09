@@ -13,7 +13,9 @@ import { api } from '@/lib/api'
 export default function NovoContratoPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [checkingCliente, setCheckingCliente] = useState(false)
   const [error, setError] = useState('')
+  const [clienteHint, setClienteHint] = useState('')
   
   // Form state
   const [formData, setFormData] = useState({
@@ -33,7 +35,45 @@ export default function NovoContratoPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target
+    if (id === 'contratante_documento') {
+      setClienteHint('')
+    }
     setFormData(prev => ({ ...prev, [id]: value }))
+  }
+
+  const normalizeDocument = (value: string) => {
+    return (value || '').replace(/\D/g, '')
+  }
+
+  const buscarClientePorDocumento = async () => {
+    const documento = normalizeDocument(formData.contratante_documento)
+    if (documento.length < 11) return
+
+    setCheckingCliente(true)
+    setClienteHint('')
+    setError('')
+
+    try {
+      const response = await api.get(`/clientes/documento/${documento}`)
+      const cliente = response.data
+
+      setFormData(prev => ({
+        ...prev,
+        contratante_nome: cliente?.nome || prev.contratante_nome,
+        contratante_email: cliente?.email || prev.contratante_email,
+        contratante_telefone: cliente?.telefone || prev.contratante_telefone,
+        contratante_endereco: cliente?.endereco || prev.contratante_endereco,
+      }))
+      setClienteHint('Cliente existente encontrado. Dados preenchidos automaticamente.')
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        setClienteHint('Documento sem cadastro previo. O cliente sera criado junto com o contrato.')
+      } else {
+        setError(err?.response?.data?.detail || 'Falha ao buscar cliente por documento.')
+      }
+    } finally {
+      setCheckingCliente(false)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -151,7 +191,14 @@ export default function NovoContratoPage() {
                 required 
                 value={formData.contratante_documento}
                 onChange={handleChange}
+                onBlur={buscarClientePorDocumento}
               />
+              {checkingCliente && (
+                <p className="text-xs text-gray-500">Buscando cliente...</p>
+              )}
+              {!checkingCliente && clienteHint && (
+                <p className="text-xs text-blue-700">{clienteHint}</p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">

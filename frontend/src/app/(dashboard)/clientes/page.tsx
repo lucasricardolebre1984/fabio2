@@ -1,7 +1,7 @@
 'use client'
 
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { Loader2, RefreshCw, UserPlus } from 'lucide-react'
+import { Loader2, Pencil, RefreshCw, Save, ShieldAlert, Trash2, UserPlus, X } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -17,13 +17,29 @@ interface Cliente {
   documento: string
   email: string
   telefone?: string | null
+  endereco?: string | null
   cidade?: string | null
   estado?: string | null
+  cep?: string | null
+  observacoes?: string | null
   total_contratos: number
   created_at: string
 }
 
-const emptyForm = {
+interface ClienteForm {
+  nome: string
+  tipo_pessoa: 'fisica' | 'juridica'
+  documento: string
+  email: string
+  telefone: string
+  endereco: string
+  cidade: string
+  estado: string
+  cep: string
+  observacoes: string
+}
+
+const emptyForm: ClienteForm = {
   nome: '',
   tipo_pessoa: 'fisica',
   documento: '',
@@ -41,11 +57,15 @@ export default function ClientesPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [deduping, setDeduping] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editSaving, setEditSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState(emptyForm)
+  const [form, setForm] = useState<ClienteForm>(emptyForm)
+  const [editForm, setEditForm] = useState<Partial<ClienteForm>>({})
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -76,11 +96,15 @@ export default function ClientesPage() {
     loadClientes()
   }, [])
 
+  const resetMessages = () => {
+    setError('')
+    setNotice('')
+  }
+
   const onCreate = async (event: FormEvent) => {
     event.preventDefault()
     setSaving(true)
-    setError('')
-    setNotice('')
+    resetMessages()
 
     try {
       await clientesApi.create({
@@ -92,7 +116,11 @@ export default function ClientesPage() {
       setNotice('Cliente cadastrado com sucesso.')
       await loadClientes()
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Falha ao cadastrar cliente.')
+      if (err?.response?.status === 409) {
+        setError('Ja existe cliente com este CPF/CNPJ.')
+      } else {
+        setError(err?.response?.data?.detail || 'Falha ao cadastrar cliente.')
+      }
     } finally {
       setSaving(false)
     }
@@ -100,18 +128,98 @@ export default function ClientesPage() {
 
   const onSync = async () => {
     setSyncing(true)
-    setError('')
-    setNotice('')
+    resetMessages()
     try {
       const result = await clientesApi.syncFromContracts()
       setNotice(
-        `Sincronizacao concluida. Criados: ${result?.clientes_criados ?? 0}, vinculados: ${result?.contratos_vinculados ?? 0}.`
+        `Sincronizacao concluida. Criados: ${result?.clientes_criados ?? 0}, vinculados: ${result?.contratos_vinculados ?? 0}, clientes recalculados: ${result?.clientes_recalculados ?? 0}.`
       )
       await loadClientes()
     } catch (err: any) {
       setError(err?.response?.data?.detail || 'Falha ao sincronizar contratos.')
     } finally {
       setSyncing(false)
+    }
+  }
+
+  const onDeduplicate = async () => {
+    setDeduping(true)
+    resetMessages()
+    try {
+      const result = await clientesApi.deduplicateDocuments()
+      setNotice(
+        `Saneamento concluido. Grupos: ${result?.grupos_duplicados ?? 0}, removidos: ${result?.clientes_removidos ?? 0}, contratos relinkados: ${result?.contratos_relinkados ?? 0}.`
+      )
+      await loadClientes()
+    } catch (err: any) {
+      if (err?.response?.status === 403) {
+        setError('Saneamento permitido apenas para administrador.')
+      } else {
+        setError(err?.response?.data?.detail || 'Falha ao deduplicar clientes.')
+      }
+    } finally {
+      setDeduping(false)
+    }
+  }
+
+  const startEdit = (cliente: Cliente) => {
+    resetMessages()
+    setEditingId(cliente.id)
+    setEditForm({
+      nome: cliente.nome,
+      email: cliente.email || '',
+      telefone: cliente.telefone || '',
+      endereco: cliente.endereco || '',
+      cidade: cliente.cidade || '',
+      estado: cliente.estado || '',
+      cep: cliente.cep || '',
+      observacoes: cliente.observacoes || '',
+    })
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditForm({})
+  }
+
+  const submitEdit = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!editingId) return
+    setEditSaving(true)
+    resetMessages()
+
+    try {
+      await clientesApi.update(editingId, editForm)
+      setNotice('Cliente atualizado com sucesso.')
+      cancelEdit()
+      await loadClientes()
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || 'Falha ao atualizar cliente.')
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  const onDelete = async (cliente: Cliente) => {
+    const confirmed = window.confirm(
+      `Excluir cliente ${cliente.nome} (${cliente.documento})?\n\nSe houver contratos vinculados, a exclusao pode falhar.`
+    )
+    if (!confirmed) return
+
+    resetMessages()
+    try {
+      await clientesApi.delete(cliente.id)
+      setNotice('Cliente excluido com sucesso.')
+      if (editingId === cliente.id) {
+        cancelEdit()
+      }
+      await loadClientes()
+    } catch (err: any) {
+      if (err?.response?.status === 403) {
+        setError('Exclusao permitida apenas para administrador.')
+      } else {
+        setError(err?.response?.data?.detail || 'Falha ao excluir cliente.')
+      }
     }
   }
 
@@ -123,6 +231,10 @@ export default function ClientesPage() {
           <Button type="button" variant="outline" onClick={onSync} disabled={syncing}>
             {syncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
             Sincronizar contratos
+          </Button>
+          <Button type="button" variant="outline" onClick={onDeduplicate} disabled={deduping}>
+            {deduping ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldAlert className="mr-2 h-4 w-4" />}
+            Corrigir duplicados CPF/CNPJ
           </Button>
           <Button type="button" onClick={() => setShowForm((value) => !value)}>
             <UserPlus className="mr-2 h-4 w-4" />
@@ -305,6 +417,120 @@ export default function ClientesPage() {
                       </p>
                     </div>
                   </div>
+
+                  <div className="mt-3 flex items-center justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => startEdit(cliente)}
+                    >
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Editar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-red-600 hover:text-red-700"
+                      onClick={() => onDelete(cliente)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Excluir
+                    </Button>
+                  </div>
+
+                  {editingId === cliente.id && (
+                    <form onSubmit={submitEdit} className="mt-4 grid gap-3 rounded-md border bg-gray-50 p-3 md:grid-cols-2">
+                      <div className="space-y-1 md:col-span-2">
+                        <Label htmlFor={`edit-nome-${cliente.id}`}>Nome</Label>
+                        <Input
+                          id={`edit-nome-${cliente.id}`}
+                          required
+                          value={editForm.nome || ''}
+                          onChange={(event) => setEditForm((prev) => ({ ...prev, nome: event.target.value }))}
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor={`edit-email-${cliente.id}`}>Email</Label>
+                        <Input
+                          id={`edit-email-${cliente.id}`}
+                          type="email"
+                          required
+                          value={editForm.email || ''}
+                          onChange={(event) => setEditForm((prev) => ({ ...prev, email: event.target.value }))}
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor={`edit-telefone-${cliente.id}`}>Telefone</Label>
+                        <Input
+                          id={`edit-telefone-${cliente.id}`}
+                          value={editForm.telefone || ''}
+                          onChange={(event) => setEditForm((prev) => ({ ...prev, telefone: event.target.value }))}
+                        />
+                      </div>
+
+                      <div className="space-y-1 md:col-span-2">
+                        <Label htmlFor={`edit-endereco-${cliente.id}`}>Endereco</Label>
+                        <Input
+                          id={`edit-endereco-${cliente.id}`}
+                          value={editForm.endereco || ''}
+                          onChange={(event) => setEditForm((prev) => ({ ...prev, endereco: event.target.value }))}
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor={`edit-cidade-${cliente.id}`}>Cidade</Label>
+                        <Input
+                          id={`edit-cidade-${cliente.id}`}
+                          value={editForm.cidade || ''}
+                          onChange={(event) => setEditForm((prev) => ({ ...prev, cidade: event.target.value }))}
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor={`edit-estado-${cliente.id}`}>UF</Label>
+                        <Input
+                          id={`edit-estado-${cliente.id}`}
+                          maxLength={2}
+                          value={editForm.estado || ''}
+                          onChange={(event) => setEditForm((prev) => ({ ...prev, estado: event.target.value.toUpperCase() }))}
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label htmlFor={`edit-cep-${cliente.id}`}>CEP</Label>
+                        <Input
+                          id={`edit-cep-${cliente.id}`}
+                          value={editForm.cep || ''}
+                          onChange={(event) => setEditForm((prev) => ({ ...prev, cep: event.target.value }))}
+                        />
+                      </div>
+
+                      <div className="space-y-1 md:col-span-2">
+                        <Label htmlFor={`edit-observacoes-${cliente.id}`}>Observacoes</Label>
+                        <textarea
+                          id={`edit-observacoes-${cliente.id}`}
+                          className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          value={editForm.observacoes || ''}
+                          onChange={(event) => setEditForm((prev) => ({ ...prev, observacoes: event.target.value }))}
+                        />
+                      </div>
+
+                      <div className="md:col-span-2 flex justify-end gap-2">
+                        <Button type="button" variant="outline" onClick={cancelEdit}>
+                          <X className="mr-2 h-4 w-4" />
+                          Cancelar
+                        </Button>
+                        <Button type="submit" disabled={editSaving}>
+                          {editSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                          Salvar alteracoes
+                        </Button>
+                      </div>
+                    </form>
+                  )}
                 </div>
               ))}
             </div>
