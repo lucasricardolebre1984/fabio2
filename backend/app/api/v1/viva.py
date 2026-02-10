@@ -3,14 +3,17 @@ Chat direto com a VIVA - Assistente Virtual Interna
 Usa OpenAI para Chat, Visao, Audio e Imagem
 """
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 import base64
 import json
 import re
+import unicodedata
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
 
 from app.api.deps import get_current_user, get_db
 from app.models.user import User
@@ -30,6 +33,7 @@ class ChatRequest(BaseModel):
     mensagem: str
     contexto: List[Dict[str, Any]] = []
     prompt_extra: Optional[str] = None
+    modo: Optional[str] = None
 
 
 class MediaItem(BaseModel):
@@ -41,6 +45,33 @@ class MediaItem(BaseModel):
 class ChatResponse(BaseModel):
     resposta: str
     midia: Optional[List[MediaItem]] = None
+
+
+class CampanhaSaveRequest(BaseModel):
+    modo: str
+    image_url: str
+    titulo: Optional[str] = None
+    briefing: Optional[str] = None
+    mensagem_original: Optional[str] = None
+    overlay: Optional[Dict[str, Any]] = None
+    meta: Optional[Dict[str, Any]] = None
+
+
+class CampanhaItem(BaseModel):
+    id: UUID
+    modo: str
+    titulo: str
+    briefing: Optional[str] = None
+    mensagem_original: Optional[str] = None
+    image_url: str
+    overlay: Dict[str, Any] = {}
+    meta: Dict[str, Any] = {}
+    created_at: datetime
+
+
+class CampanhaListResponse(BaseModel):
+    items: List[CampanhaItem]
+    total: int
 
 
 class ImageAnalysisRequest(BaseModel):
@@ -78,6 +109,35 @@ def _is_image_request(texto: str) -> bool:
     ]
     texto_lower = texto.lower()
     return any(t in texto_lower for t in termos)
+
+
+def _is_campaign_request(texto: str) -> bool:
+    terms = [
+        "campanha",
+        "mockup",
+        "criativo",
+        "criativa",
+        "copy",
+        "headline",
+        "subheadline",
+        "cta",
+        "publico",
+        "publico alvo",
+        "persona",
+        "formato",
+        "feed",
+        "stories",
+        "story",
+        "carrossel",
+        "anuncio",
+        "ads",
+        "trafego",
+        "a b",
+        "a/b",
+        "teste a/b",
+    ]
+    normalized = _normalize_key(texto)
+    return any(term in normalized for term in terms)
 
 
 def _is_greeting(texto: str) -> bool:
@@ -135,6 +195,466 @@ def _mode_hint(modo: Optional[str]) -> Optional[str]:
         "CRIADORLANDPAGE": "Fundo clean e moderno para landing page.",
     }
     return hints.get(modo)
+
+
+def _normalize_mode(modo: Optional[str]) -> Optional[str]:
+    if not modo:
+        return None
+    normalized = str(modo).strip().upper()
+    allowed = {
+        "LOGO",
+        "FC",
+        "REZETA",
+        "CRIADORLANDPAGE",
+        "CRIADORPROMPT",
+        "CRIADORWEB",
+    }
+    return normalized if normalized in allowed else None
+
+
+def _normalize_key(texto: str) -> str:
+    normalized = unicodedata.normalize("NFKD", (texto or ""))
+    without_accents = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    return re.sub(r"[^a-z0-9]+", " ", without_accents.lower()).strip()
+
+
+def _normalize_formato_value(value: str) -> str:
+    normalized = _normalize_key(value)
+    if "9 16" in normalized or "stories" in normalized or "story" in normalized:
+        return "9:16"
+    if "4 5" in normalized or "feed" in normalized:
+        return "4:5"
+    if "1 1" in normalized or "quadrado" in normalized or "square" in normalized:
+        return "1:1"
+    if "16 9" in normalized or "banner" in normalized:
+        return "16:9"
+    return value.strip()
+
+
+def _normalize_publico_value(value: str) -> str:
+    normalized = _normalize_key(value)
+    if any(term in normalized for term in ("pf", "pessoa fisica", "pessoas fisicas", "publico geral", "geral")):
+        return "Publico geral (PF)"
+    if any(term in normalized for term in ("mei", "microempreendedor", "micro empreendedor")):
+        return "Microempreendedores (MEI)"
+    if any(term in normalized for term in ("empresarios", "gestores", "pequenas empresas", "pj")):
+        return "Empresarios e gestores"
+    return value.strip()
+
+
+def _is_affirmative(texto: str) -> bool:
+    normalized = _normalize_key(texto)
+    return normalized in {
+        "sim",
+        "ok",
+        "pode",
+        "pode sim",
+        "confirmo",
+        "usar cta padrao",
+        "usar cta padrão",
+        "cta padrao",
+        "cta padrão",
+    }
+
+
+def _is_logo_request(texto: str) -> bool:
+    normalized = _normalize_key(texto)
+    logo_terms = (
+        "logo",
+        "logotipo",
+        "identidade visual",
+        "marca",
+    )
+    return any(term in normalized for term in logo_terms)
+
+
+def _is_generation_confirmation(texto: str) -> bool:
+    normalized = _normalize_key(texto)
+    if normalized in {
+        "sim",
+        "ok",
+        "pode",
+        "pode gerar",
+        "gerar",
+        "gera",
+        "versao final",
+        "versao final png",
+        "png",
+        "jpg",
+        "jpeg",
+        "manda",
+        "enviar",
+    }:
+        return True
+    return bool(re.search(r"\b(gera|gerar|final|png|jpg)\b", normalized))
+
+
+def _extract_publico_option(texto: str) -> Optional[str]:
+    normalized = _normalize_key(texto)
+    if normalized == "1":
+        return "Publico geral (PF)"
+    if normalized == "2":
+        return "Microempreendedores (MEI)"
+    if normalized == "3":
+        return "Jovens 18-35 com credito e cartao"
+    return None
+
+
+def _apply_campaign_defaults(fields: Dict[str, str]) -> Dict[str, str]:
+    normalized = dict(fields or {})
+    normalized.setdefault("objetivo", "Geracao de leads")
+    normalized.setdefault("publico", "Publico geral (PF)")
+    normalized.setdefault("formato", "4:5")
+    normalized.setdefault("cta", "Saiba mais")
+    return normalized
+
+
+def _extract_campaign_brief_fields(texto: str) -> Dict[str, str]:
+    lines = [line.strip() for line in (texto or "").splitlines() if ":" in line]
+    mapping = {
+        "objetivo": "objetivo",
+        "objetivo da campanha": "objetivo",
+        "publico": "publico",
+        "publico alvo": "publico",
+        "persona": "publico",
+        "formato": "formato",
+        "fortato": "formato",
+        "headline": "headline",
+        "titulo": "headline",
+        "titulo principal": "headline",
+        "subheadline": "subheadline",
+        "subtitulo": "subheadline",
+        "subtitulo apoio": "subheadline",
+        "cta": "cta",
+        "chamada": "cta",
+        "call to action": "cta",
+        "oferta": "oferta",
+        "desconto": "oferta",
+        "tema": "tema",
+        "campanha": "tema",
+        "cena": "cena",
+        "descricao da cena": "cena",
+    }
+
+    fields: Dict[str, str] = {}
+    for line in lines:
+        raw_key, raw_value = line.split(":", 1)
+        value = raw_value.strip()
+        if not value:
+            continue
+        normalized_key = _normalize_key(raw_key)
+        mapped = mapping.get(normalized_key)
+        if mapped:
+            fields[mapped] = value
+
+    # Extract from free sentence style:
+    # "objetivo da campanha e ... publico ... formato feed ..."
+    normalized_sentence = _normalize_key(texto or "")
+    sentence_patterns = {
+        "objetivo": r"objetivo(?: da campanha)?(?: e| eh| =)? (.*?)(?= publico| formato| fortato| cta| tema| oferta| headline| subheadline| cena|$)",
+        "publico": r"publico(?: alvo)?(?: e| eh| =)? (.*?)(?= objetivo| formato| fortato| cta| tema| oferta| headline| subheadline| cena|$)",
+        "formato": r"(?:formato|fortato)(?: e| eh| =)? (.*?)(?= objetivo| publico| cta| tema| oferta| headline| subheadline| cena|$)",
+        "cta": r"cta(?: e| eh| =)? (.*?)(?= objetivo| publico| formato| fortato| tema| oferta| headline| subheadline| cena|$)",
+        "tema": r"tema(?: e| eh| =)? (.*?)(?= objetivo| publico| formato| fortato| cta| oferta| headline| subheadline| cena|$)",
+        "oferta": r"oferta(?: e| eh| =)? (.*?)(?= objetivo| publico| formato| fortato| cta| tema| headline| subheadline| cena|$)",
+        "headline": r"headline(?: e| eh| =)? (.*?)(?= objetivo| publico| formato| fortato| cta| tema| oferta| subheadline| cena|$)",
+        "subheadline": r"subheadline(?: e| eh| =)? (.*?)(?= objetivo| publico| formato| fortato| cta| tema| oferta| headline| cena|$)",
+        "cena": r"cena(?: e| eh| =)? (.*?)(?= objetivo| publico| formato| fortato| cta| tema| oferta| headline| subheadline|$)",
+    }
+
+    for key, pattern in sentence_patterns.items():
+        if fields.get(key):
+            continue
+        match = re.search(pattern, normalized_sentence)
+        if not match:
+            continue
+        value = (match.group(1) or "").strip(" ,.;")
+        if not value:
+            continue
+        fields[key] = value
+
+    if fields.get("formato"):
+        fields["formato"] = _normalize_formato_value(fields["formato"])
+    if fields.get("publico"):
+        fields["publico"] = _normalize_publico_value(fields["publico"])
+
+    return fields
+
+
+def _infer_campaign_fields_from_free_text(texto: str) -> Dict[str, str]:
+    normalized = _normalize_key(texto)
+    inferred: Dict[str, str] = {}
+
+    if "9 16" in normalized or "stories" in normalized or "story" in normalized:
+        inferred["formato"] = "9:16"
+    elif "4 5" in normalized or "feed" in normalized:
+        inferred["formato"] = "4:5"
+    elif "1 1" in normalized or "quadrado" in normalized or "square" in normalized:
+        inferred["formato"] = "1:1"
+    elif "16 9" in normalized or "banner" in normalized:
+        inferred["formato"] = "16:9"
+
+    if (
+        "publico geral" in normalized
+        or "pessoas fisicas" in normalized
+        or "pessoa fisica" in normalized
+        or "pf em geral" in normalized
+        or "pf geral" in normalized
+    ):
+        inferred["publico"] = "Publico geral (PF)"
+    elif "microempreendedor" in normalized or "mei" in normalized:
+        inferred["publico"] = "Microempreendedores (MEI)"
+    elif "pequenas empresas" in normalized or "gestores" in normalized or "empresarios" in normalized:
+        inferred["publico"] = "Empresarios e gestores"
+
+    cta_candidates = [
+        "saiba mais",
+        "conheca como",
+        "ver como funciona",
+        "quero meu nome limpo",
+        "comecar agora",
+    ]
+    for candidate in cta_candidates:
+        if candidate in normalized:
+            inferred["cta"] = candidate.title()
+            break
+
+    if "lead" in normalized or "captacao" in normalized:
+        inferred["objetivo"] = "Geracao de leads"
+    elif "convers" in normalized or "fechamento" in normalized or "venda" in normalized:
+        inferred["objetivo"] = "Conversao"
+    elif "reconhecimento" in normalized or "awareness" in normalized:
+        inferred["objetivo"] = "Reconhecimento de marca"
+
+    if "carnaval" in normalized:
+        inferred["tema"] = "Campanha de Carnaval"
+
+    discount_match = re.search(r"(\d{1,2})\s*%|\b(\d{1,2})\s+por cento\b", normalized)
+    if discount_match:
+        pct = discount_match.group(1) or discount_match.group(2)
+        inferred["oferta"] = f"Desconto de {pct}% no servico"
+
+    return inferred
+
+
+def _collect_campaign_fields_from_context(contexto: List[Dict[str, Any]]) -> Dict[str, str]:
+    collected: Dict[str, str] = {}
+    for msg in contexto or []:
+        if str(msg.get("tipo") or "") != "usuario":
+            continue
+        content = str(msg.get("conteudo") or "").strip()
+        if not content:
+            continue
+        explicit = _extract_campaign_brief_fields(content)
+        inferred = _infer_campaign_fields_from_free_text(content)
+        collected.update(inferred)
+        collected.update(explicit)
+    return collected
+
+
+def _missing_campaign_fields(fields: Dict[str, str]) -> List[str]:
+    required = ["objetivo", "publico", "formato"]
+    return [field for field in required if not fields.get(field)]
+
+
+def _has_pending_campaign_brief(contexto: List[Dict[str, Any]]) -> bool:
+    for msg in reversed(contexto or []):
+        if msg.get("tipo") != "ia":
+            continue
+        content = str(msg.get("conteudo") or "").lower()
+        if (
+            "brief da campanha" in content
+            or "so preciso fechar" in content
+            or "faltam:" in content
+        ):
+            return True
+    return False
+
+
+def _compose_campaign_brief_text(mensagem: str, fields: Dict[str, str], modo: str) -> str:
+    brand = "FC Solucoes Financeiras" if modo == "FC" else "RezetaBrasil"
+    cta = fields.get("cta") or "Saiba mais"
+    parts: List[str] = [
+        f"Marca: {brand}",
+        f"Tema: {fields.get('tema') or _extract_subject(mensagem)}",
+        f"Objetivo: {fields.get('objetivo')}",
+        f"Publico: {fields.get('publico')}",
+        f"Formato: {fields.get('formato')}",
+        f"CTA: {cta}",
+    ]
+    if fields.get("headline"):
+        parts.append(f"Headline: {fields.get('headline')}")
+    if fields.get("subheadline"):
+        parts.append(f"Subheadline: {fields.get('subheadline')}")
+    if fields.get("oferta"):
+        parts.append(f"Oferta: {fields.get('oferta')}")
+    if fields.get("cena"):
+        parts.append(f"Cena: {fields.get('cena')}")
+    return "\n".join(parts)
+
+
+def _build_campaign_brief_reply(modo: str, missing_fields: List[str]) -> str:
+    labels = {
+        "objetivo": "objetivo da campanha",
+        "publico": "publico-alvo",
+        "formato": "formato da arte",
+    }
+    missing_text = ", ".join(labels.get(field, field) for field in missing_fields)
+    brand = "FC" if modo == "FC" else "Rezeta"
+    return (
+        f"Modo {brand} confirmado. Para gerar a campanha com qualidade, so preciso fechar: {missing_text}.\n\n"
+        "Pode responder em texto natural (sem formato fixo). Exemplo:\n"
+        "`objetivo: gerar leads | publico: PF geral | formato: 4:5`.\n"
+        "Se quiser, eu uso CTA padrao automaticamente."
+    )
+
+
+def _sanitize_fake_asset_delivery_reply(resposta: str, modo: Optional[str]) -> str:
+    if modo not in ("FC", "REZETA"):
+        return resposta
+
+    lower = (resposta or "").lower()
+    normalized = _normalize_key(resposta or "")
+    has_fake_signal = (
+        "http://" in lower
+        or "https://" in lower
+        or "marketing > campanhas" in lower
+        or "files." in lower
+        or "link de download" in normalized
+        or "publiquei" in normalized
+        or "publiquei os arquivos" in normalized
+        or "enviei ao projeto" in normalized
+        or "subi no projeto" in normalized
+    )
+    if not has_fake_signal:
+        return resposta
+
+    return (
+        "Nao consigo publicar arquivos nem gerar links externos diretamente pelo chat. "
+        "Consigo gerar a imagem aqui no fluxo da VIVA e anexar no proprio chat para revisao/download."
+    )
+
+
+def _derive_campaign_title(
+    modo: str,
+    campaign_copy: Optional[Dict[str, Any]] = None,
+    fallback_message: Optional[str] = None,
+) -> str:
+    if campaign_copy and str(campaign_copy.get("headline") or "").strip():
+        return _sanitize_prompt(str(campaign_copy.get("headline")), 120)
+
+    subject = _extract_subject(fallback_message or "")
+    brand = "FC" if modo == "FC" else "Rezeta"
+    if subject and subject.lower() != "imagem promocional institucional":
+        return _sanitize_prompt(f"{brand} - {subject}", 120)
+    return f"Campanha {brand}"
+
+
+async def _ensure_campaigns_table(db: AsyncSession) -> None:
+    await db.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS viva_campanhas (
+                id UUID PRIMARY KEY,
+                user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+                modo VARCHAR(32) NOT NULL,
+                titulo VARCHAR(255) NOT NULL,
+                briefing TEXT,
+                mensagem_original TEXT,
+                image_url TEXT NOT NULL,
+                overlay_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+                meta_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ
+            )
+            """
+        )
+    )
+    await db.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS idx_viva_campanhas_created_at
+            ON viva_campanhas(created_at DESC)
+            """
+        )
+    )
+    await db.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS idx_viva_campanhas_user_id
+            ON viva_campanhas(user_id)
+            """
+        )
+    )
+    await db.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS idx_viva_campanhas_modo
+            ON viva_campanhas(modo)
+            """
+        )
+    )
+
+
+def _campaign_row_to_item(row: Any) -> CampanhaItem:
+    return CampanhaItem(
+        id=row.id,
+        modo=row.modo,
+        titulo=row.titulo,
+        briefing=row.briefing,
+        mensagem_original=row.mensagem_original,
+        image_url=row.image_url,
+        overlay=row.overlay_json or {},
+        meta=row.meta_json or {},
+        created_at=row.created_at,
+    )
+
+
+async def _save_campaign_record(
+    db: AsyncSession,
+    user_id: Optional[UUID],
+    modo: str,
+    image_url: str,
+    titulo: Optional[str],
+    briefing: Optional[str],
+    mensagem_original: Optional[str],
+    overlay: Optional[Dict[str, Any]],
+    meta: Optional[Dict[str, Any]],
+) -> Optional[UUID]:
+    if not image_url:
+        return None
+
+    await _ensure_campaigns_table(db)
+    campaign_id = uuid4()
+    now = datetime.now(timezone.utc)
+    await db.execute(
+        text(
+            """
+            INSERT INTO viva_campanhas (
+                id, user_id, modo, titulo, briefing, mensagem_original, image_url,
+                overlay_json, meta_json, created_at, updated_at
+            )
+            VALUES (
+                :id, :user_id, :modo, :titulo, :briefing, :mensagem_original, :image_url,
+                CAST(:overlay_json AS JSONB), CAST(:meta_json AS JSONB), :created_at, :updated_at
+            )
+            """
+        ),
+        {
+            "id": str(campaign_id),
+            "user_id": str(user_id) if user_id else None,
+            "modo": modo,
+            "titulo": _sanitize_prompt(titulo or f"Campanha {modo}", 255),
+            "briefing": briefing,
+            "mensagem_original": mensagem_original,
+            "image_url": image_url,
+            "overlay_json": json.dumps(overlay or {}, ensure_ascii=False),
+            "meta_json": json.dumps(meta or {}, ensure_ascii=False),
+            "created_at": now,
+            "updated_at": now,
+        },
+    )
+    return campaign_id
 
 
 def _extract_image_url(result: Dict[str, Any]) -> Optional[str]:
@@ -354,18 +874,24 @@ async def _generate_campaign_copy(
 
 def _build_branded_background_prompt(modo: str, campaign_copy: Dict[str, Any]) -> str:
     scene = campaign_copy.get("scene", "")
+    scene_lower = str(scene).lower()
+    carnaval_hint = (
+        " Elementos de carnaval devem ser sutis e elegantes (confetes em azul, atmosfera alegre sem fantasia caricata)."
+        if "carnaval" in scene_lower
+        else ""
+    )
     if modo == "FC":
         return (
             "Fotografia publicitária corporativa premium, contexto financeiro no Brasil, "
             "escritório moderno, iluminação natural, composição clean, tons azul institucional "
             "(#071c4a, #00a3ff, #010a1c), sem verde, sem texto, sem letras, sem logotipo. "
-            f"Cena: {scene}"
+            f"{carnaval_hint} Cena: {scene}"
         )
     return (
         "Fotografia publicitária realista e humanizada para campanha de crédito no Brasil, "
         "ambiente moderno e acolhedor, tom de confiança e esperança, cores com presença de "
-        "azul marinho e verde esmeralda (#1E3A5F, #3DAA7F, #2A8B68), sem texto, sem letras, sem logotipo. "
-        f"Cena: {scene}"
+        "azul marinho e verde esmeralda (#1E3A5F, #3DAA7F, #2A8B68), sem texto, sem letras, sem logotipo."
+        f"{carnaval_hint} Cena: {scene}"
     )
 
 
@@ -513,32 +1039,77 @@ async def chat_with_viva(
                 )
             )
 
-        modo = None
-        for msg in reversed(request.contexto):
-            if msg.get("modo"):
-                modo = msg.get("modo")
-                break
+        modo = _normalize_mode(request.modo)
+        if not modo:
+            for msg in reversed(request.contexto):
+                maybe_mode = _normalize_mode(msg.get("modo"))
+                if maybe_mode:
+                    modo = maybe_mode
+                    break
 
         prompt_extra_raw = request.prompt_extra.strip() if request.prompt_extra else None
         prompt_extra_chat = _sanitize_prompt(prompt_extra_raw, 4000) if prompt_extra_raw else None
         prompt_extra_image = _sanitize_prompt(prompt_extra_raw, 1200) if prompt_extra_raw else None
 
-        if _is_image_request(request.mensagem):
+        campaign_flow_requested = False
+        campaign_fields: Dict[str, str] = {}
+        campaign_missing_fields: List[str] = []
+        campaign_prompt_source = request.mensagem
+        pending_brief = _has_pending_campaign_brief(request.contexto)
+        logo_request = _is_logo_request(request.mensagem)
+        generation_confirmation = _is_generation_confirmation(request.mensagem)
+
+        if modo in ("FC", "REZETA") and not logo_request:
+            campaign_fields = _collect_campaign_fields_from_context(request.contexto)
+            inferred_fields = _infer_campaign_fields_from_free_text(request.mensagem)
+            explicit_fields = _extract_campaign_brief_fields(request.mensagem)
+            option_publico = _extract_publico_option(request.mensagem)
+            if option_publico:
+                campaign_fields["publico"] = option_publico
+            campaign_fields.update(inferred_fields)
+            campaign_fields.update(explicit_fields)
+            message_campaign_related = (
+                _is_image_request(request.mensagem)
+                or _is_campaign_request(request.mensagem)
+                or bool(inferred_fields)
+                or bool(explicit_fields)
+                or bool(option_publico)
+            )
+            campaign_flow_requested = (
+                message_campaign_related
+                or (pending_brief and (generation_confirmation or bool(option_publico)))
+            )
+            if campaign_flow_requested:
+                campaign_fields = _apply_campaign_defaults(campaign_fields)
+                campaign_missing_fields = _missing_campaign_fields(campaign_fields)
+                campaign_prompt_source = _compose_campaign_brief_text(
+                    request.mensagem,
+                    campaign_fields,
+                    modo,
+                )
+
+        should_generate_image = _is_image_request(request.mensagem) or (
+            campaign_flow_requested and (not campaign_missing_fields or generation_confirmation)
+        )
+
+        if should_generate_image:
             if not settings.OPENAI_API_KEY:
                 return ChatResponse(resposta="A geracao de imagens esta indisponivel no momento.")
 
-            hint = _mode_hint(modo)
+            effective_mode = "LOGO" if logo_request else modo
+            prompt_extra_image_effective = None if logo_request else prompt_extra_image
+            hint = _mode_hint(effective_mode)
             campaign_copy: Optional[Dict[str, Any]] = None
 
-            if modo in ("FC", "REZETA"):
+            if effective_mode in ("FC", "REZETA"):
                 campaign_copy = await _generate_campaign_copy(
-                    request.mensagem,
-                    prompt_extra_image,
-                    modo,
+                    campaign_prompt_source,
+                    prompt_extra_image_effective,
+                    effective_mode,
                 )
-                prompt = _build_branded_background_prompt(modo, campaign_copy)
+                prompt = _build_branded_background_prompt(effective_mode, campaign_copy)
             else:
-                prompt = _build_image_prompt(prompt_extra_image, hint, request.mensagem)
+                prompt = _build_image_prompt(prompt_extra_image_effective, hint, request.mensagem)
                 prompt = f"{prompt}\n{BACKGROUND_ONLY_SUFFIX}"
 
             resultado = await openai_service.generate_image(prompt=prompt, size="1024x1024")
@@ -554,10 +1125,29 @@ async def chat_with_viva(
                     if resultado.get("success"):
                         url = _extract_image_url(resultado)
                         if url:
-                            media = MediaItem(tipo="imagem", url=url)
-                            if campaign_copy:
-                                media.meta = {"overlay": campaign_copy}
-                            return ChatResponse(resposta="Imagem gerada com sucesso.", midia=[media])
+                            media_meta = {"overlay": campaign_copy} if campaign_copy else {}
+                            resposta_texto = "Imagem gerada com sucesso."
+                            if effective_mode in ("FC", "REZETA"):
+                                saved_id = await _save_campaign_record(
+                                    db=db,
+                                    user_id=current_user.id,
+                                    modo=effective_mode,
+                                    image_url=url,
+                                    titulo=_derive_campaign_title(effective_mode, campaign_copy, request.mensagem),
+                                    briefing=campaign_prompt_source,
+                                    mensagem_original=request.mensagem,
+                                    overlay=campaign_copy or {},
+                                    meta={
+                                        "source": "viva_chat",
+                                        "size": "1024x1024",
+                                        "fallback": True,
+                                    },
+                                )
+                                if saved_id:
+                                    media_meta["campanha_id"] = str(saved_id)
+                                    resposta_texto = "Imagem gerada com sucesso e salva em Campanhas."
+                            media = MediaItem(tipo="imagem", url=url, meta=media_meta or None)
+                            return ChatResponse(resposta=resposta_texto, midia=[media])
                         return ChatResponse(resposta="A imagem foi solicitada, mas a API nao retornou URL.")
 
                 msg = erro.get("message", "Erro desconhecido") if isinstance(erro, dict) else str(erro)
@@ -565,9 +1155,29 @@ async def chat_with_viva(
 
             url = _extract_image_url(resultado)
             if url:
-                media_meta = {"overlay": campaign_copy} if campaign_copy else None
+                media_meta = {"overlay": campaign_copy} if campaign_copy else {}
+                resposta_texto = "Imagem gerada com sucesso."
+                if effective_mode in ("FC", "REZETA"):
+                    saved_id = await _save_campaign_record(
+                        db=db,
+                        user_id=current_user.id,
+                        modo=effective_mode,
+                        image_url=url,
+                        titulo=_derive_campaign_title(effective_mode, campaign_copy, request.mensagem),
+                        briefing=campaign_prompt_source,
+                        mensagem_original=request.mensagem,
+                        overlay=campaign_copy or {},
+                        meta={
+                            "source": "viva_chat",
+                            "size": "1024x1024",
+                            "fallback": False,
+                        },
+                    )
+                    if saved_id:
+                        media_meta["campanha_id"] = str(saved_id)
+                        resposta_texto = "Imagem gerada com sucesso e salva em Campanhas."
                 media = MediaItem(tipo="imagem", url=url, meta=media_meta)
-                return ChatResponse(resposta="Imagem gerada com sucesso.", midia=[media])
+                return ChatResponse(resposta=resposta_texto, midia=[media])
             return ChatResponse(resposta="A imagem foi solicitada, mas a API nao retornou URL.")
 
         if not settings.OPENAI_API_KEY:
@@ -575,7 +1185,13 @@ async def chat_with_viva(
             resposta = await viva_local_service.chat(messages, modo)
         else:
             messages = openrouter_service.build_messages(request.mensagem, request.contexto)
-            if prompt_extra_chat:
+            should_inject_prompt = bool(prompt_extra_chat) and (
+                modo not in ("FC", "REZETA")
+                or campaign_flow_requested
+                or _is_image_request(request.mensagem)
+                or _is_campaign_request(request.mensagem)
+            )
+            if should_inject_prompt:
                 messages.insert(1, {"role": "system", "content": prompt_extra_chat})
             resposta = await viva_model_service.chat(
                 messages=messages,
@@ -586,10 +1202,144 @@ async def chat_with_viva(
                 messages_local = viva_local_service.build_messages(request.mensagem, request.contexto)
                 resposta = await viva_local_service.chat(messages_local, modo)
 
+        resposta = _sanitize_fake_asset_delivery_reply(resposta, modo)
         resposta = _ensure_fabio_greeting(request.mensagem, resposta)
         return ChatResponse(resposta=resposta)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
+
+
+@router.post("/campanhas", response_model=CampanhaItem)
+async def save_campanha(
+    payload: CampanhaSaveRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    modo = _normalize_mode(payload.modo)
+    if modo not in ("FC", "REZETA"):
+        raise HTTPException(status_code=400, detail="Modo de campanha invalido.")
+
+    try:
+        title = payload.titulo or _derive_campaign_title(
+            modo,
+            payload.overlay or {},
+            payload.mensagem_original or payload.briefing or "",
+        )
+        campaign_id = await _save_campaign_record(
+            db=db,
+            user_id=current_user.id,
+            modo=modo,
+            image_url=payload.image_url,
+            titulo=title,
+            briefing=payload.briefing,
+            mensagem_original=payload.mensagem_original,
+            overlay=payload.overlay or {},
+            meta=payload.meta or {},
+        )
+        if not campaign_id:
+            raise HTTPException(status_code=400, detail="URL da imagem obrigatoria.")
+
+        result = await db.execute(
+            text(
+                """
+                SELECT id, modo, titulo, briefing, mensagem_original, image_url, overlay_json, meta_json, created_at
+                FROM viva_campanhas
+                WHERE id = :id
+                """
+            ),
+            {"id": str(campaign_id)},
+        )
+        row = result.first()
+        if not row:
+            raise HTTPException(status_code=500, detail="Falha ao salvar campanha.")
+        return _campaign_row_to_item(row)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar campanha: {str(e)}")
+
+
+@router.get("/campanhas", response_model=CampanhaListResponse)
+async def list_campanhas(
+    modo: Optional[str] = None,
+    limit: int = 30,
+    offset: int = 0,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    safe_limit = min(max(limit, 1), 200)
+    safe_offset = max(offset, 0)
+    normalized_mode = _normalize_mode(modo) if modo else None
+
+    try:
+        await _ensure_campaigns_table(db)
+        params: Dict[str, Any] = {
+            "user_id": str(current_user.id),
+            "limit": safe_limit,
+            "offset": safe_offset,
+        }
+
+        where_clause = "WHERE user_id = :user_id"
+        if normalized_mode in ("FC", "REZETA"):
+            where_clause += " AND modo = :modo"
+            params["modo"] = normalized_mode
+
+        rows_result = await db.execute(
+            text(
+                f"""
+                SELECT id, modo, titulo, briefing, mensagem_original, image_url, overlay_json, meta_json, created_at
+                FROM viva_campanhas
+                {where_clause}
+                ORDER BY created_at DESC
+                LIMIT :limit OFFSET :offset
+                """
+            ),
+            params,
+        )
+        items = [_campaign_row_to_item(row) for row in rows_result.fetchall()]
+
+        count_result = await db.execute(
+            text(
+                f"""
+                SELECT COUNT(*) AS total
+                FROM viva_campanhas
+                {where_clause}
+                """
+            ),
+            {k: v for k, v in params.items() if k in ("user_id", "modo")},
+        )
+        total = int(count_result.scalar() or 0)
+        return CampanhaListResponse(items=items, total=total)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao listar campanhas: {str(e)}")
+
+
+@router.get("/campanhas/{campanha_id}", response_model=CampanhaItem)
+async def get_campanha(
+    campanha_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        await _ensure_campaigns_table(db)
+        result = await db.execute(
+            text(
+                """
+                SELECT id, modo, titulo, briefing, mensagem_original, image_url, overlay_json, meta_json, created_at
+                FROM viva_campanhas
+                WHERE id = :id AND user_id = :user_id
+                """
+            ),
+            {"id": str(campanha_id), "user_id": str(current_user.id)},
+        )
+        row = result.first()
+        if not row:
+            raise HTTPException(status_code=404, detail="Campanha nao encontrada.")
+        return _campaign_row_to_item(row)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao buscar campanha: {str(e)}")
 
 # ============================================
 # VISÃO - Análise de Imagens

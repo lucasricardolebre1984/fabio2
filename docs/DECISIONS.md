@@ -619,6 +619,110 @@ quando havia clientes duplicados para o mesmo documento em formatos diferentes
 
 ---
 
+## DECISAO-020: briefing FC/Rezeta com CTA opcional e preview interno de imagem
+
+### Data
+09/02/2026
+
+### Contexto
+No fluxo da VIVA, o briefing de campanha ainda podia travar em repeticao quando faltava somente CTA. Em paralelo, a abertura de imagem via popup/aba externa apresentava falhas em parte dos navegadores.
+
+### Decisao
+- Campos minimos de briefing para gerar campanha:
+  - `objetivo`, `publico`, `formato`.
+- `CTA` passa a ser opcional com fallback automatico `Saiba mais`.
+- O fluxo de coleta so insiste em briefing quando a mensagem atual continua no contexto de campanha (sem loop em saudacao/desvio).
+- Visualizacao de imagem padronizada em modal interno no SaaS:
+  - `/viva`: botao `Abrir imagem` abre preview interno;
+  - `/campanhas`: botao `Abrir imagem` abre modal com opcao de download.
+- Analise de anexos visuais passa a ser injetada no payload de chat como referencia de layout.
+
+### Motivo
+- Reduzir friccao de conversa no briefing.
+- Evitar respostas repetitivas e perda de contexto.
+- Eliminar dependencia de popup externo para revisar criativos.
+
+### Rollback
+- `docs/ROLLBACK/rollback-20260209-202655.patch`
+- `git revert <hash-do-commit>`
+
+---
+
+*Documentado em: 09/02/2026*
+
+---
+
+## DECISAO-018: fonte canonica de prompts da VIVA + brief minimo obrigatorio para campanhas FC/REZETA
+
+### Data
+09/02/2026
+
+### Contexto
+O chat interno da VIVA podia gerar arte sem conduzir briefing e sem aplicar de forma consistente o prompt de marca, por divergencia entre arquivos de prompt e ausencia de `modo` explicito no payload.
+
+### Decisao
+- Frontend `/viva` passa a enviar `modo` explicitamente em `/api/v1/viva/chat`.
+- Backend `/api/v1/viva/chat` passa a priorizar `modo` do payload (fallback para contexto).
+- Para modos `FC` e `REZETA`, a geracao de imagem exige brief minimo:
+  - `objetivo`, `publico`, `formato`, `cta`.
+- Fonte canonica de prompts no frontend definida como:
+  - `frontend/src/app/viva/PROMPTS`
+  - carregada por rota interna `/api/viva/prompts/[promptId]` com fallback legado.
+- Modal de "Arte final" ajustado para zoom 100% com rolagem e limite de largura.
+
+### Motivo
+- Reduzir saidas genericas e aumentar aderencia ao branding institucional.
+- Garantir conversa de elaboracao de campanha antes da geracao final.
+- Eliminar ambiguidade operacional causada por multiplas copias de prompt.
+
+### Rollback
+- `docs/ROLLBACK/rollback-20260209-181844.patch`
+- `git revert <hash-do-commit>`
+
+---
+
+*Documentado em: 09/02/2026*
+
+---
+
+## DECISAO-019: historico institucional de campanhas IA no SaaS (menu dedicado + persistencia em banco)
+
+### Data
+09/02/2026
+
+### Contexto
+No chat interno da VIVA, o usuario precisava manter historico real de campanhas (imagem + data + briefing) dentro do SaaS. O fluxo anterior permitia respostas textuais extensas sem garantia de persistencia operacional.
+
+### Decisao
+- Criar historico persistente `viva_campanhas` para campanhas geradas no `/viva`.
+- Registrar automaticamente campanhas de imagem nos modos `FC` e `REZETA`.
+- Disponibilizar rotas dedicadas:
+  - `POST /api/v1/viva/campanhas`
+  - `GET /api/v1/viva/campanhas`
+  - `GET /api/v1/viva/campanhas/{campanha_id}`
+- Expor menu e tela dedicada no frontend:
+  - `Sidebar`: item `Campanhas`
+  - rota `/campanhas` com filtro e visualizacao de historico.
+- Incluir `campanha_id` no `midia.meta` para rastreabilidade entre chat e historico.
+- No briefing FC/REZETA, evitar loop operacional:
+  - parser de texto livre para campos (`objetivo`, `publico`, `formato`, `cta`);
+  - quando faltar apenas `cta`, resposta curta de continuidade com opcao `usar CTA padrao`.
+
+### Motivo
+- Garantir trilha institucional auditavel do que foi realmente gerado.
+- Evitar dependencia de memoria do chat para revisao de criativos.
+- Permitir validacao operacional pelo front sem fluxo manual externo.
+
+### Rollback
+- `docs/ROLLBACK/rollback-20260209-190632.patch`
+- `git revert <hash-do-commit>`
+
+---
+
+*Documentado em: 09/02/2026*
+
+---
+
 ## DECISAO-016: normalizacao defensiva de local_assinatura legado
 
 ### Data
@@ -673,6 +777,32 @@ A tela de clientes precisava refletir com confiabilidade o total de contratos ap
 
 ### Rollback
 - `docs/ROLLBACK/rollback-20260209-164001.patch`
+- `git revert <hash-do-commit>`
+
+---
+
+*Documentado em: 09/02/2026*
+
+---
+
+## DECISAO-021: manter BUG-015 como pendente apos rodada de simplificacao da VIVA
+
+### Data
+09/02/2026
+
+### Contexto
+O fluxo de conversa e o salvamento de campanhas evoluiram, mas o gerador de imagem ainda apresenta repeticao de composicao visual em parte dos casos.
+
+### Decisao
+- Encerrar a rodada atual com os demais itens consolidados em producao local;
+- manter o refino do gerador (BUG-015) como pendencia formal para proxima iteracao dedicada.
+
+### Motivo
+- preservar estabilidade do fluxo ja validado;
+- separar refino criativo do ajuste funcional para evitar regressao.
+
+### Rollback
+- `docs/ROLLBACK/rollback-20260209-205521.patch`
 - `git revert <hash-do-commit>`
 
 ---

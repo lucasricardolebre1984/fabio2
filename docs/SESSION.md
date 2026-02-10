@@ -167,3 +167,70 @@ Atualizado em: 09/02/2026
   - `total_contratos` passa a ser calculado por agregacao real da tabela `contratos`.
 - Evolucao de UX em `/clientes`:
   - novo campo de historico por cliente (botao `Ver historico`) com lista de contratos vinculados.
+
+## Atualizacao tecnica (2026-02-09 - VIVA prompts FC/REZETA + modal arte)
+- Rollback local adicional criado antes deste bloco:
+  - `docs/ROLLBACK/rollback-20260209-181844.patch`
+  - `docs/ROLLBACK/rollback-20260209-181844-staged.patch`
+  - `docs/ROLLBACK/rollback-20260209-181844-untracked.txt`
+- Correcao de coerencia de modo no chat VIVA:
+  - frontend passou a enviar `modo` explicitamente em `/viva/chat`;
+  - backend passou a priorizar `modo` do payload para aplicar fluxo de campanha correto.
+- Correcao de fluxo de campanha (FC/REZETA):
+  - antes da geracao de imagem, VIVA agora solicita brief minimo (`objetivo`, `publico`, `formato`, `cta`);
+  - com brief completo, gera imagem com copy estruturada (evita banner aleatorio sem conduzir conversa).
+- Correcao de prompts duplicados no frontend:
+  - carregamento centralizado via `/api/viva/prompts/[promptId]`;
+  - fonte canonica definida em `frontend/src/app/viva/PROMPTS` com fallback legado.
+- Correcao de usabilidade no modal "Arte final":
+  - layout adaptado para zoom 100% com scroll e limite de largura, sem esconder botoes de acao.
+
+## Atualizacao tecnica (2026-02-09 - menu campanhas + historico VIVA)
+- Rollback local adicional criado antes deste bloco:
+  - `docs/ROLLBACK/rollback-20260209-190632.patch`
+  - `docs/ROLLBACK/rollback-20260209-190632-staged.patch`
+  - `docs/ROLLBACK/rollback-20260209-190632-untracked.txt`
+- Backend (`/api/v1/viva`):
+  - adicionadas rotas de historico de campanhas:
+    - `POST /campanhas`
+    - `GET /campanhas`
+    - `GET /campanhas/{campanha_id}`
+  - criacao idempotente da tabela `viva_campanhas` em runtime (`CREATE TABLE IF NOT EXISTS`);
+  - geracoes de imagem FC/REZETA passam a salvar automaticamente campanha no historico;
+  - `midia.meta` retorna `campanha_id` para rastreabilidade no frontend.
+- Frontend:
+  - novo menu lateral `Campanhas` no dashboard;
+  - nova tela `/campanhas` com filtro (Todas/FC/Rezeta), cards com imagem, data e briefing;
+  - no chat `/viva`, cada imagem salva exibe atalho `Ver em campanhas`.
+- Fluxo de briefing:
+  - melhoria no detector de intencao de campanha (mesmo sem palavra "imagem");
+  - extracao de campos por texto livre para reduzir atrito no preenchimento do brief.
+  - ajuste anti-loop quando faltar apenas CTA: resposta curta e opcao `usar CTA padrao`.
+
+## Atualizacao tecnica (2026-02-09 - FCNOVO + preview imagem sem popup)
+- Rollback local adicional criado antes deste ajuste:
+  - `docs/ROLLBACK/rollback-20260209-202655.patch`
+  - `docs/ROLLBACK/rollback-20260209-202655-staged.patch`
+  - `docs/ROLLBACK/rollback-20260209-202655-untracked.txt`
+- Prompt FC unificado com `FCNOVO.md` em:
+  - `frontend/src/app/viva/PROMPTS/FC.md` (fonte canonica no app)
+  - `frontend/public/PROMPTS/FC.md` (fallback)
+  - `docs/PROMPTS/FC.md` (documentacao)
+- Roteamento operacional adicionado ao prompt FC (rotas SaaS e regras para nao simular publicacao externa).
+- Chat VIVA:
+  - anexo de imagem agora injeta resumo de visao no payload de `/api/v1/viva/chat` como referencia visual;
+  - autoscroll reforcado no viewport real do `ScrollArea`;
+  - no modal de arte, `Abrir imagem` abre preview interno (sem popup/aba em branco).
+- Briefing FC/Rezeta:
+  - campos minimos agora: `objetivo`, `publico`, `formato` (CTA vira fallback automatico `Saiba mais`);
+  - resposta de coleta ficou natural e nao repete loop quando mensagem sai do contexto de briefing.
+- Tela `/campanhas`:
+  - `Abrir imagem` passou para modal interno com download, removendo dependencia de popup.
+
+## Atualizacao tecnica (2026-02-09 - pendencia aberta no gerador)
+- Status homologado da rodada:
+  - fluxo de conversa da VIVA simplificado (sem burocracia de formato fixo);
+  - abertura de imagem no SaaS estabilizada sem popup externo;
+  - historico de campanhas ativo.
+- Pendencia mantida:
+  - BUG-015 (gerador de imagem) segue pendente por repeticao de composicao e aderencia parcial ao contexto.

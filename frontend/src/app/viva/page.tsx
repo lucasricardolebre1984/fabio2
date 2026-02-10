@@ -107,6 +107,12 @@ const extractOverlaySource = (text: string) => {
 }
 
 const parseOverlayText = (overlay?: Mensagem['overlay']) => {
+  const clamp = (value: string, max: number) => {
+    const text = (value || '').trim()
+    if (text.length <= max) return text
+    return `${text.slice(0, max - 1).trim()}…`
+  }
+
   if (!overlay) {
     return {
       headline: 'Mensagem principal',
@@ -149,10 +155,10 @@ const parseOverlayText = (overlay?: Mensagem['overlay']) => {
   const subheadline = remaining[0] || ''
 
   return {
-    headline,
-    subheadline,
-    bullets: bulletLines.slice(0, 6),
-    quote,
+    headline: clamp(headline, 90),
+    subheadline: clamp(subheadline, 120),
+    bullets: bulletLines.slice(0, 6).map(line => clamp(line, 90)),
+    quote: clamp(quote || '', 120),
     cta: ''
   }
 }
@@ -194,14 +200,20 @@ export default function VivaChatPage() {
   const [arteAtiva, setArteAtiva] = useState<{ url: string; nome?: string; overlay: NonNullable<Mensagem['overlay']> } | null>(null)
   const [erroExport, setErroExport] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const audioInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement | null
+    if (viewport) {
+      viewport.scrollTop = viewport.scrollHeight
+      return
+    }
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [mensagens])
+  }, [mensagens, loading])
 
   const handleSend = async () => {
     if ((!input.trim() && anexos.length === 0) || loading) return
@@ -234,6 +246,7 @@ export default function VivaChatPage() {
 
     try {
       let resposta = ''
+      const referenciasVisuais: string[] = []
 
       // Processa anexos primeiro
       for (const anexo of anexos) {
@@ -244,7 +257,11 @@ export default function VivaChatPage() {
           const response = await api.post('/viva/vision/upload', formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
           })
-          resposta += `📷 **Análise da imagem "${anexo.file.name}":**\n${response.data.analise}\n\n`
+          const analise = String(response.data?.analise || '').trim()
+          if (analise) {
+            resposta += `📷 **Análise da imagem "${anexo.file.name}":**\n${analise}\n\n`
+            referenciasVisuais.push(`Referencia "${anexo.file.name}": ${analise.slice(0, 1200)}`)
+          }
         } else if (anexo.tipo === 'audio') {
           const formData = new FormData()
           formData.append('file', anexo.file)
@@ -257,11 +274,16 @@ export default function VivaChatPage() {
 
       // Se tiver mensagem de texto, processa
       if (textoEntrada) {
+        const mensagemComReferencia =
+          referenciasVisuais.length > 0
+            ? `${textoEntrada}\n\nReferencia visual enviada pelo usuario (usar como base):\n${referenciasVisuais.join('\n\n')}`
+            : textoEntrada
         const contexto = mensagens.slice(-10)
         const response = await api.post('/viva/chat', {
-          mensagem: textoEntrada,
+          mensagem: mensagemComReferencia,
           contexto,
-          prompt_extra: promptConteudo || undefined
+          prompt_extra: promptConteudo || undefined,
+          modo: modoAtual || undefined
         })
         resposta += response.data.resposta
 
@@ -349,11 +371,23 @@ export default function VivaChatPage() {
     
     // Carrega o prompt
     try {
-      const response = await fetch(`/PROMPTS/${promptId}.md`)
+      const response = await fetch(`/api/viva/prompts/${encodeURIComponent(promptId)}`, {
+        cache: 'no-store'
+      })
+      if (!response.ok) {
+        throw new Error(`prompt_${response.status}`)
+      }
       const texto = await response.text()
       setPromptConteudo(texto)
       
-      const novoContexto = `Modo **${PROMPTS.find(p => p.id === promptId)?.titulo}** ativado!\n\nComo posso ajudar?`
+      const nomeModo = PROMPTS.find(p => p.id === promptId)?.titulo
+      let novoContexto = `Modo **${nomeModo}** ativado com sucesso.\n\nComo posso ajudar?`
+      if (promptId === 'FC' || promptId === 'REZETA') {
+        novoContexto = (
+          `Modo **${nomeModo}** ativado.\n\n` +
+          'Converse normal e me diga o que quer criar que eu gero a imagem.'
+        )
+      }
       
       const iaMsg: Mensagem = {
         id: Date.now().toString(),
@@ -369,7 +403,7 @@ export default function VivaChatPage() {
       const iaMsg: Mensagem = {
         id: Date.now().toString(),
         tipo: 'ia',
-        conteudo: `Modo **${PROMPTS.find(p => p.id === promptId)?.titulo}** ativado!`,
+        conteudo: `Modo **${PROMPTS.find(p => p.id === promptId)?.titulo}** ativado.`,
         timestamp: new Date()
       }
       setMensagens(prev => [...prev, iaMsg])
@@ -625,7 +659,7 @@ export default function VivaChatPage() {
         </div>
 
         {/* Área de mensagens */}
-        <ScrollArea className="flex-1 px-4" ref={scrollRef}>
+        <ScrollArea className="flex-1 px-4" ref={scrollAreaRef}>
           <div className="max-w-3xl mx-auto py-6 space-y-6">
             {mensagens.map((msg) => (
               <div
@@ -678,6 +712,16 @@ export default function VivaChatPage() {
                                     className="text-xs text-blue-600 hover:text-blue-800"
                                   >
                                     Ver arte final
+                                  </button>
+                                )}
+                                {anexo.meta?.campanha_id && (
+                                  <button
+                                    onClick={() => {
+                                      window.location.href = `/campanhas?id=${anexo.meta.campanha_id}`
+                                    }}
+                                    className="ml-3 text-xs text-emerald-600 hover:text-emerald-800"
+                                  >
+                                    Ver em campanhas
                                   </button>
                                 )}
                               </div>
@@ -863,82 +907,84 @@ export default function VivaChatPage() {
 
       {arteAtiva && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/70 p-4 sm:p-6"
           onClick={() => setArteAtiva(null)}
         >
-          <div
-            className="relative w-full max-w-5xl rounded-lg bg-white p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Arte final</h2>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => window.open(arteAtiva.url, '_blank')}>
-                  Abrir imagem
-                </Button>
-                <Button size="sm" onClick={exportarArte}>
-                  Baixar PNG
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setArteAtiva(null)}>
-                  Fechar
-                </Button>
-              </div>
-            </div>
-
-            {erroExport && (
-              <p className="mb-3 text-sm text-red-600">{erroExport}</p>
-            )}
-
-            {(() => {
-              const theme = BRAND_THEMES[arteAtiva.overlay.brand]
-              const parsed = parseOverlayText(arteAtiva.overlay)
-
-              return (
-                <div className="relative w-full aspect-square overflow-hidden rounded-lg border bg-gray-100">
-                  <img
-                    src={arteAtiva.url}
-                    alt={arteAtiva.nome || 'Arte gerada'}
-                    className="absolute inset-0 h-full w-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                  <div className="absolute inset-x-0 top-0 h-[26%] bg-white/85 px-6 py-4">
-                    <p className="text-xs uppercase tracking-widest" style={{ color: theme.accent }}>
-                      {theme.label}
-                    </p>
-                    <h3 className="mt-2 text-lg sm:text-2xl font-bold" style={{ color: theme.primary }}>
-                      {parsed.headline}
-                    </h3>
-                    {parsed.subheadline && (
-                      <p className="mt-1 text-sm sm:text-base" style={{ color: theme.primary }}>
-                        {parsed.subheadline}
-                      </p>
-                    )}
-                  </div>
-                  <div
-                    className="absolute inset-x-0 bottom-0 h-[30%] px-6 py-4 text-white"
-                    style={{
-                      background: `linear-gradient(90deg, ${theme.dark}e6, ${theme.accent}e6)`
-                    }}
-                  >
-                    <ul className="space-y-1 text-xs sm:text-sm">
-                      {parsed.bullets.map((bullet, idx) => (
-                        <li key={idx}>{bullet}</li>
-                      ))}
-                    </ul>
-                    {parsed.quote && (
-                      <p className="mt-3 text-xs sm:text-sm italic">{parsed.quote}</p>
-                    )}
-                    {parsed.cta && (
-                      <p className="mt-3 inline-block rounded-full bg-white/20 px-3 py-1 text-xs sm:text-sm font-semibold tracking-wide">
-                        {parsed.cta}
-                      </p>
-                    )}
-                  </div>
+          <div className="min-h-full flex items-start justify-center">
+            <div
+              className="relative my-4 w-full max-w-4xl rounded-lg bg-white p-4 sm:p-6 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-4 flex items-center justify-between gap-2">
+                <h2 className="text-lg font-semibold">Arte final</h2>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => { setImagemAtiva({ url: arteAtiva.url, nome: arteAtiva.nome }); setArteAtiva(null) }}>
+                    Abrir imagem
+                  </Button>
+                  <Button size="sm" onClick={exportarArte}>
+                    Baixar PNG
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setArteAtiva(null)}>
+                    Fechar
+                  </Button>
                 </div>
-              )
-            })()}
+              </div>
+
+              {erroExport && (
+                <p className="mb-3 text-sm text-red-600">{erroExport}</p>
+              )}
+
+              {(() => {
+                const theme = BRAND_THEMES[arteAtiva.overlay.brand]
+                const parsed = parseOverlayText(arteAtiva.overlay)
+
+                return (
+                  <div className="relative mx-auto w-full max-w-[680px] aspect-square overflow-hidden rounded-lg border bg-gray-100">
+                    <img
+                      src={arteAtiva.url}
+                      alt={arteAtiva.nome || 'Arte gerada'}
+                      className="absolute inset-0 h-full w-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                    <div className="absolute inset-x-0 top-0 h-[26%] bg-white/85 px-6 py-4">
+                      <p className="text-xs uppercase tracking-widest" style={{ color: theme.accent }}>
+                        {theme.label}
+                      </p>
+                      <h3 className="mt-2 text-lg sm:text-2xl font-bold" style={{ color: theme.primary }}>
+                        {parsed.headline}
+                      </h3>
+                      {parsed.subheadline && (
+                        <p className="mt-1 text-sm sm:text-base" style={{ color: theme.primary }}>
+                          {parsed.subheadline}
+                        </p>
+                      )}
+                    </div>
+                    <div
+                      className="absolute inset-x-0 bottom-0 h-[30%] px-6 py-4 text-white"
+                      style={{
+                        background: `linear-gradient(90deg, ${theme.dark}e6, ${theme.accent}e6)`
+                      }}
+                    >
+                      <ul className="space-y-1 text-xs sm:text-sm">
+                        {parsed.bullets.map((bullet, idx) => (
+                          <li key={idx}>{bullet}</li>
+                        ))}
+                      </ul>
+                      {parsed.quote && (
+                        <p className="mt-3 text-xs sm:text-sm italic">{parsed.quote}</p>
+                      )}
+                      {parsed.cta && (
+                        <p className="mt-3 inline-block rounded-full bg-white/20 px-3 py-1 text-xs sm:text-sm font-semibold tracking-wide">
+                          {parsed.cta}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
           </div>
         </div>
       )}

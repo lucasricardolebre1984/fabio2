@@ -101,3 +101,42 @@ Atualizado em: 09/02/2026
 - `/clientes` com historico de contratos por cliente no proprio card.
 - Contagem exibida em `/clientes` calculada por agregacao real de contratos no backend.
 - Rollback desta rodada registrado em `docs/ROLLBACK/rollback-20260209-164001.patch`.
+
+## Estado VIVA (2026-02-09 - prompts FC/REZETA e arte final)
+- Rollback local adicional registrado em:
+  - `docs/ROLLBACK/rollback-20260209-181844.patch`
+- Frontend `/viva` envia `modo` explicitamente para `/api/v1/viva/chat`.
+- Backend `/api/v1/viva/chat` prioriza `modo` do payload para aplicar fluxo correto de campanha.
+- FC/REZETA agora conduzem brief minimo antes da geracao de imagem:
+  - campos obrigatorios: `objetivo`, `publico`, `formato`, `cta`.
+- Fonte canonica dos prompts da VIVA no frontend:
+  - `frontend/src/app/viva/PROMPTS` (via rota interna `/api/viva/prompts/[promptId]`).
+- Modal de "Arte final" ajustado para uso em zoom 100% (scroll e limite de largura) sem ocultar botoes de acao.
+
+## Estado VIVA (2026-02-09 - campanhas e historico)
+- Novo menu `Campanhas` ativo no dashboard (`/campanhas`).
+- Historico persistente de campanhas IA em banco (`viva_campanhas`) com data, modo, imagem e briefing.
+- Geracoes FC/REZETA no `/viva` salvam automaticamente no historico e retornam `campanha_id`.
+- Chat bloqueia resposta operacional ficticia de upload/publicacao/link quando nao houve operacao real.
+- Briefing de campanha com contexto acumulado e destrave de CTA:
+  - aceita entrada em texto livre;
+  - quando faltar apenas CTA, nao repete o template completo em loop.
+- Rota de leitura para historico pronta:
+  - `GET /api/v1/viva/campanhas`
+
+## Estado VIVA (2026-02-09 - FCNOVO e fluxo de imagem)
+- Prompt FC atualizado com base em `FCNOVO.md` e rotas operacionais do SaaS.
+- Briefing de campanha menos engessado:
+  - obrigatoriedade reduzida para `objetivo + publico + formato`;
+  - CTA com fallback padrao (`Saiba mais`);
+  - sem loop de repeticao ao receber mensagens fora do briefing.
+- Referencia visual por anexo ativa:
+  - resultado de `/api/v1/viva/vision/upload` agora segue junto para `/api/v1/viva/chat`.
+- Preview de imagem estabilizado:
+  - `/viva` modal "Abrir imagem" abre internamente;
+  - `/campanhas` usa modal interno para visualizacao/download (sem popup externo).
+
+## Estado VIVA (2026-02-09 - pendencia gerador de imagem)
+- BUG-015 mantido como pendente.
+- Sintoma atual: gerador ainda repete composicao visual em alguns pedidos (baixa variacao de cena).
+- Proxima rodada: refino de prompt de cena e controle de diversidade de composicao.

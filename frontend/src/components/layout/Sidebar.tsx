@@ -2,11 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { FileText, Users, Calendar, MessageCircle, LogOut, Bot } from 'lucide-react'
+import { FileText, Users, Calendar, MessageCircle, LogOut, Bot, Megaphone } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const menuItems = [
   { href: '/viva', label: 'Chat IA VIVA', icon: Bot },
+  { href: '/campanhas', label: 'Campanhas', icon: Megaphone },
   { href: '/contratos', label: 'Contratos', icon: FileText },
   { href: '/clientes', label: 'Clientes', icon: Users },
   { href: '/agenda', label: 'Agenda', icon: Calendar },
