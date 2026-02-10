@@ -351,3 +351,16 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
   - apos `chat/session/new`, memoria longa continua recuperavel por busca.
 - plano das proximas ordens documentado em:
   - `docs/ARCHITECTURE/VIVA_NEXT_EXECUTION_PLAN.md`
+
+## Atualizacao Operacional (2026-02-10 - audio institucional no chat VIVA)
+- ajuste final no frontend VIVA para fluxo de audio institucional:
+  - ao parar a gravacao (`MediaRecorder.onstop`), o audio agora segue direto para transcricao + envio ao chat;
+  - removida a dependencia de `Enter` para concluir fluxo normal de audio;
+  - no fluxo normal, deixa de aparecer bolha de "Anexos enviados" de audio aguardando envio manual.
+- arquivo alterado:
+  - `frontend/src/app/viva/page.tsx`
+- validacao tecnica:
+  - `npm run lint -- --file src/app/viva/page.tsx` (ok; warnings conhecidos de `<img>` nao bloqueantes);
+  - `npm run type-check` (ok).
+- rastreabilidade:
+  - `BUG-071` registrado e resolvido em `docs/BUGSREPORT.md`.

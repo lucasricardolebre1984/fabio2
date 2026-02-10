@@ -476,3 +476,20 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
   - limpeza de chat (`session/new`) mantendo recuperacao de memoria longa.
 - proximo plano executivo registrado em:
   - `docs/ARCHITECTURE/VIVA_NEXT_EXECUTION_PLAN.md`
+
+## Atualizacao da sessao (2026-02-10 - fechamento bug audio institucional)
+- contexto validado pelo cliente:
+  - tamanho do campo de texto aprovado;
+  - rolagem automatica do chat aprovada;
+  - pendencia restante focada no fluxo de audio.
+- problema final observado:
+  - apos gravar, audio ainda aparecia como anexo pendente e dependia de `Enter` para seguir.
+- correcao aplicada:
+  - `frontend/src/app/viva/page.tsx`:
+    - `MediaRecorder.onstop` agora dispara envio automatico para `handleSend` com `anexosOverride` de audio;
+    - fluxo normal passa a ser direto: gravar -> parar -> transcrever -> VIVA responde;
+    - bolha de anexo de audio deixa de ser etapa obrigatoria no caminho principal.
+- evidencia de governanca:
+  - BUG documentado/fechado como `BUG-071` em `docs/BUGSREPORT.md`.
+- estado ao fim da rodada:
+  - pendencia de audio institucional encerrada para demonstracao local.

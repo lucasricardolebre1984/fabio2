@@ -50,6 +50,12 @@ interface ChatSnapshot {
   messages: SnapshotMessage[]
 }
 
+type ComposerAnexo = { file: File; tipo: 'imagem' | 'audio' | 'arquivo'; preview?: string }
+type SendOptions = {
+  textoOverride?: string
+  anexosOverride?: ComposerAnexo[]
+}
+
 const PROMPTS: PromptItem[] = [
   {
     id: 'CRIADORLANDPAGE',
@@ -278,7 +284,7 @@ export default function VivaChatPage() {
   const [erroAudio, setErroAudio] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [anexos, setAnexos] = useState<{ file: File; tipo: 'imagem' | 'audio' | 'arquivo'; preview?: string }[]>([])
+  const [anexos, setAnexos] = useState<ComposerAnexo[]>([])
   const [promptAtivo, setPromptAtivo] = useState<string | null>(null)
   const [menuAberto, setMenuAberto] = useState(true)
   const [imagemAtiva, setImagemAtiva] = useState<{ url: string; nome?: string } | null>(null)
@@ -369,42 +375,22 @@ export default function VivaChatPage() {
     }
   }, [])
 
-  const handleSend = async () => {
-    if ((!input.trim() && anexos.length === 0) || loading) return
+  const handleSend = async (options?: SendOptions) => {
+    const anexosAtuais = options?.anexosOverride ?? anexos
+    const textoEntrada = (options?.textoOverride ?? input).trim()
+    if ((!textoEntrada && anexosAtuais.length === 0) || loading) return
 
-    const textoEntrada = input.trim()
     const modoAtual = promptAtivo
-    const deveGerarOverlay = Boolean(
-      textoEntrada &&
-      (modoAtual === 'REZETA' || modoAtual === 'FC') &&
-      isImageRequest(textoEntrada)
-    )
-    const overlayText = deveGerarOverlay ? extractOverlaySource(textoEntrada) : null
+    const referenciasVisuais: string[] = []
+    const transcricoesAudio: string[] = []
+    const anexosUsuarioPreview: Mensagem['anexos'] = []
 
-    const userMsg: Mensagem = {
-      id: Date.now().toString(),
-      tipo: 'usuario',
-      conteudo: textoEntrada || (anexos.length > 0 ? 'Anexos enviados:' : ''),
-      timestamp: new Date(),
-      anexos: anexos.map(a => ({ 
-        tipo: a.tipo, 
-        url: a.preview || '', 
-        nome: a.file.name 
-      })),
-      modo: modoAtual || undefined
-    }
-
-    setMensagens(prev => [...prev, userMsg])
-    setInput('')
     setLoading(true)
+    if (!options?.textoOverride) setInput('')
+    if (!options?.anexosOverride) setAnexos([])
 
     try {
-      let resposta = ''
-      const referenciasVisuais: string[] = []
-      const transcricoesAudio: { nome: string; texto: string }[] = []
-
-      // Processa anexos primeiro
-      for (const anexo of anexos) {
+      for (const anexo of anexosAtuais) {
         if (anexo.tipo === 'imagem') {
           const formData = new FormData()
           formData.append('file', anexo.file)
@@ -414,9 +400,13 @@ export default function VivaChatPage() {
           })
           const analise = String(response.data?.analise || '').trim()
           if (analise) {
-            resposta += `Analise da imagem "${anexo.file.name}":\n${analise}\n\n`
             referenciasVisuais.push(`Referencia "${anexo.file.name}": ${analise.slice(0, 1200)}`)
           }
+          anexosUsuarioPreview.push({
+            tipo: 'imagem',
+            url: anexo.preview || '',
+            nome: anexo.file.name
+          })
         } else if (anexo.tipo === 'audio') {
           const formData = new FormData()
           formData.append('file', anexo.file)
@@ -425,106 +415,116 @@ export default function VivaChatPage() {
           })
           const transcricao = String(response.data?.transcricao || '').trim()
           if (transcricao) {
-            transcricoesAudio.push({ nome: anexo.file.name, texto: transcricao })
-            resposta += `Transcricao do audio "${anexo.file.name}":\n${transcricao}\n\n`
+            transcricoesAudio.push(transcricao)
           }
+        } else {
+          anexosUsuarioPreview.push({
+            tipo: 'arquivo',
+            url: anexo.preview || '',
+            nome: anexo.file.name
+          })
         }
       }
 
-      const textoAudio = transcricoesAudio.map((item) => item.texto).join('\n')
+      const textoAudio = transcricoesAudio.join('\n').trim()
       const mensagemBase = textoEntrada || textoAudio
-      if (!mensagemBase && anexos.some((item) => item.tipo === 'audio')) {
-        resposta += 'Nao consegui transcrever o audio com qualidade. Tente gravar novamente em ambiente mais silencioso.\n\n'
+      const mensagemComReferencia =
+        referenciasVisuais.length > 0
+          ? `${mensagemBase}\n\nReferencia visual enviada pelo usuario (usar como base):\n${referenciasVisuais.join('\n\n')}`
+          : mensagemBase
+
+      if (!mensagemBase) {
+        const iaMsg: Mensagem = {
+          id: (Date.now() + 1).toString(),
+          tipo: 'ia',
+          conteudo: 'Nao consegui transcrever o audio com qualidade. Tente gravar novamente em ambiente mais silencioso.',
+          timestamp: new Date()
+        }
+        setMensagens(prev => [...prev, iaMsg])
+        return
       }
 
-      // Processa chat quando houver texto digitado ou texto vindo da transcricao do audio
-      if (mensagemBase) {
-        const mensagemPrincipal = textoEntrada
-          ? mensagemBase
-          : `Mensagem de audio transcrita do usuario:\n${mensagemBase}`
-        const mensagemComReferencia =
-          referenciasVisuais.length > 0
-            ? `${mensagemPrincipal}\n\nReferencia visual enviada pelo usuario (usar como base):\n${referenciasVisuais.join('\n\n')}`
-            : mensagemPrincipal
+      const deveGerarOverlay = Boolean(
+        mensagemBase &&
+        (modoAtual === 'REZETA' || modoAtual === 'FC') &&
+        isImageRequest(mensagemBase)
+      )
+      const overlayText = deveGerarOverlay ? extractOverlaySource(mensagemBase) : null
 
-        const contexto = mensagens.slice(-10)
-        const response = await api.post('/viva/chat', {
-          mensagem: mensagemComReferencia,
-          contexto,
-          modo: modoAtual || undefined,
-          session_id: sessionId || undefined
-        })
-        if (response.data?.session_id) {
-          setSessionId(response.data.session_id)
-        }
-        resposta += response.data.resposta
+      const userMsg: Mensagem = {
+        id: Date.now().toString(),
+        tipo: 'usuario',
+        conteudo: mensagemBase,
+        timestamp: new Date(),
+        anexos: anexosUsuarioPreview.length > 0 ? anexosUsuarioPreview : undefined,
+        modo: modoAtual || undefined
+      }
+      setMensagens(prev => [...prev, userMsg])
 
-        const midia = Array.isArray(response.data.midia) ? response.data.midia : []
-        if (midia.length > 0) {
-          const anexosIA = midia
-            .filter((item: any) => item && item.url)
-            .map((item: any) => ({
-              tipo: item.tipo === 'imagem' ? 'imagem' : 'arquivo',
-              url: item.url,
-              nome: item.nome,
-              meta: item.meta
-            }))
+      const contexto = mensagens.slice(-10)
+      const response = await api.post('/viva/chat', {
+        mensagem: mensagemComReferencia,
+        contexto,
+        modo: modoAtual || undefined,
+        session_id: sessionId || undefined
+      })
+      if (response.data?.session_id) {
+        setSessionId(response.data.session_id)
+      }
 
-          // Log para debug
-          console.log('Midia response:', midia)
-          const primeiroItem = midia[0]
-          console.log('Primeiro item:', primeiroItem)
-          console.log('Primeiro item meta:', primeiroItem?.meta)
-          
-          const overlayMeta = primeiroItem?.meta?.overlay
-          console.log('Overlay meta:', overlayMeta)
-          
-          const overlayFromBackend = overlayMeta && (overlayMeta.brand === 'FC' || overlayMeta.brand === 'REZETA')
-            ? {
-                brand: overlayMeta.brand as 'FC' | 'REZETA',
-                copy: {
-                  headline: overlayMeta.headline,
-                  subheadline: overlayMeta.subheadline,
-                  bullets: Array.isArray(overlayMeta.bullets) ? overlayMeta.bullets : [],
-                  quote: overlayMeta.quote,
-                  cta: overlayMeta.cta
-                }
+      const resposta = String(response.data?.resposta || '').trim() || 'Processado com sucesso!'
+      const midia = Array.isArray(response.data.midia) ? response.data.midia : []
+      if (midia.length > 0) {
+        const anexosIA = midia
+          .filter((item: any) => item && item.url)
+          .map((item: any) => ({
+            tipo: item.tipo === 'imagem' ? 'imagem' : 'arquivo',
+            url: item.url,
+            nome: item.nome,
+            meta: item.meta
+          }))
+
+        const overlayMeta = midia[0]?.meta?.overlay
+        const overlayFromBackend = overlayMeta && (overlayMeta.brand === 'FC' || overlayMeta.brand === 'REZETA')
+          ? {
+              brand: overlayMeta.brand as 'FC' | 'REZETA',
+              copy: {
+                headline: overlayMeta.headline,
+                subheadline: overlayMeta.subheadline,
+                bullets: Array.isArray(overlayMeta.bullets) ? overlayMeta.bullets : [],
+                quote: overlayMeta.quote,
+                cta: overlayMeta.cta
               }
-            : undefined
-          
-          console.log('Overlay from backend:', overlayFromBackend)
-
-          const overlayFallback = overlayText && (modoAtual === 'REZETA' || modoAtual === 'FC')
-            ? { brand: modoAtual as 'REZETA' | 'FC', text: overlayText }
-            : undefined
-
-          if (anexosIA.length > 0) {
-            const iaMsg: Mensagem = {
-              id: (Date.now() + 1).toString(),
-              tipo: 'ia',
-              conteudo: resposta || 'Processado com sucesso!',
-              timestamp: new Date(),
-              anexos: anexosIA,
-              overlay: overlayFromBackend || overlayFallback
             }
-            setMensagens(prev => [...prev, iaMsg])
-            return
-          }
+          : undefined
+
+        const overlayFallback = overlayText && (modoAtual === 'REZETA' || modoAtual === 'FC')
+          ? { brand: modoAtual as 'REZETA' | 'FC', text: overlayText }
+          : undefined
+
+        const iaMsg: Mensagem = {
+          id: (Date.now() + 1).toString(),
+          tipo: 'ia',
+          conteudo: resposta,
+          timestamp: new Date(),
+          anexos: anexosIA.length > 0 ? anexosIA : undefined,
+          overlay: overlayFromBackend || overlayFallback
         }
+        setMensagens(prev => [...prev, iaMsg])
+        return
       }
 
       const iaMsg: Mensagem = {
         id: (Date.now() + 1).toString(),
         tipo: 'ia',
-        conteudo: resposta || 'Processado com sucesso!',
+        conteudo: resposta,
         timestamp: new Date(),
         overlay: overlayText && (modoAtual === 'REZETA' || modoAtual === 'FC')
           ? { brand: modoAtual as 'REZETA' | 'FC', text: overlayText }
           : undefined
       }
-
       setMensagens(prev => [...prev, iaMsg])
-    } catch (error) {
+    } catch {
       const errorMsg: Mensagem = {
         id: (Date.now() + 1).toString(),
         tipo: 'ia',
@@ -534,7 +534,6 @@ export default function VivaChatPage() {
       setMensagens(prev => [...prev, errorMsg])
     } finally {
       setLoading(false)
-      setAnexos([])
     }
   }
 
@@ -593,7 +592,16 @@ export default function VivaChatPage() {
         const ext = mimeType.includes('mp4') ? 'm4a' : 'webm'
         const stamp = new Date().toISOString().replace(/[:.]/g, '-')
         const audioFile = new File([audioBlob], `gravacao-${stamp}.${ext}`, { type: mimeType })
-        setAnexos(prev => [...prev, { file: audioFile, tipo: 'audio' }])
+
+        // Fluxo institucional: grava, transcreve e envia direto para a VIVA.
+        if (loading) {
+          setAnexos(prev => [...prev, { file: audioFile, tipo: 'audio' }])
+          return
+        }
+        void handleSend({
+          anexosOverride: [{ file: audioFile, tipo: 'audio' }],
+          textoOverride: ''
+        })
       }
 
       recorder.start()
@@ -1085,7 +1093,7 @@ export default function VivaChatPage() {
                 style={{ minHeight: `${INPUT_MIN_HEIGHT}px`, maxHeight: `${INPUT_MAX_HEIGHT}px` }}
               />
               <Button
-                onClick={handleSend}
+                onClick={() => { void handleSend() }}
                 disabled={(!input.trim() && anexos.length === 0) || loading}
                 className="px-4 h-12"
               >

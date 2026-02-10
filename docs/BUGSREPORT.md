@@ -66,6 +66,7 @@
 | BUG-068 | Media | VIVA/UI Chat | Chat nao auto-rola para o final em toda interacao, obrigando rolagem manual durante conversa longa | Resolvido |
 | BUG-069 | Media | VIVA/UI Chat | Campo de digitacao muito baixo para edicao de mensagens maiores, com baixa visibilidade | Resolvido |
 | BUG-070 | Alta | VIVA/Audio UX | Audio era transcrito no front, mas sem texto digitado a transcricao nao era enviada para `/viva/chat`, entao VIVA nao respondia ao conteudo falado | Resolvido |
+| BUG-071 | Media | VIVA/Audio UX | Gravacao de audio ainda ficava anexada aguardando Enter, em vez de fluxo direto institucional (parar > transcrever > enviar) | Resolvido |
 
 ---
 
@@ -166,6 +167,7 @@
 | BUG-068 | VIVA/UI Chat | Auto-scroll reforcado para manter foco no fim da conversa, inclusive com carregamento de imagem | 2026-02-10 |
 | BUG-069 | VIVA/UI Chat | Campo de digitacao ampliado com autoaltura para melhor visibilidade em mensagens longas | 2026-02-10 |
 | BUG-070 | VIVA/Audio UX | Transcricao de audio agora entra no fluxo do `/viva/chat` mesmo sem texto digitado, com fallback claro em caso de baixa qualidade | 2026-02-10 |
+| BUG-071 | VIVA/Audio UX | Gravacao do microfone passou a disparar envio automatico ao finalizar (sem depender de Enter e sem bolha de anexo de audio no fluxo normal) | 2026-02-10 |
 
 ---
 
@@ -773,12 +775,22 @@
 **Atual:** fluxo ajustado para enviar a transcricao ao `/viva/chat` mesmo sem texto digitado, com fallback de aviso quando a transcricao vier vazia/ruim.
 **Status:** Resolvido
 
+### BUG-071: Gravacao ainda aguardava Enter e anexava audio no chat
+**Data:** 2026-02-10
+**Severidade:** Media
+**Descricao:** mesmo com transcricao ativa, o fluxo de gravacao ainda podia ficar parado em "Anexos enviados", exigindo Enter manual e exibindo bolha de arquivo de audio.
+**Passos:** 1. clicar mic para gravar 2. clicar mic para parar 3. observar anexo de audio pendente aguardando envio manual.
+**Esperado:** ao parar gravacao, transcrever e enviar direto para a VIVA sem passo manual.
+**Atual:** `onstop` do `MediaRecorder` envia automaticamente para `handleSend` com `anexosOverride` de audio; sem dependencia de Enter no fluxo normal.
+**Status:** Resolvido
+
 ### Atualizacao 2026-02-10 (audio + UX chat VIVA)
 - frontend:
   - `frontend/src/app/viva/page.tsx`:
     - botao de microfone passou a gravar/parar audio com `MediaRecorder` (fallback para upload manual quando necessario);
     - anexos de audio agora podem ser adicionados mesmo em repeticao do mesmo arquivo (reset do input file);
     - transcricao de audio agora entra no `POST /viva/chat` automaticamente quando nao houver texto digitado;
+    - parada de gravacao no microfone passou a disparar envio automatico (stop > transcreve > envia), sem anexo pendente no fluxo normal;
     - mensagem de fallback clara quando a transcricao do audio vier vazia/baixa qualidade;
     - auto-scroll reforcado com sentinela no fim das mensagens e chamada apos novas mensagens/loading/imagens;
     - campo de digitacao ampliado e com autoajuste de altura para conversa longa.
@@ -790,3 +802,4 @@
   - `BUG-068` => **Resolvido**.
   - `BUG-069` => **Resolvido**.
   - `BUG-070` => **Resolvido**.
+  - `BUG-071` => **Resolvido**.
