@@ -92,7 +92,10 @@ npm run dev
 
 Após criar usuário:
 - **Email:** fabio@fcsolucoes.com
-- **Senha:** senha123
+- **Senha (dev local):** 1234
+
+Observação:
+- Em ambiente local, o `security_stub.py` aceita senha `1234` para testes.
 
 ---
 

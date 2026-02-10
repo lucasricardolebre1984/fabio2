@@ -1,0 +1,68 @@
+﻿ M README.md
+ M backend/app/api/v1/agenda.py
+ M backend/app/api/v1/viva.py
+ M backend/app/config.py
+ M backend/app/services/agenda_service.py
+ D backend/app/services/brainimage_service_v1_backup.py
+ D backend/app/services/openrouter_service.py
+ M backend/test_glm.py
+ M docs/API.md
+ M docs/ARCHITECTURE/OVERVIEW.md
+ M docs/BUGSREPORT.md
+ M docs/DECISIONS.md
+ M docs/DEPLOY_UBUNTU_DOCKER.md
+ D docs/PROMPTS/BRAINIMAGE.md
+ D docs/PROMPTS/CRIADORLANDPAGE.md
+ D docs/PROMPTS/CRIADORWEB.md
+ D docs/PROMPTS/DEVCONTRATOS.md
+ D docs/PROMPTS/FC.md
+ D docs/PROMPTS/LOGO.md
+ D docs/PROMPTS/REZETA.md
+ M docs/SESSION.md
+ M docs/STATUS.md
+ M frontend/package-lock.json
+ M frontend/package.json
+ D frontend/public/PROMPTS/BRAINIMAGE.md
+ D frontend/public/PROMPTS/CRIADORLANDPAGE.md
+ D frontend/public/PROMPTS/CRIADORWEB.md
+ D frontend/public/PROMPTS/DEVCONTRATOS.md
+ D frontend/public/PROMPTS/FC.md
+ D frontend/public/PROMPTS/GODMOD.md
+ D frontend/public/PROMPTS/LOGO.md
+ D frontend/public/PROMPTS/PROJETISTA.md
+ D frontend/public/PROMPTS/REZETA.md
+ M frontend/src/app/(dashboard)/campanhas/page.tsx
+ M frontend/src/app/(dashboard)/contratos/novo/page.tsx
+ D frontend/src/app/api/viva/prompts/[promptId]/route.ts
+ M frontend/src/app/page.tsx
+ D frontend/src/app/viva/PROMPTS/CRIADORLANDPAGE.md
+ D frontend/src/app/viva/PROMPTS/CRIADORPROMPT.md
+ D frontend/src/app/viva/PROMPTS/FC.md
+ D frontend/src/app/viva/PROMPTS/LOGO.md
+ D frontend/src/app/viva/PROMPTS/REZETA.md
+ M frontend/src/app/viva/page.tsx
+ M frontend/src/app/whatsapp/conversas/page.tsx
+ M test_db.py
+ M test_db2.py
+?? backend/app/services/viva_concierge_service.py
+?? docs/ARCHITECTURE/VIVA_REDESIGN.md
+?? docs/ROLLBACK/rollback-20260209-213516-baseline.txt
+?? docs/ROLLBACK/rollback-20260210-104803-pre-fix-baseline.txt
+?? docs/ROLLBACK/rollback-20260210-104803-pre-fix-staged.patch
+?? docs/ROLLBACK/rollback-20260210-104803-pre-fix-untracked.txt
+?? docs/ROLLBACK/rollback-20260210-104803-pre-fix.patch
+?? docs/ROLLBACK/rollback-20260210-112843-pre-clean-baseline.txt
+?? docs/ROLLBACK/rollback-20260210-112843-pre-clean-staged.patch
+?? docs/ROLLBACK/rollback-20260210-112843-pre-clean-untracked.txt
+?? docs/ROLLBACK/rollback-20260210-112843-pre-clean.patch
+?? docs/ROLLBACK/rollback-20260210-140052-login-auth-baseline.txt
+?? docs/ROLLBACK/rollback-20260210-140052-login-auth-staged.patch
+?? docs/ROLLBACK/rollback-20260210-140052-login-auth-untracked.txt
+?? docs/ROLLBACK/rollback-20260210-140052-login-auth.meta.txt
+?? docs/ROLLBACK/rollback-20260210-140052-login-auth.patch
+?? docs/ROLLBACK/rollback-20260210-150711-viva-campaign-baseline.txt
+?? docs/ROLLBACK/rollback-20260210-150711-viva-campaign-untracked.txt
+?? docs/ROLLBACK/rollback-20260210-150711-viva-campaign.meta.txt
+?? docs/ROLLBACK/rollback-20260210-150711-viva-campaign.patch
+?? docs/ROLLBACK/rollback-20260210-155336-security-checkpoint-baseline.txt
+?? frontend/.eslintrc.json

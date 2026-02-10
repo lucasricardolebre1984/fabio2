@@ -31,8 +31,19 @@ export default function LoginPage() {
       localStorage.setItem('refresh_token', refresh_token)
 
       router.push('/contratos')
-    } catch (err) {
-      setError('Email ou senha incorretos')
+    } catch (err: any) {
+      const status = err?.response?.status
+      const detail = err?.response?.data?.detail
+
+      if (status === 401) {
+        setError('Email ou senha incorretos')
+      } else if (status === 403) {
+        setError(detail || 'Usuario inativo')
+      } else if (status) {
+        setError(detail || `Falha no login (HTTP ${status})`)
+      } else {
+        setError('Falha de conexao com o backend. Verifique a API em http://localhost:8000')
+      }
     } finally {
       setLoading(false)
     }

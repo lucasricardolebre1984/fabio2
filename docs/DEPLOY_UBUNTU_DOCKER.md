@@ -54,7 +54,6 @@ Obrigatórias
 - `ZAI_API_KEY`
 
 Recomendadas
-- `OPENROUTER_API_KEY` (fallback)
 - `CORS_ORIGINS` (domínio e variações)
 
 Exemplo mínimo
@@ -106,7 +105,6 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 ```
 docker ps
 curl http://localhost/health
-curl http://localhost/api/v1/health
 ```
 
 ---
@@ -114,7 +112,7 @@ curl http://localhost/api/v1/health
 ## Checklist de Validação
 
 - Frontend acessa `https://fabio.automaniaai.com.br`
-- Backend responde em `/health` e `/api/v1/health`
+- Backend responde em `/health`
 - DB e Redis em execução
 - Evolution API ativa em `/evolution/`
 - VIVA operando e sem erros nos logs
@@ -147,3 +145,11 @@ Checklist
 ---
 
 *Documento criado em: 2026-02-05*
+
+---
+
+## Status de Validade (2026-02-10)
+
+- Este documento permanece como referencia de deploy futuro.
+- Nesta sessao, **nao** deve ser usado como evidencia de ambiente ativo.
+- Fonte de verdade operacional atual: ambiente local `c:\projetos\fabio2`.

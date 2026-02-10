@@ -2,12 +2,12 @@
 Chat direto com a VIVA - Assistente Virtual Interna
 Usa OpenAI para Chat, Visao, Audio e Imagem
 """
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timezone
+from typing import List, Dict, Any, Optional, Tuple
+from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import base64
 import json
 import re
@@ -22,8 +22,8 @@ from app.schemas.agenda import EventoCreate
 from app.services.agenda_service import AgendaService
 from app.services.viva_local_service import viva_local_service
 from app.services.viva_model_service import viva_model_service
+from app.services.viva_concierge_service import viva_concierge_service
 from app.services.openai_service import openai_service
-from app.services.openrouter_service import openrouter_service
 from app.config import settings
 
 router = APIRouter()
@@ -34,17 +34,40 @@ class ChatRequest(BaseModel):
     contexto: List[Dict[str, Any]] = []
     prompt_extra: Optional[str] = None
     modo: Optional[str] = None
+    session_id: Optional[UUID] = None
 
 
 class MediaItem(BaseModel):
     tipo: str
     url: str
+    nome: Optional[str] = None
     meta: Optional[Dict[str, Any]] = None
 
 
 class ChatResponse(BaseModel):
     resposta: str
     midia: Optional[List[MediaItem]] = None
+    session_id: Optional[UUID] = None
+
+
+class ChatMessageItem(BaseModel):
+    id: UUID
+    tipo: str
+    conteudo: str
+    modo: Optional[str] = None
+    anexos: List[Dict[str, Any]] = Field(default_factory=list)
+    meta: Dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+
+
+class ChatSnapshotResponse(BaseModel):
+    session_id: Optional[UUID] = None
+    modo: Optional[str] = None
+    messages: List[ChatMessageItem] = Field(default_factory=list)
+
+
+class ChatSessionStartRequest(BaseModel):
+    modo: Optional[str] = None
 
 
 class CampanhaSaveRequest(BaseModel):
@@ -184,6 +207,34 @@ def _sanitize_prompt(texto: str, max_len: int) -> str:
     return texto_limpo[:max_len].rstrip() + "..."
 
 
+def _build_viva_concierge_messages(
+    mensagem: str,
+    contexto: List[Dict[str, Any]],
+    modo: Optional[str],
+) -> List[Dict[str, str]]:
+    messages: List[Dict[str, str]] = [
+        {"role": "system", "content": viva_concierge_service.build_system_prompt(modo=modo)}
+    ]
+    for msg in contexto[-60:]:
+        tipo = str(msg.get("tipo") or "")
+        conteudo = str(msg.get("conteudo") or "").strip()
+        if not conteudo:
+            continue
+        if tipo == "usuario":
+            messages.append({"role": "user", "content": conteudo})
+        elif tipo == "ia":
+            messages.append({"role": "assistant", "content": conteudo})
+
+    ultima_igual = (
+        len(messages) > 1
+        and messages[-1].get("role") == "user"
+        and (messages[-1].get("content") or "").strip() == (mensagem or "").strip()
+    )
+    if not ultima_igual:
+        messages.append({"role": "user", "content": mensagem})
+    return messages
+
+
 def _mode_hint(modo: Optional[str]) -> Optional[str]:
     if not modo:
         return None
@@ -210,6 +261,34 @@ def _normalize_mode(modo: Optional[str]) -> Optional[str]:
         "CRIADORWEB",
     }
     return normalized if normalized in allowed else None
+
+
+def _infer_mode_from_message(mensagem: str) -> Optional[str]:
+    normalized = _normalize_key(mensagem or "")
+    if not normalized:
+        return None
+
+    if "rezeta" in normalized:
+        return "REZETA"
+    if "fc" in normalized or "fc solucoes" in normalized or "fc solucoes financeiras" in normalized:
+        return "FC"
+    if "logo" in normalized or "logotipo" in normalized or "identidade visual" in normalized:
+        return "LOGO"
+    if "landing page" in normalized or "lp" in normalized:
+        return "CRIADORLANDPAGE"
+    return None
+
+
+def _infer_mode_from_context(contexto: List[Dict[str, Any]]) -> Optional[str]:
+    for msg in reversed(contexto or []):
+        maybe_mode = _normalize_mode(msg.get("modo") if isinstance(msg, dict) else None)
+        if maybe_mode:
+            return maybe_mode
+        conteudo = str(msg.get("conteudo") if isinstance(msg, dict) else "" or "")
+        inferred = _infer_mode_from_message(conteudo)
+        if inferred:
+            return inferred
+    return None
 
 
 def _normalize_key(texto: str) -> str:
@@ -240,6 +319,12 @@ def _normalize_publico_value(value: str) -> str:
     if any(term in normalized for term in ("empresarios", "gestores", "pequenas empresas", "pj")):
         return "Empresarios e gestores"
     return value.strip()
+
+
+def _clean_extracted_value(value: str) -> str:
+    cleaned = str(value or "").strip(" ,.;:-")
+    cleaned = re.sub(r"\s+(a|o|e|de|do|da|para)$", "", cleaned, flags=re.IGNORECASE)
+    return cleaned.strip(" ,.;:-")
 
 
 def _is_affirmative(texto: str) -> bool:
@@ -289,6 +374,32 @@ def _is_generation_confirmation(texto: str) -> bool:
     return bool(re.search(r"\b(gera|gerar|final|png|jpg)\b", normalized))
 
 
+def _is_direct_generation_intent(texto: str) -> bool:
+    normalized = _normalize_key(texto)
+    direct_patterns = (
+        r"\b(gera|gerar|criar|produzir)\b.*\b(imagem|arte|post|banner|campanha)\b",
+        r"\b(imagem|arte|post|banner|campanha)\b.*\b(gera|gerar|criar|produzir)\b",
+        r"\bpode gerar\b",
+        r"\bgerar agora\b",
+    )
+    return any(re.search(pattern, normalized) for pattern in direct_patterns)
+
+
+def _campaign_gate_count(contexto: List[Dict[str, Any]]) -> int:
+    count = 0
+    for msg in contexto or []:
+        if str(msg.get("tipo") or "") != "ia":
+            continue
+        content = _normalize_key(str(msg.get("conteudo") or ""))
+        if (
+            "so preciso fechar" in content
+            or "sugestoes rapidas para sua campanha" in content
+            or "responda 1 2 ou 3" in content
+        ):
+            count += 1
+    return count
+
+
 def _extract_publico_option(texto: str) -> Optional[str]:
     normalized = _normalize_key(texto)
     if normalized == "1":
@@ -328,6 +439,8 @@ def _extract_campaign_brief_fields(texto: str) -> Dict[str, str]:
         "cta": "cta",
         "chamada": "cta",
         "call to action": "cta",
+        "promocao": "oferta",
+        "promo": "oferta",
         "oferta": "oferta",
         "desconto": "oferta",
         "tema": "tema",
@@ -351,15 +464,15 @@ def _extract_campaign_brief_fields(texto: str) -> Dict[str, str]:
     # "objetivo da campanha e ... publico ... formato feed ..."
     normalized_sentence = _normalize_key(texto or "")
     sentence_patterns = {
-        "objetivo": r"objetivo(?: da campanha)?(?: e| eh| =)? (.*?)(?= publico| formato| fortato| cta| tema| oferta| headline| subheadline| cena|$)",
-        "publico": r"publico(?: alvo)?(?: e| eh| =)? (.*?)(?= objetivo| formato| fortato| cta| tema| oferta| headline| subheadline| cena|$)",
-        "formato": r"(?:formato|fortato)(?: e| eh| =)? (.*?)(?= objetivo| publico| cta| tema| oferta| headline| subheadline| cena|$)",
-        "cta": r"cta(?: e| eh| =)? (.*?)(?= objetivo| publico| formato| fortato| tema| oferta| headline| subheadline| cena|$)",
-        "tema": r"tema(?: e| eh| =)? (.*?)(?= objetivo| publico| formato| fortato| cta| oferta| headline| subheadline| cena|$)",
-        "oferta": r"oferta(?: e| eh| =)? (.*?)(?= objetivo| publico| formato| fortato| cta| tema| headline| subheadline| cena|$)",
-        "headline": r"headline(?: e| eh| =)? (.*?)(?= objetivo| publico| formato| fortato| cta| tema| oferta| subheadline| cena|$)",
-        "subheadline": r"subheadline(?: e| eh| =)? (.*?)(?= objetivo| publico| formato| fortato| cta| tema| oferta| headline| cena|$)",
-        "cena": r"cena(?: e| eh| =)? (.*?)(?= objetivo| publico| formato| fortato| cta| tema| oferta| headline| subheadline|$)",
+        "objetivo": r"objetivo(?: da campanha)?(?: e| eh| =)? (.*?)(?= publico| formato| fortato| cta| tema| oferta| promocao| promo| desconto| headline| subheadline| cena|$)",
+        "publico": r"publico(?: alvo)?(?: e| eh| =)? (.*?)(?= objetivo| formato| fortato| cta| tema| oferta| promocao| promo| desconto| headline| subheadline| cena|$)",
+        "formato": r"(?:formato|fortato)(?: e| eh| =)? (.*?)(?= objetivo| publico| cta| tema| oferta| promocao| promo| desconto| headline| subheadline| cena|$)",
+        "cta": r"cta(?: e| eh| =)? (.*?)(?= objetivo| publico| formato| fortato| tema| oferta| promocao| promo| desconto| headline| subheadline| cena|$)",
+        "tema": r"tema(?: da campanha)?(?: e| eh| =)? (.*?)(?= objetivo| publico| formato| fortato| cta| oferta| promocao| promo| desconto| headline| subheadline| cena|$)",
+        "oferta": r"(?:oferta|promocao|promo|desconto)(?: e| eh| =)? (.*?)(?= objetivo| publico| formato| fortato| cta| tema| headline| subheadline| cena|$)",
+        "headline": r"headline(?: e| eh| =)? (.*?)(?= objetivo| publico| formato| fortato| cta| tema| oferta| promocao| promo| desconto| subheadline| cena|$)",
+        "subheadline": r"subheadline(?: e| eh| =)? (.*?)(?= objetivo| publico| formato| fortato| cta| tema| oferta| promocao| promo| desconto| headline| cena|$)",
+        "cena": r"cena(?: e| eh| =)? (.*?)(?= objetivo| publico| formato| fortato| cta| tema| oferta| promocao| promo| desconto| headline| subheadline|$)",
     }
 
     for key, pattern in sentence_patterns.items():
@@ -371,12 +484,15 @@ def _extract_campaign_brief_fields(texto: str) -> Dict[str, str]:
         value = (match.group(1) or "").strip(" ,.;")
         if not value:
             continue
-        fields[key] = value
+        fields[key] = _clean_extracted_value(value)
 
     if fields.get("formato"):
         fields["formato"] = _normalize_formato_value(fields["formato"])
     if fields.get("publico"):
         fields["publico"] = _normalize_publico_value(fields["publico"])
+    for key in ("tema", "oferta", "headline", "subheadline", "cta", "cena"):
+        if fields.get(key):
+            fields[key] = _clean_extracted_value(fields[key])
 
     return fields
 
@@ -426,13 +542,33 @@ def _infer_campaign_fields_from_free_text(texto: str) -> Dict[str, str]:
     elif "reconhecimento" in normalized or "awareness" in normalized:
         inferred["objetivo"] = "Reconhecimento de marca"
 
-    if "carnaval" in normalized:
-        inferred["tema"] = "Campanha de Carnaval"
+    if not inferred.get("tema"):
+        theme_match = re.search(
+            r"tema(?: da campanha)?(?: e| eh| =)? (.*?)(?= objetivo| publico| formato| cta| oferta| promocao| promo| desconto|$)",
+            normalized,
+        )
+        if theme_match and str(theme_match.group(1) or "").strip():
+            inferred["tema"] = _clean_extracted_value(str(theme_match.group(1)))
+        elif "carnaval" in normalized:
+            inferred["tema"] = "carnaval sem dividas" if "sem divida" in normalized else "carnaval"
 
-    discount_match = re.search(r"(\d{1,2})\s*%|\b(\d{1,2})\s+por cento\b", normalized)
-    if discount_match:
-        pct = discount_match.group(1) or discount_match.group(2)
-        inferred["oferta"] = f"Desconto de {pct}% no servico"
+    discount_match_raw = re.search(r"(\d{1,2})\s*%", texto or "", flags=re.IGNORECASE)
+    discount_match_words = re.search(r"\b(\d{1,2})\s+por cento\b", normalized)
+    if discount_match_raw or discount_match_words:
+        pct = (
+            (discount_match_raw.group(1) if discount_match_raw else None)
+            or (discount_match_words.group(1) if discount_match_words else None)
+            or ""
+        )
+        service_match = re.search(
+            r"\b(limpa nome|aumento de score|score|rating|diagnostico 360|renegociacao|quitacao|credito)\b",
+            normalized,
+        )
+        if service_match:
+            service = str(service_match.group(1)).strip()
+            inferred["oferta"] = f"Desconto de {pct}% em {service}"
+        else:
+            inferred["oferta"] = f"Desconto de {pct}% no servico"
 
     return inferred
 
@@ -447,8 +583,8 @@ def _collect_campaign_fields_from_context(contexto: List[Dict[str, Any]]) -> Dic
             continue
         explicit = _extract_campaign_brief_fields(content)
         inferred = _infer_campaign_fields_from_free_text(content)
-        collected.update(inferred)
         collected.update(explicit)
+        collected.update(inferred)
     return collected
 
 
@@ -461,11 +597,13 @@ def _has_pending_campaign_brief(contexto: List[Dict[str, Any]]) -> bool:
     for msg in reversed(contexto or []):
         if msg.get("tipo") != "ia":
             continue
-        content = str(msg.get("conteudo") or "").lower()
+        content = _normalize_key(str(msg.get("conteudo") or ""))
         if (
             "brief da campanha" in content
             or "so preciso fechar" in content
-            or "faltam:" in content
+            or "faltam" in content
+            or "sugestoes rapidas para sua campanha" in content
+            or "me diga 1 2 ou 3 e eu gero agora" in content
         ):
             return True
     return False
@@ -506,6 +644,54 @@ def _build_campaign_brief_reply(modo: str, missing_fields: List[str]) -> str:
         "Pode responder em texto natural (sem formato fixo). Exemplo:\n"
         "`objetivo: gerar leads | publico: PF geral | formato: 4:5`.\n"
         "Se quiser, eu uso CTA padrao automaticamente."
+    )
+
+
+def _build_scene_seed(fields: Dict[str, str], modo: str) -> str:
+    tema = str(fields.get("tema") or "").strip()
+    objetivo = str(fields.get("objetivo") or "gerar leads").strip()
+    publico = str(fields.get("publico") or "publico geral").strip()
+    oferta = str(fields.get("oferta") or "").strip()
+
+    if modo == "FC":
+        brand_style = "estetica FC com azul e branco (#071c4a, #00a3ff, #f9feff)"
+    else:
+        brand_style = "estetica Rezeta com verde e azul (#3DAA7F, #1E3A5F)"
+
+    scene_parts: List[str] = [
+        f"cena publicitaria realista com {brand_style}",
+        f"foco em {objetivo}",
+        f"publico {publico}",
+    ]
+    if tema:
+        scene_parts.append(f"tema {tema}")
+    if oferta:
+        scene_parts.append(f"mensagem visual de oferta {oferta}")
+
+    merged = " | ".join(scene_parts)
+    low = _normalize_key(merged)
+    if "escritorio" not in low and "terno" not in low and "corporativo" not in low:
+        merged += " | evitar homem de terno e escritorio como padrao"
+    return _sanitize_prompt(merged, 240)
+
+
+def _build_campaign_quick_plan(modo: str, fields: Dict[str, str]) -> str:
+    brand = "FC Solucoes Financeiras" if modo == "FC" else "RezetaBrasil"
+    tema = fields.get("tema") or "tema livre"
+    objetivo = fields.get("objetivo") or "gerar leads"
+    publico = fields.get("publico") or "Publico geral (PF)"
+    formato = fields.get("formato") or "4:5"
+    oferta = fields.get("oferta") or "Sem oferta explicita"
+    cta = fields.get("cta") or ("Ver como funciona" if modo == "FC" else "Chamar no WhatsApp")
+
+    return (
+        f"Perfeito. Entendi sua campanha para {brand}.\n"
+        f"Tema: {tema} | Objetivo: {objetivo} | Publico: {publico} | Formato: {formato} | Oferta: {oferta}\n\n"
+        "Sugestoes rapidas para sua campanha:\n"
+        f"1) Conversao direta: headline objetiva + promessa clara + CTA '{cta}'.\n"
+        f"2) Dor e alivio: problema real do publico + prova social + CTA '{cta}'.\n"
+        f"3) Oferta forte: destaque da promocao + urgencia leve + CTA '{cta}'.\n\n"
+        "Me diga 1, 2 ou 3 e eu gero agora. Se preferir, escreva: gerar agora."
     )
 
 
@@ -657,6 +843,307 @@ async def _save_campaign_record(
     return campaign_id
 
 
+async def _ensure_chat_tables(db: AsyncSession) -> None:
+    await db.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS viva_chat_sessions (
+                id UUID PRIMARY KEY,
+                user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                modo VARCHAR(32),
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                last_message_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+    )
+    await db.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS idx_viva_chat_sessions_user_updated
+            ON viva_chat_sessions(user_id, updated_at DESC)
+            """
+        )
+    )
+    await db.execute(
+        text(
+            """
+            CREATE TABLE IF NOT EXISTS viva_chat_messages (
+                id UUID PRIMARY KEY,
+                session_id UUID NOT NULL REFERENCES viva_chat_sessions(id) ON DELETE CASCADE,
+                user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                tipo VARCHAR(16) NOT NULL,
+                conteudo TEXT NOT NULL,
+                modo VARCHAR(32),
+                anexos_json JSONB NOT NULL DEFAULT '[]'::jsonb,
+                meta_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+            """
+        )
+    )
+    await db.execute(
+        text(
+            """
+            CREATE INDEX IF NOT EXISTS idx_viva_chat_messages_session_created
+            ON viva_chat_messages(session_id, created_at DESC)
+            """
+        )
+    )
+
+
+def _safe_json(value: Any, fallback: Any) -> Any:
+    if value is None:
+        return fallback
+    if isinstance(value, type(fallback)):
+        return value
+    if isinstance(fallback, dict) and isinstance(value, dict):
+        return value
+    if isinstance(fallback, list) and isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            if isinstance(fallback, dict) and isinstance(parsed, dict):
+                return parsed
+            if isinstance(fallback, list) and isinstance(parsed, list):
+                return parsed
+        except Exception:
+            return fallback
+    return fallback
+
+
+def _serialize_media_items(items: Optional[List[MediaItem]]) -> List[Dict[str, Any]]:
+    if not items:
+        return []
+    payload: List[Dict[str, Any]] = []
+    for item in items:
+        if isinstance(item, MediaItem):
+            payload.append(item.model_dump(exclude_none=True))
+        elif isinstance(item, dict):
+            payload.append(item)
+    return payload
+
+
+async def _create_chat_session(db: AsyncSession, user_id: UUID, modo: Optional[str]) -> UUID:
+    session_id = uuid4()
+    now = datetime.now(timezone.utc)
+    await db.execute(
+        text(
+            """
+            INSERT INTO viva_chat_sessions (id, user_id, modo, created_at, updated_at, last_message_at)
+            VALUES (:id, :user_id, :modo, :created_at, :updated_at, :last_message_at)
+            """
+        ),
+        {
+            "id": str(session_id),
+            "user_id": str(user_id),
+            "modo": _normalize_mode(modo),
+            "created_at": now,
+            "updated_at": now,
+            "last_message_at": now,
+        },
+    )
+    return session_id
+
+
+async def _get_latest_chat_session_row(db: AsyncSession, user_id: UUID) -> Optional[Any]:
+    result = await db.execute(
+        text(
+            """
+            SELECT id, modo
+            FROM viva_chat_sessions
+            WHERE user_id = :user_id
+            ORDER BY updated_at DESC
+            LIMIT 1
+            """
+        ),
+        {"user_id": str(user_id)},
+    )
+    return result.first()
+
+
+async def _resolve_chat_session(
+    db: AsyncSession,
+    user_id: UUID,
+    requested_session_id: Optional[UUID],
+    modo: Optional[str],
+) -> UUID:
+    normalized_mode = _normalize_mode(modo)
+
+    if requested_session_id:
+        result = await db.execute(
+            text(
+                """
+                SELECT id
+                FROM viva_chat_sessions
+                WHERE id = :id AND user_id = :user_id
+                LIMIT 1
+                """
+            ),
+            {"id": str(requested_session_id), "user_id": str(user_id)},
+        )
+        row = result.first()
+        if row:
+            await db.execute(
+                text(
+                    """
+                    UPDATE viva_chat_sessions
+                    SET modo = COALESCE(:modo, modo),
+                        updated_at = NOW()
+                    WHERE id = :id
+                    """
+                ),
+                {"id": str(requested_session_id), "modo": normalized_mode},
+            )
+            return requested_session_id
+
+    latest = await _get_latest_chat_session_row(db, user_id)
+    if latest:
+        await db.execute(
+            text(
+                """
+                UPDATE viva_chat_sessions
+                SET modo = COALESCE(:modo, modo),
+                    updated_at = NOW()
+                WHERE id = :id
+                """
+            ),
+            {"id": str(latest.id), "modo": normalized_mode},
+        )
+        return latest.id
+
+    return await _create_chat_session(db, user_id, normalized_mode)
+
+
+async def _append_chat_message(
+    db: AsyncSession,
+    session_id: UUID,
+    user_id: UUID,
+    tipo: str,
+    conteudo: str,
+    modo: Optional[str] = None,
+    anexos: Optional[List[Dict[str, Any]]] = None,
+    meta: Optional[Dict[str, Any]] = None,
+) -> None:
+    normalized_mode = _normalize_mode(modo)
+    await db.execute(
+        text(
+            """
+            INSERT INTO viva_chat_messages (
+                id, session_id, user_id, tipo, conteudo, modo, anexos_json, meta_json, created_at
+            )
+            VALUES (
+                :id, :session_id, :user_id, :tipo, :conteudo, :modo,
+                CAST(:anexos_json AS JSONB), CAST(:meta_json AS JSONB), NOW()
+            )
+            """
+        ),
+        {
+            "id": str(uuid4()),
+            "session_id": str(session_id),
+            "user_id": str(user_id),
+            "tipo": tipo,
+            "conteudo": conteudo,
+            "modo": normalized_mode,
+            "anexos_json": json.dumps(anexos or [], ensure_ascii=False),
+            "meta_json": json.dumps(meta or {}, ensure_ascii=False),
+        },
+    )
+    await db.execute(
+        text(
+            """
+            UPDATE viva_chat_sessions
+            SET modo = COALESCE(:modo, modo),
+                updated_at = NOW(),
+                last_message_at = NOW()
+            WHERE id = :id AND user_id = :user_id
+            """
+        ),
+        {
+            "id": str(session_id),
+            "user_id": str(user_id),
+            "modo": normalized_mode,
+        },
+    )
+
+
+def _chat_message_from_row(row: Any) -> ChatMessageItem:
+    return ChatMessageItem(
+        id=row.id,
+        tipo=row.tipo,
+        conteudo=row.conteudo,
+        modo=row.modo,
+        anexos=_safe_json(row.anexos_json, []),
+        meta=_safe_json(row.meta_json, {}),
+        created_at=row.created_at,
+    )
+
+
+async def _load_chat_snapshot(
+    db: AsyncSession,
+    user_id: UUID,
+    session_id: UUID,
+    limit: int,
+) -> ChatSnapshotResponse:
+    result = await db.execute(
+        text(
+            """
+            SELECT id, modo
+            FROM viva_chat_sessions
+            WHERE id = :session_id AND user_id = :user_id
+            LIMIT 1
+            """
+        ),
+        {"session_id": str(session_id), "user_id": str(user_id)},
+    )
+    session_row = result.first()
+    if not session_row:
+        return ChatSnapshotResponse(session_id=None, modo=None, messages=[])
+
+    safe_limit = min(max(limit, 1), 250)
+    messages_result = await db.execute(
+        text(
+            """
+            SELECT id, tipo, conteudo, modo, anexos_json, meta_json, created_at
+            FROM (
+                SELECT m.id, m.tipo, m.conteudo, m.modo, m.anexos_json, m.meta_json, m.created_at
+                FROM viva_chat_messages m
+                WHERE m.session_id = :session_id AND m.user_id = :user_id
+                ORDER BY m.created_at DESC
+                LIMIT :limit
+            ) recent
+            ORDER BY created_at ASC
+            """
+        ),
+        {
+            "session_id": str(session_id),
+            "user_id": str(user_id),
+            "limit": safe_limit,
+        },
+    )
+    messages = [_chat_message_from_row(row) for row in messages_result.fetchall()]
+    return ChatSnapshotResponse(session_id=session_row.id, modo=session_row.modo, messages=messages)
+
+
+def _context_from_snapshot(snapshot: ChatSnapshotResponse) -> List[Dict[str, Any]]:
+    contexto: List[Dict[str, Any]] = []
+    for item in snapshot.messages:
+        contexto.append(
+            {
+                "id": str(item.id),
+                "tipo": item.tipo,
+                "conteudo": item.conteudo,
+                "modo": item.modo,
+                "anexos": item.anexos,
+                "meta": item.meta,
+                "created_at": item.created_at.isoformat() if item.created_at else None,
+            }
+        )
+    return contexto
+
+
 def _extract_image_url(result: Dict[str, Any]) -> Optional[str]:
     payload = result.get("data") if isinstance(result, dict) else None
 
@@ -770,23 +1257,45 @@ def _extract_json_block(raw: str) -> Optional[Dict[str, Any]]:
 
 def _fallback_copy(texto: str, modo: str) -> Dict[str, Any]:
     lines = [ln.strip() for ln in texto.splitlines() if ln.strip()]
-    bullet_lines = [ln for ln in lines if re.match(r"^(✅|❌|⚠️|•|-)", ln)]
-    headline = next((ln for ln in lines if ln not in bullet_lines), "Destrave seu crédito com estratégia")
-    subheadline = next((ln for ln in lines[1:] if ln not in bullet_lines), "Diagnóstico claro e plano de ação objetivo")
-    quote = next((ln for ln in lines if ln.startswith('"') or ln.startswith('“')), "")
+    bullet_lines = [ln for ln in lines if re.match(r"^([*+-]|[0-9]+\.)\s", ln)]
+    explicit = _extract_campaign_brief_fields(texto)
+    inferred = _infer_campaign_fields_from_free_text(texto)
+    fields = _apply_campaign_defaults({**explicit, **inferred})
+
+    headline = (
+        str(fields.get("headline") or "").strip()
+        or next((ln for ln in lines if ln not in bullet_lines), "")
+        or "Resolva suas dividas com estrategia clara"
+    )
+    subheadline = (
+        str(fields.get("subheadline") or "").strip()
+        or next((ln for ln in lines[1:] if ln not in bullet_lines), "")
+        or "Plano objetivo para organizar seu credito com seguranca"
+    )
+    offer = str(fields.get("oferta") or "").strip()
+    cta = str(fields.get("cta") or "").strip() or (
+        "CHAMAR NO WHATSAPP" if modo == "REZETA" else "VER COMO FUNCIONA"
+    )
+
+    default_bullets = [
+        "Diagnostico rapido e objetivo",
+        "Plano de acao adaptado ao seu perfil",
+        "Acompanhamento claro do inicio ao fim",
+    ]
+    if offer:
+        default_bullets[0] = offer
+
+    scene = str(fields.get("cena") or "").strip() or _build_scene_seed(fields, modo)
+    quote = next((ln for ln in lines if ln.startswith('"')), "")
 
     return {
         "brand": modo,
         "headline": _sanitize_prompt(headline, 90),
         "subheadline": _sanitize_prompt(subheadline, 130),
-        "bullets": bullet_lines[:5] or [
-            "✅ Diagnóstico completo",
-            "✅ Plano de melhoria estruturado",
-            "✅ Acompanhamento estratégico",
-        ],
+        "bullets": [_sanitize_prompt(item, 80) for item in (bullet_lines[:5] or default_bullets)],
         "quote": _sanitize_prompt(quote, 120) if quote else "",
-        "cta": "CHAMAR NO WHATSAPP" if modo == "REZETA" else "VER COMO FUNCIONA",
-        "scene": "Pessoa em ambiente profissional moderno, expressão confiante, contexto financeiro",
+        "cta": _sanitize_prompt(cta, 40),
+        "scene": _sanitize_prompt(scene, 240),
     }
 
 
@@ -795,53 +1304,44 @@ async def _generate_campaign_copy(
     prompt_extra_image: Optional[str],
     modo: str,
 ) -> Dict[str, Any]:
-    """
-    Gera copy estruturada combinando o prompt mestre (REZETA.md ou FC.md) 
-    com o brief específico do usuário.
-    """
     fonte = _sanitize_prompt(_extract_overlay_source(mensagem), 5000)
-    
-    # Se temos o prompt_extra (conteúdo do REZETA.md ou FC.md), usamos ele como base
-    prompt_mestre = prompt_extra_image or ""
-    
-    # Guardrails específicos por marca
+    baseline = _fallback_copy(fonte, modo)
+
+    explicit = _extract_campaign_brief_fields(fonte)
+    inferred = _infer_campaign_fields_from_free_text(fonte)
+    fields = _apply_campaign_defaults({**explicit, **inferred})
+    scene_seed = _build_scene_seed(fields, modo)
+
     if modo == "REZETA":
         guardrail = (
-            "Você é um diretor de arte especialista em campanhas RezetaBrasil. "
-            "Use as diretrizes visuais da marca: azul marinho (#1E3A5F), verde esmeralda (#3DAA7F), "
-            "layout com overlay branco superior e verde inferior, fotografia realista de pessoas."
+            "Marca RezetaBrasil. Paleta obrigatoria: #1E3A5F, #3DAA7F, #2A8B68, #FFFFFF. "
+            "Tom humano e acessivel."
         )
-    else:  # FC
+    else:
         guardrail = (
-            "Você é um diretor de arte especialista em campanhas FC Soluções Financeiras. "
-            "Use as diretrizes visuais da marca: azul escuro (#071c4a), azul claro (#00a3ff), "
-            "layout institucional corporativo, fotografia realista profissional."
+            "Marca FC Solucoes Financeiras. Paleta obrigatoria: #071c4a, #00a3ff, #010a1c, #f9feff. "
+            "Tom premium e consultivo."
         )
 
     system = (
-        f"{guardrail}\n\n"
-        "Você deve analisar o brief do cliente e extrair/copy estruturada. "
-        "Responda SOMENTE JSON válido, sem markdown."
+        f"{guardrail}\n"
+        "Voce e diretor(a) de criacao de campanhas financeiras. "
+        "Responda apenas JSON valido e siga o brief. "
+        "Nunca imponha homem de terno ou escritorio como padrao, "
+        "a menos que o brief peca isso explicitamente."
     )
-    
+
+    brand_reference = _sanitize_prompt(prompt_extra_image or "", 1800)
     user = (
-        "ANÁLISE DO BRIEF DE CAMPANHA:\n\n"
+        "Brief da campanha:\n"
         f"{fonte}\n\n"
-        "---\n\n"
-        "DIRETRIZES VISUAIS DA MARCA (use como referência):\n\n"
-        f"{prompt_mestre[:3000]}\n\n"  # Limita para não ultrapassar tokens
-        "---\n\n"
-        "INSTRUÇÃO:\n"
-        "Com base no brief acima e nas diretrizes visuais da marca, "
-        "extraia/devolva um JSON com as chaves exatas:\n"
-        "- headline: título principal impactante (6-10 palavras)\n"
-        "- subheadline: subtítulo de apoio (8-16 palavras)\n"
-        "- bullets: array com 3-5 bullets curtos destacando benefícios\n"
-        "- quote: depoimento ou frase de impacto (opcional)\n"
-        "- cta: call-to-action curto e direto (2-5 palavras)\n"
-        "- scene: descrição detalhada da cena fotográfica para o fundo (sem texto, sem logo)\n\n"
-        "O headline e subheadline devem capturar a essência do problema/solução do brief.\n"
-        "A scene deve descrever uma fotografia realista de pessoa em contexto financeiro."
+        f"Campos inferidos: objetivo={fields.get('objetivo')}; publico={fields.get('publico')}; "
+        f"formato={fields.get('formato')}; tema={fields.get('tema')}; oferta={fields.get('oferta')}; cta={fields.get('cta')}.\n"
+        f"Seed de cena: {scene_seed}\n"
+        f"Referencia de marca: {brand_reference or 'nao informada'}\n\n"
+        "Retorne JSON com chaves exatas:\n"
+        "headline, subheadline, bullets (array 3-5), quote, cta, scene.\n"
+        "scene deve refletir o tema/oferta do brief sem texto na imagem."
     )
 
     resposta = await openai_service.chat(
@@ -849,49 +1349,48 @@ async def _generate_campaign_copy(
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
-        temperature=0.4,
+        temperature=0.35,
         max_tokens=800,
     )
 
     parsed = _extract_json_block(resposta)
     if not parsed:
-        return _fallback_copy(fonte, modo)
+        return baseline
 
     bullets = parsed.get("bullets") if isinstance(parsed.get("bullets"), list) else []
     bullets = [str(item).strip() for item in bullets if str(item).strip()][:5]
 
-    copy = {
+    return {
         "brand": modo,
-        "headline": _sanitize_prompt(str(parsed.get("headline") or "Destrave seu crédito com estratégia"), 90),
-        "subheadline": _sanitize_prompt(str(parsed.get("subheadline") or "Diagnóstico claro e pleno de ação objetivo"), 130),
-        "bullets": bullets or _fallback_copy(fonte, modo)["bullets"],
-        "quote": _sanitize_prompt(str(parsed.get("quote") or ""), 120),
-        "cta": _sanitize_prompt(str(parsed.get("cta") or ("CHAMAR NO WHATSAPP" if modo == "REZETA" else "VER COMO FUNCIONA")), 40),
-        "scene": _sanitize_prompt(str(parsed.get("scene") or "Pessoa em ambiente profissional moderno, expressão confiante, contexto financeiro"), 240),
+        "headline": _sanitize_prompt(str(parsed.get("headline") or baseline["headline"]), 90),
+        "subheadline": _sanitize_prompt(str(parsed.get("subheadline") or baseline["subheadline"]), 130),
+        "bullets": bullets or baseline["bullets"],
+        "quote": _sanitize_prompt(str(parsed.get("quote") or baseline.get("quote") or ""), 120),
+        "cta": _sanitize_prompt(str(parsed.get("cta") or baseline["cta"]), 40),
+        "scene": _sanitize_prompt(str(parsed.get("scene") or baseline["scene"]), 240),
     }
-    return copy
 
 
 def _build_branded_background_prompt(modo: str, campaign_copy: Dict[str, Any]) -> str:
-    scene = campaign_copy.get("scene", "")
-    scene_lower = str(scene).lower()
-    carnaval_hint = (
-        " Elementos de carnaval devem ser sutis e elegantes (confetes em azul, atmosfera alegre sem fantasia caricata)."
-        if "carnaval" in scene_lower
+    scene = _sanitize_prompt(str(campaign_copy.get("scene") or ""), 240)
+    normalized_scene = _normalize_key(scene)
+    avoid_corporate_stereotype = (
+        " Evitar estereotipo de homem de terno em escritorio, salvo se a cena pedir explicitamente."
+        if ("terno" not in normalized_scene and "escritorio" not in normalized_scene)
         else ""
     )
     if modo == "FC":
         return (
-            "Fotografia publicitária corporativa premium, contexto financeiro no Brasil, "
-            "escritório moderno, iluminação natural, composição clean, tons azul institucional "
-            "(#071c4a, #00a3ff, #010a1c), sem verde, sem texto, sem letras, sem logotipo. "
-            f"{carnaval_hint} Cena: {scene}"
+            "Fotografia publicitaria realista para campanha financeira no Brasil. "
+            "Identidade FC: azul e branco (#071c4a, #00a3ff, #010a1c, #f9feff). "
+            "Sem texto, sem letras, sem logotipo. "
+            f"{avoid_corporate_stereotype} Cena principal: {scene}"
         )
     return (
-        "Fotografia publicitária realista e humanizada para campanha de crédito no Brasil, "
-        "ambiente moderno e acolhedor, tom de confiança e esperança, cores com presença de "
-        "azul marinho e verde esmeralda (#1E3A5F, #3DAA7F, #2A8B68), sem texto, sem letras, sem logotipo."
-        f"{carnaval_hint} Cena: {scene}"
+        "Fotografia publicitaria realista para campanha financeira no Brasil. "
+        "Identidade Rezeta: verde e azul (#3DAA7F, #1E3A5F, #2A8B68, #FFFFFF). "
+        "Sem texto, sem letras, sem logotipo. "
+        f"{avoid_corporate_stereotype} Cena principal: {scene}"
     )
 
 
@@ -998,6 +1497,225 @@ def _parse_agenda_command(message: str) -> Optional[Dict[str, Any]]:
     }
 
 
+def _is_agenda_verb(text: str) -> bool:
+    normalized = _normalize_key(text)
+    return any(
+        term in normalized
+        for term in (
+            "agenda",
+            "agendamento",
+            "agendamentos",
+            "compromisso",
+            "compromissos",
+            "lembrete",
+            "lembra",
+            "lembrar",
+        )
+    )
+
+
+def _is_simple_confirmation(text: str) -> bool:
+    normalized = _normalize_key(text)
+    return normalized in {
+        "sim",
+        "quero",
+        "quero sim",
+        "ok",
+        "pode",
+        "sim ja",
+        "ja",
+        "todos",
+        "todos sem mais perguntas",
+        "todos sem mais pergintas",
+    }
+
+
+def _has_recent_agenda_prompt(contexto: List[Dict[str, Any]]) -> bool:
+    for msg in reversed(contexto[-8:]):
+        if msg.get("tipo") != "ia":
+            continue
+        normalized = _normalize_key(str(msg.get("conteudo") or ""))
+        if "agenda" in normalized or "compromiss" in normalized:
+            return True
+    return False
+
+
+def _is_agenda_query_intent(message: str, contexto: List[Dict[str, Any]]) -> bool:
+    normalized = _normalize_key(message)
+
+    create_terms = (
+        "agendar",
+        "marcar",
+        "criar compromisso",
+        "novo compromisso",
+        "adicionar compromisso",
+    )
+    conclude_terms = ("concluir", "confirmar compromisso", "finalizar compromisso")
+
+    if any(term in normalized for term in conclude_terms):
+        return False
+    if any(term in normalized for term in create_terms):
+        return False
+
+    query_terms = (
+        "minha agenda",
+        "como esta minha agenda",
+        "como esta a agenda",
+        "como esta minha agenda hj",
+        "como ta minha agenda",
+        "o que tenho",
+        "quais compromissos",
+        "listar agenda",
+        "lista da agenda",
+        "agendamentos de hoje",
+        "agenda de hoje",
+        "compromissos de hoje",
+        "agenda hj",
+        "agenda hoje",
+        "agenda amanha",
+    )
+
+    if any(term in normalized for term in query_terms):
+        return True
+
+    if _is_agenda_verb(message):
+        return True
+
+    if _is_simple_confirmation(message) and _has_recent_agenda_prompt(contexto):
+        return True
+
+    return False
+
+
+def _agenda_window_from_text(message: str) -> Tuple[datetime, datetime, str]:
+    normalized = _normalize_key(message)
+    now = datetime.now()
+
+    if "amanha" in normalized:
+        start = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=1)
+        return start, end, "de amanha"
+
+    if "semana" in normalized:
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=7)
+        return start, end, "dos proximos 7 dias"
+
+    start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    end = start + timedelta(days=1)
+    return start, end, "de hoje"
+
+
+def _format_agenda_list(items: List[Any], period_label: str) -> str:
+    if not items:
+        return f"Voce nao tem compromissos {period_label}."
+
+    ordered = sorted(items, key=lambda item: item.data_inicio)
+    lines = [f"Seus compromissos {period_label}:"]
+    for item in ordered:
+        status = "Concluido" if item.concluido else "Pendente"
+        horario = item.data_inicio.strftime("%H:%M")
+        lines.append(f"- {horario} | {item.titulo} ({status})")
+
+    return "\n".join(lines)
+
+
+def _parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
+    raw = (message or "").strip()
+    if not raw:
+        return None
+
+    normalized = _normalize_key(raw)
+    if not any(
+        term in normalized
+        for term in ("agendar", "marcar", "novo compromisso", "criar compromisso", "adicionar compromisso")
+    ):
+        return None
+
+    if "|" in raw:
+        return None
+
+    time_match = re.search(r"\b(\d{1,2}:\d{2})\b", raw)
+    if not time_match:
+        return {"error": "Data/hora invalida"}
+
+    hour, minute = [int(part) for part in time_match.group(1).split(":")]
+    if hour > 23 or minute > 59:
+        return {"error": "Data/hora invalida"}
+
+    date_match = re.search(r"\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b", raw)
+    date_value: Optional[datetime] = None
+
+    if date_match:
+        for fmt in ("%d/%m/%Y", "%d/%m/%y", "%d-%m-%Y"):
+            try:
+                parsed_date = datetime.strptime(date_match.group(1), fmt)
+                date_value = parsed_date
+                break
+            except ValueError:
+                continue
+    elif "amanha" in normalized:
+        date_value = datetime.now() + timedelta(days=1)
+    elif "hoje" in normalized:
+        date_value = datetime.now()
+
+    if not date_value:
+        return {"error": "Data/hora invalida"}
+
+    date_time = date_value.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+    title = raw
+    title = re.sub(
+        r"(?i)\b(agendar|agenda|marcar|marque|novo compromisso|criar compromisso|adicionar compromisso)\b",
+        "",
+        title,
+    )
+    title = title.replace(time_match.group(0), "")
+    if date_match:
+        title = title.replace(date_match.group(1), "")
+    title = re.sub(r"(?i)\b(hoje|amanha|amanhã|as|às|para|dia)\b", " ", title)
+    title = re.sub(r"\s+", " ", title).strip(" -,:;")
+    if not title:
+        title = "Compromisso"
+
+    return {
+        "title": title,
+        "date_time": date_time,
+        "description": None,
+        "tipo": _infer_event_type(title),
+    }
+
+
+def _parse_agenda_conclude_command(message: str) -> Optional[Dict[str, Any]]:
+    raw = (message or "").strip()
+    if not raw:
+        return None
+
+    normalized = _normalize_key(raw)
+    if not any(term in normalized for term in ("concluir", "confirmar", "finalizar")):
+        return None
+
+    uuid_match = re.search(
+        r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}\b",
+        raw,
+    )
+    if not uuid_match:
+        text_query = re.sub(
+            r"(?i)\b(concluir|confirmar|finalizar|compromisso|evento|agenda)\b",
+            " ",
+            raw,
+        )
+        text_query = re.sub(r"\s+", " ", text_query).strip(" -,:;")
+        if text_query and len(text_query) >= 3:
+            return {"search_text": text_query}
+        return {"error": "ID ou titulo obrigatorio"}
+
+    try:
+        return {"evento_id": UUID(uuid_match.group(0))}
+    except ValueError:
+        return {"error": "ID invalido"}
+
+
 # ============================================
 # CHAT
 # ============================================
@@ -1009,65 +1727,193 @@ async def chat_with_viva(
 ):
     """Chat direto com a VIVA usando OpenAI como provedor institucional."""
     try:
-        agenda_command = _parse_agenda_command(request.mensagem)
-        if agenda_command:
-            if agenda_command.get("error"):
-                return ChatResponse(
-                    resposta=(
-                        "Para agendar, use: "
-                        "agendar TITULO | DD/MM/AAAA HH:MM | descricao opcional"
-                    )
-                )
+        await _ensure_chat_tables(db)
 
-            service = AgendaService(db)
+        modo = (
+            _normalize_mode(request.modo)
+            or _infer_mode_from_message(request.mensagem)
+            or _infer_mode_from_context(request.contexto)
+        )
+
+        session_id = await _resolve_chat_session(
+            db=db,
+            user_id=current_user.id,
+            requested_session_id=request.session_id,
+            modo=modo,
+        )
+
+        async def finalize(
+            resposta: str,
+            midia: Optional[List[MediaItem]] = None,
+            meta: Optional[Dict[str, Any]] = None,
+        ) -> ChatResponse:
+            await _append_chat_message(
+                db=db,
+                session_id=session_id,
+                user_id=current_user.id,
+                tipo="ia",
+                conteudo=resposta,
+                modo=modo,
+                anexos=_serialize_media_items(midia),
+                meta=meta or {},
+            )
+            return ChatResponse(resposta=resposta, midia=midia, session_id=session_id)
+
+        await _append_chat_message(
+            db=db,
+            session_id=session_id,
+            user_id=current_user.id,
+            tipo="usuario",
+            conteudo=request.mensagem,
+            modo=modo,
+            meta={"contexto_len": len(request.contexto or [])},
+        )
+
+        snapshot = await _load_chat_snapshot(
+            db=db,
+            user_id=current_user.id,
+            session_id=session_id,
+            limit=180,
+        )
+        contexto_efetivo = _context_from_snapshot(snapshot)
+        if not modo:
+            modo = _normalize_mode(snapshot.modo) or _infer_mode_from_context(contexto_efetivo)
+
+        service = AgendaService(db)
+        agenda_query_intent = _is_agenda_query_intent(request.mensagem, contexto_efetivo)
+        agenda_command = _parse_agenda_command(request.mensagem)
+        agenda_natural_command = _parse_agenda_natural_create(request.mensagem)
+        agenda_errors: List[str] = []
+        agenda_create_payload: Optional[Dict[str, Any]] = None
+
+        if agenda_command is not None:
+            if agenda_command.get("error"):
+                agenda_errors.append(str(agenda_command["error"]))
+            else:
+                agenda_create_payload = agenda_command
+
+        if not agenda_create_payload and agenda_natural_command is not None:
+            if agenda_natural_command.get("error"):
+                agenda_errors.append(str(agenda_natural_command["error"]))
+            else:
+                agenda_create_payload = agenda_natural_command
+
+        if agenda_create_payload:
             evento = await service.create(
                 EventoCreate(
-                    titulo=agenda_command["title"],
-                    descricao=agenda_command.get("description"),
-                    tipo=agenda_command["tipo"],
-                    data_inicio=agenda_command["date_time"],
+                    titulo=agenda_create_payload["title"],
+                    descricao=agenda_create_payload.get("description"),
+                    tipo=agenda_create_payload["tipo"],
+                    data_inicio=agenda_create_payload["date_time"],
                     data_fim=None,
                     cliente_id=None,
                     contrato_id=None,
                 ),
                 current_user.id,
             )
-            return ChatResponse(
+            return await finalize(
                 resposta=(
                     "Agendamento criado com sucesso: "
                     f"{evento.titulo} em {evento.data_inicio.strftime('%d/%m/%Y %H:%M')}."
                 )
             )
 
-        modo = _normalize_mode(request.modo)
-        if not modo:
-            for msg in reversed(request.contexto):
-                maybe_mode = _normalize_mode(msg.get("modo"))
-                if maybe_mode:
-                    modo = maybe_mode
-                    break
+        conclude_command = _parse_agenda_conclude_command(request.mensagem)
+        if conclude_command is not None:
+            if conclude_command.get("error"):
+                return await finalize(
+                    resposta=(
+                        "Para concluir um compromisso, informe ID ou parte do titulo. "
+                        "Exemplo: concluir reuniao com Fabio."
+                    )
+                )
 
-        prompt_extra_raw = request.prompt_extra.strip() if request.prompt_extra else None
-        prompt_extra_chat = _sanitize_prompt(prompt_extra_raw, 4000) if prompt_extra_raw else None
-        prompt_extra_image = _sanitize_prompt(prompt_extra_raw, 1200) if prompt_extra_raw else None
+            target_event_id: Optional[UUID] = conclude_command.get("evento_id")
+            search_text = str(conclude_command.get("search_text") or "").strip()
+            if not target_event_id and search_text:
+                agenda_data = await service.list(
+                    inicio=None,
+                    fim=None,
+                    concluido=False,
+                    user_id=current_user.id,
+                    page=1,
+                    page_size=120,
+                )
+                items = list(agenda_data.get("items", []))
+                normalized_search = _normalize_key(search_text)
+                matches = [
+                    item for item in items
+                    if normalized_search in _normalize_key(getattr(item, "titulo", ""))
+                ]
+                if len(matches) == 1:
+                    target_event_id = matches[0].id
+                elif len(matches) > 1:
+                    sugestoes = "\n".join(
+                        f"- {m.titulo} ({m.data_inicio.strftime('%d/%m %H:%M')})"
+                        for m in matches[:3]
+                    )
+                    return await finalize(
+                        resposta=(
+                            "Encontrei mais de um compromisso parecido. Me diga qual deseja concluir:\n"
+                            f"{sugestoes}"
+                        )
+                    )
+
+            if not target_event_id:
+                return await finalize(resposta="Nao encontrei esse compromisso para concluir na sua agenda.")
+
+            evento = await service.concluir(target_event_id, user_id=current_user.id)
+            if not evento:
+                return await finalize(resposta="Nao encontrei esse compromisso para concluir na sua agenda.")
+            return await finalize(
+                resposta=(
+                    "Compromisso concluido com sucesso: "
+                    f"{evento.titulo} ({evento.data_inicio.strftime('%d/%m/%Y %H:%M')})."
+                )
+            )
+
+        if agenda_query_intent:
+            inicio, fim, period_label = _agenda_window_from_text(request.mensagem)
+            agenda_data = await service.list(
+                inicio=inicio,
+                fim=fim,
+                concluido=None,
+                user_id=current_user.id,
+                page=1,
+                page_size=120,
+            )
+            items = list(agenda_data.get("items", []))
+            return await finalize(resposta=_format_agenda_list(items, period_label))
+
+        if agenda_errors and (agenda_command is not None or agenda_natural_command is not None):
+            return await finalize(
+                resposta=(
+                    "Para agendar, use: "
+                    "agendar TITULO | DD/MM/AAAA HH:MM | descricao opcional. "
+                    "Tambem aceito linguagem natural, ex.: agendar reuniao com Fabio amanha 10:30."
+                )
+            )
 
         campaign_flow_requested = False
         campaign_fields: Dict[str, str] = {}
         campaign_missing_fields: List[str] = []
         campaign_prompt_source = request.mensagem
-        pending_brief = _has_pending_campaign_brief(request.contexto)
+        pending_brief = _has_pending_campaign_brief(contexto_efetivo)
+        campaign_gate_count = _campaign_gate_count(contexto_efetivo)
         logo_request = _is_logo_request(request.mensagem)
         generation_confirmation = _is_generation_confirmation(request.mensagem)
+        direct_generation_intent = _is_direct_generation_intent(request.mensagem)
+        option_publico: Optional[str] = None
 
         if modo in ("FC", "REZETA") and not logo_request:
-            campaign_fields = _collect_campaign_fields_from_context(request.contexto)
+            campaign_fields = _collect_campaign_fields_from_context(contexto_efetivo)
             inferred_fields = _infer_campaign_fields_from_free_text(request.mensagem)
             explicit_fields = _extract_campaign_brief_fields(request.mensagem)
             option_publico = _extract_publico_option(request.mensagem)
             if option_publico:
                 campaign_fields["publico"] = option_publico
-            campaign_fields.update(inferred_fields)
             campaign_fields.update(explicit_fields)
+            campaign_fields.update(inferred_fields)
             message_campaign_related = (
                 _is_image_request(request.mensagem)
                 or _is_campaign_request(request.mensagem)
@@ -1088,28 +1934,45 @@ async def chat_with_viva(
                     modo,
                 )
 
+        if (
+            modo in ("FC", "REZETA")
+            and campaign_flow_requested
+            and not logo_request
+            and not generation_confirmation
+            and not direct_generation_intent
+            and campaign_gate_count < 3
+            and not _is_image_request(request.mensagem)
+        ):
+            return await finalize(resposta=_build_campaign_quick_plan(modo, campaign_fields))
+
         should_generate_image = _is_image_request(request.mensagem) or (
-            campaign_flow_requested and (not campaign_missing_fields or generation_confirmation)
+            campaign_flow_requested
+            and (
+                generation_confirmation
+                or direct_generation_intent
+                or bool(option_publico)
+                or campaign_gate_count >= 3
+                or not campaign_missing_fields
+            )
         )
 
         if should_generate_image:
             if not settings.OPENAI_API_KEY:
-                return ChatResponse(resposta="A geracao de imagens esta indisponivel no momento.")
+                return await finalize(resposta="A geracao de imagens esta indisponivel no momento.")
 
             effective_mode = "LOGO" if logo_request else modo
-            prompt_extra_image_effective = None if logo_request else prompt_extra_image
             hint = _mode_hint(effective_mode)
             campaign_copy: Optional[Dict[str, Any]] = None
 
             if effective_mode in ("FC", "REZETA"):
                 campaign_copy = await _generate_campaign_copy(
                     campaign_prompt_source,
-                    prompt_extra_image_effective,
+                    None,
                     effective_mode,
                 )
                 prompt = _build_branded_background_prompt(effective_mode, campaign_copy)
             else:
-                prompt = _build_image_prompt(prompt_extra_image_effective, hint, request.mensagem)
+                prompt = _build_image_prompt(None, hint, request.mensagem)
                 prompt = f"{prompt}\n{BACKGROUND_ONLY_SUFFIX}"
 
             resultado = await openai_service.generate_image(prompt=prompt, size="1024x1024")
@@ -1147,11 +2010,15 @@ async def chat_with_viva(
                                     media_meta["campanha_id"] = str(saved_id)
                                     resposta_texto = "Imagem gerada com sucesso e salva em Campanhas."
                             media = MediaItem(tipo="imagem", url=url, meta=media_meta or None)
-                            return ChatResponse(resposta=resposta_texto, midia=[media])
-                        return ChatResponse(resposta="A imagem foi solicitada, mas a API nao retornou URL.")
+                            return await finalize(
+                                resposta=resposta_texto,
+                                midia=[media],
+                                meta={"effective_mode": effective_mode, "fallback": True},
+                            )
+                        return await finalize(resposta="A imagem foi solicitada, mas a API nao retornou URL.")
 
                 msg = erro.get("message", "Erro desconhecido") if isinstance(erro, dict) else str(erro)
-                return ChatResponse(resposta=f"Erro ao gerar imagem: {msg}")
+                return await finalize(resposta=f"Erro ao gerar imagem: {msg}")
 
             url = _extract_image_url(resultado)
             if url:
@@ -1177,36 +2044,79 @@ async def chat_with_viva(
                         media_meta["campanha_id"] = str(saved_id)
                         resposta_texto = "Imagem gerada com sucesso e salva em Campanhas."
                 media = MediaItem(tipo="imagem", url=url, meta=media_meta)
-                return ChatResponse(resposta=resposta_texto, midia=[media])
-            return ChatResponse(resposta="A imagem foi solicitada, mas a API nao retornou URL.")
+                return await finalize(
+                    resposta=resposta_texto,
+                    midia=[media],
+                    meta={"effective_mode": effective_mode, "fallback": False},
+                )
+            return await finalize(resposta="A imagem foi solicitada, mas a API nao retornou URL.")
 
         if not settings.OPENAI_API_KEY:
-            messages = viva_local_service.build_messages(request.mensagem, request.contexto)
+            messages = viva_local_service.build_messages(request.mensagem, contexto_efetivo)
             resposta = await viva_local_service.chat(messages, modo)
         else:
-            messages = openrouter_service.build_messages(request.mensagem, request.contexto)
-            should_inject_prompt = bool(prompt_extra_chat) and (
-                modo not in ("FC", "REZETA")
-                or campaign_flow_requested
-                or _is_image_request(request.mensagem)
-                or _is_campaign_request(request.mensagem)
+            messages = _build_viva_concierge_messages(
+                mensagem=request.mensagem,
+                contexto=contexto_efetivo,
+                modo=modo,
             )
-            if should_inject_prompt:
-                messages.insert(1, {"role": "system", "content": prompt_extra_chat})
             resposta = await viva_model_service.chat(
                 messages=messages,
                 temperature=0.58,
                 max_tokens=700,
             )
             if not resposta or resposta.strip().lower().startswith(("erro", "error")):
-                messages_local = viva_local_service.build_messages(request.mensagem, request.contexto)
+                messages_local = viva_local_service.build_messages(request.mensagem, contexto_efetivo)
                 resposta = await viva_local_service.chat(messages_local, modo)
 
         resposta = _sanitize_fake_asset_delivery_reply(resposta, modo)
         resposta = _ensure_fabio_greeting(request.mensagem, resposta)
-        return ChatResponse(resposta=resposta)
+        return await finalize(resposta=resposta)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
+
+
+@router.get("/chat/snapshot", response_model=ChatSnapshotResponse)
+async def get_chat_snapshot(
+    session_id: Optional[UUID] = None,
+    limit: int = 120,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retorna sessao atual/mais recente com historico de mensagens da VIVA."""
+    try:
+        await _ensure_chat_tables(db)
+        target_session_id = session_id
+        if not target_session_id:
+            latest = await _get_latest_chat_session_row(db, current_user.id)
+            target_session_id = latest.id if latest else None
+
+        if not target_session_id:
+            return ChatSnapshotResponse(session_id=None, modo=None, messages=[])
+
+        return await _load_chat_snapshot(
+            db=db,
+            user_id=current_user.id,
+            session_id=target_session_id,
+            limit=limit,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao carregar historico: {str(e)}")
+
+
+@router.post("/chat/session/new", response_model=ChatSnapshotResponse)
+async def create_chat_session(
+    payload: ChatSessionStartRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Inicia nova sessao de chat para limpar contexto sem perder historico anterior."""
+    try:
+        await _ensure_chat_tables(db)
+        session_id = await _create_chat_session(db, current_user.id, payload.modo)
+        return ChatSnapshotResponse(session_id=session_id, modo=_normalize_mode(payload.modo), messages=[])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao criar sessao: {str(e)}")
 
 
 @router.post("/campanhas", response_model=CampanhaItem)
@@ -1476,6 +2386,7 @@ async def viva_status(
     if settings.OPENAI_API_KEY:
         return viva_model_service.get_status()
     return viva_local_service.get_status()
+
 
 
 

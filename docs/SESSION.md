@@ -1,7 +1,7 @@
 # SESSION - contexto atual da sessao
 
-Sessao ativa: 09/02/2026
-Status: V1.7 local com fluxo de clientes/contratos saneado (unicidade CPF/CNPJ)
+Sessao ativa: 10/02/2026
+Status: rodada GODMOD pre-clean iniciada (persona dual + limpeza estrutural + memoria/RAG)
 Branch: main
 
 ## Resumo executivo
@@ -110,7 +110,7 @@ passo e evoluir para melhorias incrementais sem quebrar o fluxo homologado.
 
 ---
 
-Atualizado em: 09/02/2026
+Atualizado em: 10/02/2026
 
 ## Atualizacao tecnica (2026-02-09 - layout contratos + CADIN)
 - Rollback snapshot criado antes desta fase:
@@ -234,3 +234,193 @@ Atualizado em: 09/02/2026
   - historico de campanhas ativo.
 - Pendencia mantida:
   - BUG-015 (gerador de imagem) segue pendente por repeticao de composicao e aderencia parcial ao contexto.
+
+## Atualizacao tecnica (2026-02-09 - blocos 1 e 2 memoria/persona)
+- Rollback institucional desta rodada:
+  - `docs/ROLLBACK/rollback-20260209-213516-baseline.txt`
+- Bloco 1 aplicado:
+  - fonte canonica de prompts consolidada em `frontend/src/app/viva/PROMPTS`;
+  - rota interna `/api/viva/prompts/[promptId]` sem fallback em `public/PROMPTS`;
+  - alias legado `CRIADORWEB` mantido para `CRIADORPROMPT`.
+- Bloco 2 aplicado:
+  - backend com persistencia de sessao e historico por usuario (`viva_chat_sessions`, `viva_chat_messages`);
+  - novas rotas de memoria:
+    - `GET /api/v1/viva/chat/snapshot`
+    - `POST /api/v1/viva/chat/session/new`
+  - `/api/v1/viva/chat` agora aceita/retorna `session_id` e persiste mensagens da conversa;
+  - frontend `/viva` recupera historico automaticamente na abertura e limpa contexto iniciando nova sessao.
+
+## Proximos passos aprovados (pendentes de execucao)
+1. Bloco 3: memoria operacional da VIVA com agenda em linguagem natural (consultar/criar/concluir).
+2. Bloco 4: streaming da resposta com autoscroll continuo em tempo real.
+3. Bloco 5: previsibilidade de erros no fluxo de audio interno.
+4. Bloco 6: atualizacao documental e fechamento institucional por bloco validado.
+
+## Atualizacao tecnica (2026-02-10 - bloco 3 agenda linguagem natural)
+- VIVA/chat:
+  - bypass de agenda implementado antes do fluxo LLM para evitar loop de confirmacoes;
+  - consulta de agenda por linguagem natural (`hoje`, `amanha`, `semana`, follow-up de confirmacao);
+  - criacao por comando estruturado e tambem por frase natural com data/hora;
+  - conclusao/confirmacao de compromisso via ID no chat.
+- Agenda service/api:
+  - filtro por usuario aplicado em listagem/consulta/update/concluir/delete;
+  - rotas `/api/v1/agenda/*` agora usam `current_user.id` em todas as operacoes.
+- Objetivo desta rodada:
+  - eliminar respostas "falsas" de acesso/checagem e retornar agenda real do usuario no primeiro pedido.
+
+## Atualizacao operacional (2026-02-10 - auditoria GODMOD pre-fix)
+- Pedido do usuario: documentar estado real antes de corrigir e registrar rollback institucional.
+- Leitura institucional revalidada:
+  - `README.md`
+  - `docs/CONTEXT.md`
+  - `docs/FOUNDATION.md`
+  - `docs/STATUS.md`
+  - `docs/DECISIONS.md`
+  - `docs/BUGSREPORT.md`
+  - `docs/PROMPTS/GODMOD.md`
+- Rollback institucional pre-fix gerado:
+  - `docs/ROLLBACK/rollback-20260210-104803-pre-fix-baseline.txt`
+  - `docs/ROLLBACK/rollback-20260210-104803-pre-fix.patch`
+  - `docs/ROLLBACK/rollback-20260210-104803-pre-fix-staged.patch`
+  - `docs/ROLLBACK/rollback-20260210-104803-pre-fix-untracked.txt`
+- Validacao com frontend ativo:
+  - rotas web principais com `200` (`/`, `/viva`, `/contratos`, `/contratos/novo`, `/whatsapp`, `/whatsapp/conversas`, `/campanhas`);
+  - backend + auth + VIVA/WhatsApp operacionais (`200`).
+- Pendencias abertas formalizadas em `docs/BUGSREPORT.md`:
+  - `BUG-048` a `BUG-053`.
+
+## Atualizacao tecnica (2026-02-10 - execucao BUG-048..053)
+- Build frontend destravado com `Suspense` em paginas que usam `useSearchParams`:
+  - `frontend/src/app/(dashboard)/campanhas/page.tsx`
+  - `frontend/src/app/(dashboard)/contratos/novo/page.tsx`
+  - `frontend/src/app/whatsapp/conversas/page.tsx`
+- Testes legados higienizados:
+  - `test_db.py` e `test_db2.py` sem credenciais hardcoded, agora com `TEST_DATABASE_URL`/`TEST_DB_*`;
+  - `backend/test_glm.py` convertido para placeholder legado com `pytest.mark.skip` (sem quebra de coleta).
+- Tooling frontend estabilizado:
+  - ESLint inicializado com `frontend/.eslintrc.json` + dependencias (`eslint`, `eslint-config-next`);
+  - `npm run lint` executa sem wizard.
+- Documentacao alinhada ao runtime:
+  - `docs/DEPLOY_UBUNTU_DOCKER.md` ajustado para `/health`;
+  - `docs/API.md` ajustado para auth obrigatoria em `/whatsapp-chat/*`.
+- Validacao desta rodada:
+  - `npm run type-check`: OK
+  - `npm run lint`: OK (warnings nao bloqueantes)
+  - `npm run build`: OK
+  - `python -m pytest -q ..\\test_db.py ..\\test_db2.py .\\test_glm.py`: `3 skipped`
+
+## Gate atual da sessao
+Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
+
+## Atualizacao operacional (2026-02-10 - kickoff persona dual + RAG)
+- Solicitação formal do cliente:
+  - separar claramente personas:
+    - VIVA = concierge do Fabio, assistente global do SaaS;
+    - Viviane = secretaria humana/comercial em atendimento externo.
+  - reduzir Frankenstein de prompts/pastas e simplificar fluxo conversacional.
+- Rollback institucional pre-clean criado antes de delecoes/refatoracoes:
+  - `docs/ROLLBACK/rollback-20260210-112843-pre-clean-baseline.txt`
+  - `docs/ROLLBACK/rollback-20260210-112843-pre-clean.patch`
+  - `docs/ROLLBACK/rollback-20260210-112843-pre-clean-staged.patch`
+  - `docs/ROLLBACK/rollback-20260210-112843-pre-clean-untracked.txt`
+- Diagnostico consolidado da rodada:
+  - prompt files duplicados em:
+    - `frontend/src/app/viva/PROMPTS`
+    - `frontend/public/PROMPTS`
+    - `docs/PROMPTS`
+  - chat interno `/viva` com memoria persistida, mas contexto de inferencia ainda curto por dependencia do frontend;
+  - agenda natural evoluiu, mas ainda com rigidez em alguns padroes de frase;
+  - sem camada vetorial RAG no backend atual.
+- Bugs abertos para execucao desta rodada:
+  - `BUG-054` a `BUG-058`.
+
+## Plano de execucao aprovado na sessao
+1. atualizar documentacao institucional completa (estado + riscos + plano).
+2. remover duplicacoes de prompt com seguranca e rollback.
+3. consolidar contrato de persona no backend por dominio/canal.
+4. ajustar memoria para contexto server-side por sessao.
+5. preparar arquitetura RAG moderna para piloto.
+
+## Atualizacao tecnica (2026-02-10 - execucao blocos B/C/D)
+- Limpeza estrutural concluida:
+  - removido `frontend/src/app/api/viva/prompts/[promptId]/route.ts`;
+  - removida cadeia de arquivos em `frontend/src/app/viva/PROMPTS`;
+  - removidos prompts legados em `frontend/public/PROMPTS`;
+  - em `docs/PROMPTS`, mantidos apenas `GODMOD.md` e `PROJETISTA.md`.
+- Persona interna consolidada:
+  - novo serviço `backend/app/services/viva_concierge_service.py` para VIVA concierge;
+  - chat interno `/api/v1/viva/chat` agora monta mensagens com prompt de sistema da concierge.
+- Memoria operacional reforcada:
+  - contexto de inferencia agora parte de snapshot server-side da sessao (`viva_chat_sessions`/`viva_chat_messages`);
+  - frontend deixa de injetar `prompt_extra` baseado em arquivo.
+- Agenda natural melhorada:
+  - conclusao passou a aceitar ID ou parte do titulo do compromisso.
+- Limpeza adicional de legado:
+  - removidos `backend/app/services/openrouter_service.py` e `backend/app/services/brainimage_service_v1_backup.py`.
+
+## Validacao desta etapa
+- frontend:
+  - `npm run type-check` OK
+  - `npm run lint` OK (warnings nao bloqueantes)
+  - `npm run build` OK
+- backend:
+  - `python -m py_compile` OK nos arquivos alterados
+  - `pytest` alvo legado: `3 skipped` (sem erro de coleta)
+  - smoke:
+    - `GET /health` = `200`
+    - `POST /api/v1/viva/chat` autenticado = `200` com `session_id`
+    - agenda natural por chat: criar e concluir por titulo = `200`
+
+## Direcao RAG definida na sessao
+- Fase piloto: `pgvector` em PostgreSQL (stack atual), minimizando complexidade e acelerando entrega.
+- Fase de escala: avaliar Qdrant se volume/QPS ultrapassar limite do piloto.
+
+## Atualizacao tecnica (2026-02-10 - incidente Next dev apos remocao de rota legacy)
+- Contexto operacional consolidado: local-only (`c:\projetos\fabio2`) nesta rodada.
+- Observacao do usuario: ambiente Ubuntu/deploy ainda virgem para esta fase; documentacao de deploy fica como referencia futura, nao como estado real do runtime atual.
+- Erro reportado e reproduzido por evidencias de log:
+  - `MODULE_NOT_FOUND` com requireStack referenciando `.../.next/server/app/api/viva/prompts/[promptId]/route`.
+- Diagnostico:
+  - rota legacy removida corretamente em source;
+  - cache `.next` stale mantendo grafo antigo de dependencias do dev server.
+- Correcao implementada:
+  - `frontend/package.json`:
+    - `clean:next`: limpeza de cache `.next`
+    - `dev:reset`: limpeza + subida do `next dev`
+- Validacao executada:
+  - `npm run clean:next`: OK
+  - `npm run build`: OK (com warnings conhecidos nao bloqueantes)
+- Runbook local definido:
+  1. parar processo `next dev` atual
+  2. rodar `npm run clean:next`
+  3. rodar `npm run dev:reset`
+  4. se persistir, remover `tsconfig.tsbuildinfo` e repetir
+
+## Atualizacao tecnica (2026-02-10 - BUG-060 autenticacao local)
+- Causa raiz: divergencia entre documentacao de login (`README.md`) e runtime dev (`security_stub.py`), somada a mensagem de erro generica no frontend.
+- Mudancas executadas:
+  - `frontend/src/app/page.tsx`: mensagens de erro diferenciadas por status/falha de conexao.
+  - `README.md`: credencial de teste local corrigida para `1234`.
+- Evidencias:
+  - login API com `1234`: `200`.
+  - login API com `senha123`: `401`.
+  - `npm run type-check`: OK.
+  - `npm run lint`: OK (warnings legados).
+- Rollback institucional desta micro-rodada (auth/docs):
+  - `docs/ROLLBACK/rollback-20260210-140052-login-auth-baseline.txt`
+  - `docs/ROLLBACK/rollback-20260210-140052-login-auth.patch`
+  - `docs/ROLLBACK/rollback-20260210-140052-login-auth-staged.patch`
+  - `docs/ROLLBACK/rollback-20260210-140052-login-auth-untracked.txt`
+
+## Atualizacao da sessao (2026-02-10 - APROVADO redesign VIVA)
+- Solicitacao do cliente:
+  - remover comportamento de "bot travado" no fluxo de agenda;
+  - reduzir Frankenstein de regras no monolito `viva.py`;
+  - garantir fluxo fluido de secretaria: `Fabio -> VIVA -> Viviane -> Fabio`.
+- Planejamento aprovado em 3 etapas:
+  1. documentacao + baseline;
+  2. refatoracao por dominios + agenda fluida;
+  3. handoff operacional + memoria longa vetorial.
+- Artefatos criados nesta etapa:
+  - `docs/ARCHITECTURE/VIVA_REDESIGN.md`
+  - registros `BUG-062`, `BUG-063`, `BUG-064` em `docs/BUGSREPORT.md`.

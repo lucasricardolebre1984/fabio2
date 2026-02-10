@@ -90,12 +90,6 @@ class Settings(BaseSettings):
     DEEPSEEK_API_KEY: Optional[str] = None
     
     # ==================================================================
-    # OpenRouter API (Gratuito)
-    # Obter API key: https://openrouter.ai/
-    # ==================================================================
-    OPENROUTER_API_KEY: Optional[str] = None
-
-    # ==================================================================
     # OpenAI API (Primary for VIVA WhatsApp)
     # ==================================================================
     OPENAI_API_KEY: Optional[str] = None

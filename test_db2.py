@@ -1,22 +1,33 @@
+import os
+
 import asyncpg
-import asyncio
+import pytest
 
-async def test():
-    try:
-        # Tentando com parâmetros separados
-        conn = await asyncpg.connect(
-            host='172.18.0.3',
-            port=5432,
-            user='fabio2_prod',
-            password='Fabio2@Secure2026!',
-            database='fabio2_prod'
+
+@pytest.mark.asyncio
+async def test_database_connection_from_parts():
+    """Optional connectivity smoke test using TEST_DB_* env vars."""
+    host = os.getenv("TEST_DB_HOST")
+    port = int(os.getenv("TEST_DB_PORT", "5432"))
+    user = os.getenv("TEST_DB_USER")
+    password = os.getenv("TEST_DB_PASSWORD")
+    database = os.getenv("TEST_DB_NAME")
+
+    if not all([host, user, password, database]):
+        pytest.skip(
+            "Set TEST_DB_HOST, TEST_DB_USER, TEST_DB_PASSWORD and TEST_DB_NAME "
+            "to run this connectivity test."
         )
-        result = await conn.fetch("SELECT 1")
-        print(f"Success: {result}")
-        await conn.close()
-    except Exception as e:
-        print(f"Error: {e}")
-        import traceback
-        traceback.print_exc()
 
-asyncio.run(test())
+    conn = await asyncpg.connect(
+        host=host,
+        port=port,
+        user=user,
+        password=password,
+        database=database,
+    )
+    try:
+        result = await conn.fetchval("SELECT 1")
+        assert result == 1
+    finally:
+        await conn.close()

@@ -50,6 +50,7 @@ async def list_eventos(
         fim=fim,
         cliente_id=cliente_id,
         concluido=concluido,
+        user_id=current_user.id,
         page=page,
         page_size=page_size
     )
@@ -62,7 +63,7 @@ async def get_eventos_hoje(
 ):
     """Get today's events."""
     service = AgendaService(db)
-    return await service.get_hoje()
+    return await service.get_hoje(user_id=current_user.id)
 
 
 @router.get("/{evento_id}", response_model=EventoResponse)
@@ -73,7 +74,7 @@ async def get_evento(
 ):
     """Get event by ID."""
     service = AgendaService(db)
-    evento = await service.get_by_id(evento_id)
+    evento = await service.get_by_id(evento_id, user_id=current_user.id)
     
     if not evento:
         raise HTTPException(
@@ -93,7 +94,7 @@ async def update_evento(
 ):
     """Update event."""
     service = AgendaService(db)
-    evento = await service.update(evento_id, data)
+    evento = await service.update(evento_id, data, user_id=current_user.id)
     
     if not evento:
         raise HTTPException(
@@ -112,7 +113,7 @@ async def concluir_evento(
 ):
     """Mark event as completed."""
     service = AgendaService(db)
-    evento = await service.concluir(evento_id)
+    evento = await service.concluir(evento_id, user_id=current_user.id)
     
     if not evento:
         raise HTTPException(
@@ -131,7 +132,7 @@ async def delete_evento(
 ):
     """Delete event."""
     service = AgendaService(db)
-    deleted = await service.delete(evento_id)
+    deleted = await service.delete(evento_id, user_id=current_user.id)
     
     if not deleted:
         raise HTTPException(

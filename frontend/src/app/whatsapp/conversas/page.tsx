@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Archive, Bot, MessageCircle, RefreshCw, Send, User } from "lucide-react";
 
@@ -38,7 +38,7 @@ interface Stats {
   mensagens_hoje: number;
 }
 
-export default function WhatsAppConversasPage() {
+function WhatsAppConversasPageContent() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
@@ -380,5 +380,22 @@ export default function WhatsAppConversasPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function WhatsAppConversasPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-screen bg-gray-100">
+          <Sidebar />
+          <div className="flex flex-1 items-center justify-center">
+            <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
+          </div>
+        </div>
+      }
+    >
+      <WhatsAppConversasPageContent />
+    </Suspense>
   );
 }

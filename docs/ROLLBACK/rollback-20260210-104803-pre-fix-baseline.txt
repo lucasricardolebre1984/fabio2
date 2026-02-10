@@ -1,0 +1,13 @@
+﻿## main...origin/main
+ M backend/app/api/v1/agenda.py
+ M backend/app/api/v1/viva.py
+ M backend/app/services/agenda_service.py
+ M docs/BUGSREPORT.md
+ M docs/SESSION.md
+ M docs/STATUS.md
+ M frontend/src/app/api/viva/prompts/[promptId]/route.ts
+ M frontend/src/app/viva/page.tsx
+?? docs/ROLLBACK/rollback-20260209-213516-baseline.txt
+?? docs/ROLLBACK/rollback-20260210-104803-pre-fix-baseline.txt
+
+f5da1cd|Lucas Lebre|2026-02-09 21:13:56 -0300|feat(viva): simplifica fluxo de campanha e registra pendencia do gerador

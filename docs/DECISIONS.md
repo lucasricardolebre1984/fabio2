@@ -808,3 +808,203 @@ O fluxo de conversa e o salvamento de campanhas evoluiram, mas o gerador de imag
 ---
 
 *Documentado em: 09/02/2026*
+
+---
+
+## DECISAO-022: gate institucional pre-fix com rollback formal + documentacao de auditoria
+
+### Data
+10/02/2026
+
+### Contexto
+Antes da nova rodada de correcoes, foi solicitado congelar execucao, registrar rollback institucional e documentar achados reais com frontend ativo para reduzir risco de regressao sem trilha de reversao.
+
+### Decisao
+- Executar apenas atividades read-only e documentais nesta etapa.
+- Gerar rollback institucional pre-fix contendo baseline + diffs:
+  - `docs/ROLLBACK/rollback-20260210-104803-pre-fix-baseline.txt`
+  - `docs/ROLLBACK/rollback-20260210-104803-pre-fix.patch`
+  - `docs/ROLLBACK/rollback-20260210-104803-pre-fix-staged.patch`
+  - `docs/ROLLBACK/rollback-20260210-104803-pre-fix-untracked.txt`
+- Formalizar no `BUGSREPORT` os achados de bloqueio para a rodada seguinte:
+  - `BUG-048`, `BUG-049`, `BUG-050`, `BUG-051`, `BUG-052`, `BUG-053`.
+- Priorizar a proxima execucao na ordem:
+  1. seguranca/higiene de testes;
+  2. gate de build frontend;
+  3. alinhamento documental e tooling.
+
+### Motivo
+- Preservar capacidade de rollback imediato antes de alterar codigo.
+- Garantir rastreabilidade institucional (docs-first) conforme protocolo GODMOD.
+- Evitar iniciar correcoes sem baseline comprovada do estado atual.
+
+### Rollback
+- Reverter apenas documentacao desta decisao por `git revert <hash>`.
+- Arquivos de rollback pre-fix permanecem como artefato historico de auditoria.
+
+---
+
+*Documentado em: 10/02/2026*
+
+---
+
+## DECISAO-023: separacao oficial de personas por dominio + limpeza estrutural pre-RAG
+
+### Data
+10/02/2026
+
+### Contexto
+Foi validado com cliente que existem duas personas de negocio distintas:
+- VIVA: concierge do Fabio, assistente principal do SaaS interno (visao global de contratos, clientes, agenda e operacao).
+- Viviane: secretaria humana/comercial para atendimento externo via WhatsApp.
+
+Tambem foi identificado excesso de artefatos legados de prompt em caminhos duplicados, elevando risco de drift e comportamento inconsistente.
+
+### Decisao
+- Formalizar separacao de persona por dominio/canal:
+  - `/api/v1/viva/*` => VIVA (concierge do Fabio).
+  - webhook/evolution + fluxo comercial externo => Viviane.
+- Executar limpeza estrutural de prompts duplicados com rollback institucional previo.
+- Consolidar memoria efetiva do chat interno por sessao no backend (evitar dependencia de janela curta no frontend).
+- Iniciar desenho de camada RAG moderna para memoria e conhecimento evolutivo do piloto.
+
+### Rollback
+- Snapshot pre-clean:
+  - `docs/ROLLBACK/rollback-20260210-112843-pre-clean-baseline.txt`
+  - `docs/ROLLBACK/rollback-20260210-112843-pre-clean.patch`
+  - `docs/ROLLBACK/rollback-20260210-112843-pre-clean-staged.patch`
+  - `docs/ROLLBACK/rollback-20260210-112843-pre-clean-untracked.txt`
+- Reversao tecnica: `git revert <hash-da-rodada>` por blocos.
+
+---
+
+*Documentado em: 10/02/2026*
+
+---
+
+## DECISAO-024: VIVA concierge server-first + desativacao da cadeia de prompts file-based no chat interno
+
+### Data
+10/02/2026
+
+### Contexto
+Para reduzir complexidade operacional e comportamento engessado no chat interno `/viva`, foi solicitado eliminar a dependencia de prompts em arquivos duplicados e consolidar a persona da VIVA diretamente no backend.
+
+### Decisao
+- Criar persona server-first da VIVA concierge:
+  - `backend/app/services/viva_concierge_service.py`.
+- Atualizar `/api/v1/viva/chat` para:
+  - montar mensagens com prompt de sistema unico da VIVA concierge;
+  - usar contexto efetivo da sessao via snapshot server-side.
+- Remover cadeia de prompts file-based do chat interno:
+  - `frontend/src/app/viva/PROMPTS/*` removido;
+  - `frontend/public/PROMPTS/*` removido;
+  - `frontend/src/app/api/viva/prompts/[promptId]/route.ts` removido.
+- Manter separacao de dominio:
+  - VIVA concierge em `/viva` (interno);
+  - Viviane no fluxo WhatsApp/webhook (externo/comercial).
+
+### Motivo
+- Reduzir drift e ambiguidades entre multiplos arquivos de prompt.
+- Tornar fluxo de conversa mais natural e menos burocratico.
+- Melhorar coerencia de memoria operacional sem dependencia de contexto curto do frontend.
+
+### Rollback
+- Snapshot desta etapa:
+  - `docs/ROLLBACK/rollback-20260210-112843-pre-clean-baseline.txt`
+  - `docs/ROLLBACK/rollback-20260210-112843-pre-clean.patch`
+  - `docs/ROLLBACK/rollback-20260210-112843-pre-clean-staged.patch`
+  - `docs/ROLLBACK/rollback-20260210-112843-pre-clean-untracked.txt`
+- Reversao por bloco:
+  - `git revert <hash-da-rodada>`
+
+---
+
+*Documentado em: 10/02/2026*
+
+---
+
+## DECISAO-025: RAG do piloto em Postgres com pgvector (e caminho de escala para Qdrant)
+
+### Data
+10/02/2026
+
+### Contexto
+Foi solicitado "o melhor possivel" para memoria evolutiva da VIVA no piloto, com a stack atual baseada em FastAPI + PostgreSQL.
+
+### Decisao
+- Adotar `pgvector` como base do RAG no piloto (fase 1), por acoplamento nativo ao Postgres ja operacional.
+- Implementar desenho com separacao por camadas:
+  - memoria curta (sessao ativa),
+  - memoria episodica (eventos/decisoes por usuario),
+  - conhecimento canonico (documentos operacionais versionados).
+- Planejar fase 2 com avaliacao de migracao para Qdrant caso o volume/QPS ultrapasse o limite operacional do piloto.
+
+### Motivo
+- Reduzir complexidade de infraestrutura no inicio.
+- Preservar consistencia transacional e governanca no mesmo banco ja homologado.
+- Acelerar entrega do piloto sem abrir mao de evolucao para arquitetura vetorial dedicada.
+
+### Rollback
+- Nenhuma migracao RAG executada nesta decisao (somente definicao arquitetural).
+- Caso necessario, revisao por `git revert <hash-da-decisao-documental>`.
+
+---
+
+*Documentado em: 10/02/2026*
+
+## DECISAO-026: contexto operacional local-first ate bootstrap do Ubuntu
+
+### Contexto
+Foi sinalizado que o ambiente Ubuntu/deploy ainda nao foi bootstrapado neste ciclo. Portanto, qualquer documento de deploy nao representa estado real de runtime atual.
+
+### Decisao
+- Tratar `c:\projetos\fabio2` como fonte unica de verdade operacional nesta rodada.
+- Tratar `docs/DEPLOY_UBUNTU_DOCKER.md` como referencia futura, sem inferir status de producao/servidor.
+- Validacoes obrigatorias desta fase devem ser locais (frontend/backend/docker local).
+
+### Impacto
+- Reduz alucinacao de contexto entre local e servidor remoto.
+- Mantem auditoria focada no estado realmente executado.
+
+### Data
+2026-02-10
+
+## DECISAO-027: alinhamento de credencial dev e mensagens de erro de login
+
+### Contexto
+Foi identificado atrito recorrente no acesso local: `README.md` indicava senha `senha123`, enquanto o runtime dev (`security_stub.py`) valida senha `1234`. Alem disso, a tela de login mostrava mensagem generica para qualquer falha.
+
+### Decisao
+- Padronizar documentacao local para senha de teste `1234`.
+- Diferenciar feedback de login no frontend por tipo de erro:
+  - `401`: credencial invalida;
+  - `403`: usuario inativo;
+  - falha de conexao/servidor: mensagem especifica.
+
+### Impacto
+- Reduz falso diagnostico de "senha errada" quando o problema e conectividade.
+- Diminui ruido operacional na validacao dos modulos de contratos.
+
+### Data
+2026-02-10
+
+## DECISAO-028: redesign VIVA em 3 etapas com commit de seguranca baseline
+
+### Contexto
+Foi aprovado iniciar um redesign estrutural da VIVA para eliminar rigidez conversacional, reduzir acoplamento de `viva.py` e preparar orquestracao completa de secretaria (`Fabio -> VIVA -> Viviane -> Fabio`).
+
+### Decisao
+- Executar em 3 etapas:
+  - Etapa 1: documentacao e baseline com commit de seguranca.
+  - Etapa 2: refatoracao backend por dominio e agenda fluida sem fallback prescritivo.
+  - Etapa 3: handoff operacional VIVA->Viviane e memoria longa com `pgvector`.
+- Publicar blueprint tecnico de referencia em:
+  - `docs/ARCHITECTURE/VIVA_REDESIGN.md`.
+
+### Impacto
+- Define trilha de execucao objetiva com rollback institucional antes de mudancas pesadas.
+- Reduz risco de regressao durante desmontagem do monolito atual.
+
+### Data
+2026-02-10

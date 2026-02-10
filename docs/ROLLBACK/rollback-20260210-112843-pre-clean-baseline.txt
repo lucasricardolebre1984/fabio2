@@ -1,0 +1,74 @@
+# Rollback baseline 20260210-112843
+
+## date
+2026-02-10T11:28:53.4402329-03:00
+
+## git status --short
+ M backend/app/api/v1/agenda.py
+ M backend/app/api/v1/viva.py
+ M backend/app/services/agenda_service.py
+ M backend/test_glm.py
+ M docs/API.md
+ M docs/BUGSREPORT.md
+ M docs/DECISIONS.md
+ M docs/DEPLOY_UBUNTU_DOCKER.md
+ M docs/SESSION.md
+ M docs/STATUS.md
+ M frontend/package-lock.json
+ M frontend/package.json
+ M frontend/src/app/(dashboard)/campanhas/page.tsx
+ M frontend/src/app/(dashboard)/contratos/novo/page.tsx
+ M frontend/src/app/api/viva/prompts/[promptId]/route.ts
+ M frontend/src/app/viva/page.tsx
+ M frontend/src/app/whatsapp/conversas/page.tsx
+ M test_db.py
+ M test_db2.py
+?? docs/ROLLBACK/rollback-20260209-213516-baseline.txt
+?? docs/ROLLBACK/rollback-20260210-104803-pre-fix-baseline.txt
+?? docs/ROLLBACK/rollback-20260210-104803-pre-fix-staged.patch
+?? docs/ROLLBACK/rollback-20260210-104803-pre-fix-untracked.txt
+?? docs/ROLLBACK/rollback-20260210-104803-pre-fix.patch
+?? docs/ROLLBACK/rollback-20260210-112843-pre-clean-baseline.txt
+?? frontend/.eslintrc.json
+
+## git status
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   backend/app/api/v1/agenda.py
+	modified:   backend/app/api/v1/viva.py
+	modified:   backend/app/services/agenda_service.py
+	modified:   backend/test_glm.py
+	modified:   docs/API.md
+	modified:   docs/BUGSREPORT.md
+	modified:   docs/DECISIONS.md
+	modified:   docs/DEPLOY_UBUNTU_DOCKER.md
+	modified:   docs/SESSION.md
+	modified:   docs/STATUS.md
+	modified:   frontend/package-lock.json
+	modified:   frontend/package.json
+	modified:   frontend/src/app/(dashboard)/campanhas/page.tsx
+	modified:   frontend/src/app/(dashboard)/contratos/novo/page.tsx
+	modified:   frontend/src/app/api/viva/prompts/[promptId]/route.ts
+	modified:   frontend/src/app/viva/page.tsx
+	modified:   frontend/src/app/whatsapp/conversas/page.tsx
+	modified:   test_db.py
+	modified:   test_db2.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	docs/ROLLBACK/rollback-20260209-213516-baseline.txt
+	docs/ROLLBACK/rollback-20260210-104803-pre-fix-baseline.txt
+	docs/ROLLBACK/rollback-20260210-104803-pre-fix-staged.patch
+	docs/ROLLBACK/rollback-20260210-104803-pre-fix-untracked.txt
+	docs/ROLLBACK/rollback-20260210-104803-pre-fix.patch
+	docs/ROLLBACK/rollback-20260210-112843-pre-clean-baseline.txt
+	frontend/.eslintrc.json
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+## git log -1 --oneline
+f5da1cd feat(viva): simplifica fluxo de campanha e registra pendencia do gerador

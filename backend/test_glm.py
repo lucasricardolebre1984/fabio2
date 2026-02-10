@@ -1,20 +1,14 @@
-import asyncio
-from app.services.glm_image_service import glm_image_service
-from app.schemas.imagem import FormatoImagem
+import pytest
 
-async def test():
-    try:
-        print("Testando GLM-Image API...")
-        image_bytes, custo = await glm_image_service.gerar_imagem(
-            'campanha ano novo',
-            FormatoImagem.QUADRADO
-        )
-        print(f'SUCESSO! {len(image_bytes)} bytes')
-        print(f'Custo: R$ {custo.custo_brl}')
-        print(f'Status: {custo.status}')
-    except Exception as e:
-        print(f'ERRO: {e}')
-        import traceback
-        traceback.print_exc()
 
-asyncio.run(test())
+pytestmark = pytest.mark.skip(
+    reason=(
+        "Legacy GLM image integration script deprecated: "
+        "module app.services.glm_image_service is no longer part of backend."
+    )
+)
+
+
+def test_glm_legacy_placeholder():
+    """Placeholder to keep historical test id without breaking pytest collection."""
+    assert True

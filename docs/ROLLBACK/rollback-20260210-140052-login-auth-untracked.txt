@@ -1,0 +1,16 @@
+﻿backend/app/services/viva_concierge_service.py
+docs/ROLLBACK/rollback-20260209-213516-baseline.txt
+docs/ROLLBACK/rollback-20260210-104803-pre-fix-baseline.txt
+docs/ROLLBACK/rollback-20260210-104803-pre-fix-staged.patch
+docs/ROLLBACK/rollback-20260210-104803-pre-fix-untracked.txt
+docs/ROLLBACK/rollback-20260210-104803-pre-fix.patch
+docs/ROLLBACK/rollback-20260210-112843-pre-clean-baseline.txt
+docs/ROLLBACK/rollback-20260210-112843-pre-clean-staged.patch
+docs/ROLLBACK/rollback-20260210-112843-pre-clean-untracked.txt
+docs/ROLLBACK/rollback-20260210-112843-pre-clean.patch
+docs/ROLLBACK/rollback-20260210-140052-login-auth-baseline.txt
+docs/ROLLBACK/rollback-20260210-140052-login-auth-staged.patch
+docs/ROLLBACK/rollback-20260210-140052-login-auth-untracked.txt
+docs/ROLLBACK/rollback-20260210-140052-login-auth.meta.txt
+docs/ROLLBACK/rollback-20260210-140052-login-auth.patch
+frontend/.eslintrc.json

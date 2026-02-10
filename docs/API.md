@@ -596,8 +596,8 @@ Response 200
 ## WhatsApp Chat
 
 Observação
-- As rotas não possuem verificação explícita de token no código atual.
-- O frontend envia `Authorization`, mas o backend não valida nessas rotas.
+- As rotas exigem Bearer JWT (`require_operador`) no backend.
+- Sem token válido, as chamadas retornam `401`.
 
 ### GET /whatsapp-chat/conversas
 
@@ -684,7 +684,7 @@ Request (JSON)
 ```json
 {
   "mensagem": "Olá, VIVA",
-  "prompt_extra": "Instruções extras do modo ativo (opcional, truncado no backend)",
+  "prompt_extra": "Campo legado (opcional); mantido por compatibilidade, sem uso ativo no runtime atual",
   "contexto": [
     {
       "id": "123",

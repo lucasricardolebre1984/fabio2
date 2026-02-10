@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import Link from 'next/link'
@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
 
-export default function NovoContratoPage() {
+function NovoContratoPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const templateQuery = (searchParams.get('template') || 'bacen').toLowerCase()
@@ -327,5 +327,13 @@ export default function NovoContratoPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function NovoContratoPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-gray-500">Carregando formulario...</div>}>
+      <NovoContratoPageContent />
+    </Suspense>
   )
 }

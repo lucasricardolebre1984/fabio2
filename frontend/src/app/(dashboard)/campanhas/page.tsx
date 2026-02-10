@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CalendarDays, Download, Megaphone, RefreshCw, X } from 'lucide-react'
 import { api } from '@/lib/api'
@@ -35,7 +35,7 @@ const modoLabel: Record<CampanhaModo, string> = {
   REZETA: 'RezetaBrasil',
 }
 
-export default function CampanhasPage() {
+function CampanhasPageContent() {
   const searchParams = useSearchParams()
   const selectedId = searchParams.get('id')
 
@@ -128,7 +128,7 @@ export default function CampanhasPage() {
         <div className="rounded-xl border bg-white p-10 text-center">
           <Megaphone className="mx-auto mb-3 h-10 w-10 text-gray-300" />
           <p className="text-gray-600">Nenhuma campanha salva ainda.</p>
-          <p className="text-sm text-gray-400">Gere uma imagem no menu "Imagens FC" ou "Imagens Rezeta" na VIVA.</p>
+          <p className="text-sm text-gray-400">Gere uma imagem no menu Imagens FC ou Imagens Rezeta na VIVA.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -221,5 +221,17 @@ export default function CampanhasPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function CampanhasPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="rounded-xl border bg-white p-6 text-gray-500">Carregando campanhas...</div>
+      }
+    >
+      <CampanhasPageContent />
+    </Suspense>
   )
 }

@@ -1,15 +1,19 @@
+import os
+
 import asyncpg
-import asyncio
+import pytest
 
-async def test():
+
+@pytest.mark.asyncio
+async def test_database_connection_from_url():
+    """Optional connectivity smoke test driven by TEST_DATABASE_URL env var."""
+    database_url = os.getenv("TEST_DATABASE_URL")
+    if not database_url:
+        pytest.skip("Set TEST_DATABASE_URL to run this connectivity test.")
+
+    conn = await asyncpg.connect(database_url)
     try:
-        conn = await asyncpg.connect("postgresql://fabio2_prod:Fabio2@Secure2026!@172.18.0.3:5432/fabio2_prod")
-        result = await conn.fetch("SELECT 1")
-        print(f"Success: {result}")
+        result = await conn.fetchval("SELECT 1")
+        assert result == 1
+    finally:
         await conn.close()
-    except Exception as e:
-        print(f"Error: {e}")
-        import traceback
-        traceback.print_exc()
-
-asyncio.run(test())

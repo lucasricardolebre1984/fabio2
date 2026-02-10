@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useRef, useEffect } from 'react'
 import { Send, Bot, User, Sparkles, Trash2, Copy, Check, ImageIcon, Mic, X, FileUp, Layout, Palette, Image as ImageLucide, FileText, ChevronRight } from 'lucide-react'
@@ -34,6 +34,22 @@ interface PromptItem {
   cor: string
 }
 
+interface SnapshotMessage {
+  id: string
+  tipo: 'usuario' | 'ia'
+  conteudo: string
+  modo?: string | null
+  anexos?: { tipo: 'imagem' | 'audio' | 'arquivo'; url: string; nome?: string; meta?: any }[]
+  meta?: Record<string, any>
+  created_at: string
+}
+
+interface ChatSnapshot {
+  session_id: string | null
+  modo?: string | null
+  messages: SnapshotMessage[]
+}
+
 const PROMPTS: PromptItem[] = [
   {
     id: 'CRIADORLANDPAGE',
@@ -53,7 +69,7 @@ const PROMPTS: PromptItem[] = [
     id: 'FC',
     titulo: 'Imagens FC',
     icone: <ImageLucide className="w-5 h-5" />,
-    descricao: 'Imagens para FC Soluções',
+    descricao: 'Imagens para FC SoluÃ§Ãµes',
     cor: 'bg-indigo-500'
   },
   {
@@ -67,10 +83,14 @@ const PROMPTS: PromptItem[] = [
     id: 'CRIADORPROMPT',
     titulo: 'Criador Prompt',
     icone: <Sparkles className="w-5 h-5" />,
-    descricao: 'Criar instruções de sistema',
+    descricao: 'Criar instruÃ§Ãµes de sistema',
     cor: 'bg-amber-500'
   }
 ]
+
+const PROMPT_ID_ALIASES: Record<string, string> = {
+  CRIADORWEB: 'CRIADORPROMPT'
+}
 
 const IMAGE_TERMS = [
   'imagem',
@@ -110,7 +130,7 @@ const parseOverlayText = (overlay?: Mensagem['overlay']) => {
   const clamp = (value: string, max: number) => {
     const text = (value || '').trim()
     if (text.length <= max) return text
-    return `${text.slice(0, max - 1).trim()}…`
+    return `${text.slice(0, max - 1).trim()}â€¦`
   }
 
   if (!overlay) {
@@ -148,9 +168,9 @@ const parseOverlayText = (overlay?: Mensagem['overlay']) => {
       )
     })
 
-  const headline = lines.find(line => !/^(✅|❌|⚠️|•|-)/.test(line) && !line.startsWith('"') && !line.startsWith('“')) || lines[0] || 'Mensagem principal'
-  const quote = lines.find(line => line.startsWith('"') || line.startsWith('“'))
-  const bulletLines = lines.filter(line => /^(✅|❌|⚠️|•|-)/.test(line))
+  const headline = lines.find(line => !/^(âœ…|âŒ|âš ï¸|â€¢|-)/.test(line) && !line.startsWith('"') && !line.startsWith('â€œ')) || lines[0] || 'Mensagem principal'
+  const quote = lines.find(line => line.startsWith('"') || line.startsWith('â€œ'))
+  const bulletLines = lines.filter(line => /^(âœ…|âŒ|âš ï¸|â€¢|-)/.test(line))
   const remaining = lines.filter(line => line !== headline && line !== quote && !bulletLines.includes(line))
   const subheadline = remaining[0] || ''
 
@@ -180,21 +200,84 @@ const BRAND_THEMES = {
   }
 } as const
 
-export default function VivaChatPage() {
-  const [mensagens, setMensagens] = useState<Mensagem[]>([
-    {
-      id: 'welcome',
-      tipo: 'ia',
-      conteudo: 'Olá! Sou a VIVA, assistente virtual da FC Soluções Financeiras. Como posso ajudar você hoje?\n\n💡 Selecione um modo especial no menu lateral ou envie uma mensagem diretamente.',
-      timestamp: new Date()
+const createWelcomeMessage = (): Mensagem => ({
+  id: 'welcome',
+  tipo: 'ia',
+  conteudo: 'Ola! Sou a VIVA, assistente virtual da FC Solucoes Financeiras. Como posso ajudar voce hoje?\n\nSelecione um modo especial no menu lateral ou envie uma mensagem diretamente.',
+  timestamp: new Date()
+})
+
+const extractOverlayFromAnexos = (anexos?: Mensagem['anexos']): Mensagem['overlay'] | undefined => {
+  const first = Array.isArray(anexos) && anexos.length > 0 ? anexos[0] : undefined
+  const overlayMeta = first?.meta?.overlay
+  if (!overlayMeta || (overlayMeta.brand !== 'FC' && overlayMeta.brand !== 'REZETA')) {
+    return undefined
+  }
+
+  return {
+    brand: overlayMeta.brand as 'FC' | 'REZETA',
+    copy: {
+      headline: overlayMeta.headline,
+      subheadline: overlayMeta.subheadline,
+      bullets: Array.isArray(overlayMeta.bullets) ? overlayMeta.bullets : [],
+      quote: overlayMeta.quote,
+      cta: overlayMeta.cta
     }
-  ])
+  }
+}
+
+const mapSnapshotMessages = (messages: SnapshotMessage[] = []): Mensagem[] => {
+  return messages.map((item) => {
+    const anexos: Mensagem['anexos'] = Array.isArray(item.anexos)
+      ? item.anexos
+          .filter((anexo) => anexo && typeof anexo.url === 'string' && anexo.url.trim().length > 0)
+          .map((anexo) => {
+            const tipo: 'imagem' | 'audio' | 'arquivo' =
+              anexo.tipo === 'imagem' || anexo.tipo === 'audio' ? anexo.tipo : 'arquivo'
+            return {
+              tipo,
+            url: anexo.url,
+            nome: anexo.nome,
+            meta: anexo.meta
+            }
+          })
+      : undefined
+
+    const overlay = extractOverlayFromAnexos(anexos) || (
+      item.meta?.overlay && (item.meta.overlay.brand === 'FC' || item.meta.overlay.brand === 'REZETA')
+        ? {
+            brand: item.meta.overlay.brand as 'FC' | 'REZETA',
+            copy: {
+              headline: item.meta.overlay.headline,
+              subheadline: item.meta.overlay.subheadline,
+              bullets: Array.isArray(item.meta.overlay.bullets) ? item.meta.overlay.bullets : [],
+              quote: item.meta.overlay.quote,
+              cta: item.meta.overlay.cta
+            }
+          }
+        : undefined
+    )
+
+    return {
+      id: String(item.id),
+      tipo: item.tipo,
+      conteudo: item.conteudo || '',
+      timestamp: item.created_at ? new Date(item.created_at) : new Date(),
+      modo: item.modo || undefined,
+      anexos,
+      overlay
+    }
+  })
+}
+
+export default function VivaChatPage() {
+  const [mensagens, setMensagens] = useState<Mensagem[]>([createWelcomeMessage()])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [sessionId, setSessionId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [anexos, setAnexos] = useState<{ file: File; tipo: 'imagem' | 'audio' | 'arquivo'; preview?: string }[]>([])
   const [promptAtivo, setPromptAtivo] = useState<string | null>(null)
-  const [promptConteudo, setPromptConteudo] = useState<string | null>(null)
   const [menuAberto, setMenuAberto] = useState(true)
   const [imagemAtiva, setImagemAtiva] = useState<{ url: string; nome?: string } | null>(null)
   const [arteAtiva, setArteAtiva] = useState<{ url: string; nome?: string; overlay: NonNullable<Mensagem['overlay']> } | null>(null)
@@ -203,6 +286,46 @@ export default function VivaChatPage() {
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const audioInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    let active = true
+
+    const restoreSnapshot = async () => {
+      try {
+        const response = await api.get<ChatSnapshot>('/viva/chat/snapshot', {
+          params: { limit: 120 }
+        })
+        if (!active) return
+
+        const snapshot = response.data
+        const restoredMessages = mapSnapshotMessages(snapshot?.messages || [])
+
+        if (snapshot?.session_id) {
+          setSessionId(snapshot.session_id)
+        }
+
+        if (snapshot?.modo) {
+          const normalizedMode = PROMPT_ID_ALIASES[snapshot.modo] || snapshot.modo
+          setPromptAtivo(normalizedMode)
+        }
+
+        if (restoredMessages.length > 0) {
+          setMensagens(restoredMessages)
+        } else {
+          setMensagens([createWelcomeMessage()])
+        }
+      } catch {
+        if (active) {
+          setMensagens([createWelcomeMessage()])
+        }
+      }
+    }
+
+    restoreSnapshot()
+    return () => {
+      active = false
+    }
+  }, [])
 
   useEffect(() => {
     const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement | null
@@ -259,7 +382,7 @@ export default function VivaChatPage() {
           })
           const analise = String(response.data?.analise || '').trim()
           if (analise) {
-            resposta += `📷 **Análise da imagem "${anexo.file.name}":**\n${analise}\n\n`
+            resposta += `ðŸ“· **AnÃ¡lise da imagem "${anexo.file.name}":**\n${analise}\n\n`
             referenciasVisuais.push(`Referencia "${anexo.file.name}": ${analise.slice(0, 1200)}`)
           }
         } else if (anexo.tipo === 'audio') {
@@ -268,7 +391,7 @@ export default function VivaChatPage() {
           const response = await api.post('/viva/audio/transcribe', formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
           })
-          resposta += `🎤 **Transcrição do áudio "${anexo.file.name}":**\n${response.data.transcricao}\n\n`
+          resposta += `ðŸŽ¤ **TranscriÃ§Ã£o do Ã¡udio "${anexo.file.name}":**\n${response.data.transcricao}\n\n`
         }
       }
 
@@ -282,9 +405,12 @@ export default function VivaChatPage() {
         const response = await api.post('/viva/chat', {
           mensagem: mensagemComReferencia,
           contexto,
-          prompt_extra: promptConteudo || undefined,
-          modo: modoAtual || undefined
+          modo: modoAtual || undefined,
+          session_id: sessionId || undefined
         })
+        if (response.data?.session_id) {
+          setSessionId(response.data.session_id)
+        }
         resposta += response.data.resposta
 
         const midia = Array.isArray(response.data.midia) ? response.data.midia : []
@@ -368,46 +494,23 @@ export default function VivaChatPage() {
 
   const selecionarPrompt = async (promptId: string) => {
     setPromptAtivo(promptId)
-    
-    // Carrega o prompt
-    try {
-      const response = await fetch(`/api/viva/prompts/${encodeURIComponent(promptId)}`, {
-        cache: 'no-store'
-      })
-      if (!response.ok) {
-        throw new Error(`prompt_${response.status}`)
-      }
-      const texto = await response.text()
-      setPromptConteudo(texto)
-      
-      const nomeModo = PROMPTS.find(p => p.id === promptId)?.titulo
-      let novoContexto = `Modo **${nomeModo}** ativado com sucesso.\n\nComo posso ajudar?`
-      if (promptId === 'FC' || promptId === 'REZETA') {
-        novoContexto = (
-          `Modo **${nomeModo}** ativado.\n\n` +
-          'Converse normal e me diga o que quer criar que eu gero a imagem.'
-        )
-      }
-      
-      const iaMsg: Mensagem = {
-        id: Date.now().toString(),
-        tipo: 'ia',
-        conteudo: novoContexto,
-        timestamp: new Date()
-      }
-      
-      setMensagens(prev => [...prev, iaMsg])
-    } catch (e) {
-      setPromptConteudo(null)
-      // Se não conseguir carregar, apenas mostra mensagem
-      const iaMsg: Mensagem = {
-        id: Date.now().toString(),
-        tipo: 'ia',
-        conteudo: `Modo **${PROMPTS.find(p => p.id === promptId)?.titulo}** ativado.`,
-        timestamp: new Date()
-      }
-      setMensagens(prev => [...prev, iaMsg])
+
+    const nomeModo = PROMPTS.find(p => p.id === promptId)?.titulo
+    let novoContexto = `Modo **${nomeModo}** ativado.\n\nComo posso ajudar?`
+    if (promptId === 'FC' || promptId === 'REZETA') {
+      novoContexto = (
+        `Modo **${nomeModo}** ativado.\n\n` +
+        'Converse normal e me diga o que quer criar que eu gero a imagem.'
+      )
     }
+
+    const iaMsg: Mensagem = {
+      id: Date.now().toString(),
+      tipo: 'ia',
+      conteudo: novoContexto,
+      timestamp: new Date()
+    }
+    setMensagens(prev => [...prev, iaMsg])
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, tipo: 'imagem' | 'audio' | 'arquivo') => {
@@ -442,15 +545,22 @@ export default function VivaChatPage() {
     }
   }
 
-  const clearChat = () => {
-    setMensagens([{
-      id: 'welcome',
-      tipo: 'ia',
-      conteudo: 'Olá! Sou a VIVA, assistente virtual da FC Soluções Financeiras. Como posso ajudar você hoje?\n\n💡 Selecione um modo especial no menu lateral ou envie uma mensagem diretamente.',
-      timestamp: new Date()
-    }])
+  const clearChat = async () => {
+    try {
+      const response = await api.post<ChatSnapshot>('/viva/chat/session/new', {
+        modo: promptAtivo || undefined
+      })
+      if (response.data?.session_id) {
+        setSessionId(response.data.session_id)
+      } else {
+        setSessionId(null)
+      }
+    } catch {
+      setSessionId(null)
+    }
+
+    setMensagens([createWelcomeMessage()])
     setPromptAtivo(null)
-    setPromptConteudo(null)
   }
 
   const copyMessage = (id: string, texto: string) => {
@@ -625,7 +735,7 @@ export default function VivaChatPage() {
         </div>
       </div>
 
-      {/* Área Principal do Chat */}
+      {/* Ãrea Principal do Chat */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b bg-white">
@@ -658,7 +768,7 @@ export default function VivaChatPage() {
           </Button>
         </div>
 
-        {/* Área de mensagens */}
+        {/* Ãrea de mensagens */}
         <ScrollArea className="flex-1 px-4" ref={scrollAreaRef}>
           <div className="max-w-3xl mx-auto py-6 space-y-6">
             {mensagens.map((msg) => (
@@ -744,7 +854,7 @@ export default function VivaChatPage() {
                     )}
                   </div>
                   
-                  {/* Ações */}
+                  {/* AÃ§Ãµes */}
                   <div className="flex items-center gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <span className="text-xs text-gray-400">
                       {msg.timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
@@ -817,7 +927,7 @@ export default function VivaChatPage() {
         <div className="p-4 border-t bg-white">
           <div className="max-w-3xl mx-auto">
             <div className="flex gap-2">
-              {/* Botões de anexo */}
+              {/* BotÃµes de anexo */}
               <div className="flex gap-1">
                 <Button
                   variant="ghost"
@@ -873,7 +983,7 @@ export default function VivaChatPage() {
             />
             
             <p className="text-center text-xs text-gray-400 mt-2">
-              VIVA pode cometer erros. Verifique informações importantes.
+              VIVA pode cometer erros. Verifique informaÃ§Ãµes importantes.
             </p>
           </div>
         </div>
@@ -991,3 +1101,4 @@ export default function VivaChatPage() {
     </>
   )
 }
+

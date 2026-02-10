@@ -42,6 +42,7 @@ class AgendaService:
         fim: Optional[datetime] = None,
         cliente_id: Optional[UUID] = None,
         concluido: Optional[bool] = None,
+        user_id: Optional[UUID] = None,
         page: int = 1,
         page_size: int = 20
     ) -> Dict[str, Any]:
@@ -56,6 +57,8 @@ class AgendaService:
             query = query.where(Agenda.cliente_id == cliente_id)
         if concluido is not None:
             query = query.where(Agenda.concluido == concluido)
+        if user_id:
+            query = query.where(Agenda.created_by == user_id)
         
         # Count total
         count_result = await self.db.execute(
@@ -75,18 +78,20 @@ class AgendaService:
             "page_size": page_size
         }
     
-    async def get_by_id(self, evento_id: UUID) -> Optional[Agenda]:
+    async def get_by_id(self, evento_id: UUID, user_id: Optional[UUID] = None) -> Optional[Agenda]:
         """Get event by ID."""
-        result = await self.db.execute(
-            select(Agenda).where(Agenda.id == evento_id)
-        )
+        query = select(Agenda).where(Agenda.id == evento_id)
+        if user_id:
+            query = query.where(Agenda.created_by == user_id)
+        result = await self.db.execute(query)
         return result.scalar_one_or_none()
     
-    async def update(self, evento_id: UUID, data: EventoUpdate) -> Optional[Agenda]:
+    async def update(self, evento_id: UUID, data: EventoUpdate, user_id: Optional[UUID] = None) -> Optional[Agenda]:
         """Update event."""
-        result = await self.db.execute(
-            select(Agenda).where(Agenda.id == evento_id)
-        )
+        query = select(Agenda).where(Agenda.id == evento_id)
+        if user_id:
+            query = query.where(Agenda.created_by == user_id)
+        result = await self.db.execute(query)
         evento = result.scalar_one_or_none()
         
         if not evento:
@@ -102,15 +107,16 @@ class AgendaService:
         
         return evento
     
-    async def concluir(self, evento_id: UUID) -> Optional[Agenda]:
+    async def concluir(self, evento_id: UUID, user_id: Optional[UUID] = None) -> Optional[Agenda]:
         """Mark event as completed."""
-        return await self.update(evento_id, EventoUpdate(concluido=True))
+        return await self.update(evento_id, EventoUpdate(concluido=True), user_id=user_id)
     
-    async def delete(self, evento_id: UUID) -> bool:
+    async def delete(self, evento_id: UUID, user_id: Optional[UUID] = None) -> bool:
         """Delete event."""
-        result = await self.db.execute(
-            select(Agenda).where(Agenda.id == evento_id)
-        )
+        query = select(Agenda).where(Agenda.id == evento_id)
+        if user_id:
+            query = query.where(Agenda.created_by == user_id)
+        result = await self.db.execute(query)
         evento = result.scalar_one_or_none()
         
         if not evento:
@@ -121,7 +127,7 @@ class AgendaService:
         
         return True
     
-    async def get_hoje(self) -> Dict[str, Any]:
+    async def get_hoje(self, user_id: Optional[UUID] = None) -> Dict[str, Any]:
         """Get today's events."""
         hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         amanha = hoje + timedelta(days=1)
@@ -129,6 +135,7 @@ class AgendaService:
         return await self.list(
             inicio=hoje,
             fim=amanha,
+            user_id=user_id,
             page=1,
             page_size=100
         )
