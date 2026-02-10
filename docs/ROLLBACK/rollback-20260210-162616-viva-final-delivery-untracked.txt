@@ -1,0 +1,4 @@
+﻿docs/ROLLBACK/rollback-20260210-162616-viva-final-delivery-baseline.txt
+docs/ROLLBACK/rollback-20260210-162616-viva-final-delivery-staged.patch
+docs/ROLLBACK/rollback-20260210-162616-viva-final-delivery-untracked.txt
+docs/ROLLBACK/rollback-20260210-162616-viva-final-delivery.patch

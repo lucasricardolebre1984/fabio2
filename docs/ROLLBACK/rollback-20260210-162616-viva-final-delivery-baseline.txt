@@ -1,0 +1,9 @@
+﻿ M backend/app/api/v1/viva.py
+ M backend/app/main.py
+ M backend/app/services/viva_concierge_service.py
+ M docs/ARCHITECTURE/OVERVIEW.md
+ M docs/BUGSREPORT.md
+ M docs/DECISIONS.md
+ M docs/SESSION.md
+ M docs/STATUS.md
+?? docs/ROLLBACK/rollback-20260210-162616-viva-final-delivery-baseline.txt

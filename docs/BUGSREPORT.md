@@ -58,8 +58,9 @@
 | BUG-060 | Alta | Frontend/Auth+Docs | Login no front exibe erro generico para qualquer falha e README publica senha de teste divergente do runtime local | Resolvido |
 | BUG-061 | Alta | VIVA/Campanhas | Geracao de imagem pode ignorar tema do brief (ex.: Carnaval sem dividas) e cair em cena corporativa generica (senhor de terno em escritorio) | Em validacao |
 | BUG-062 | Alta | VIVA/Arquitetura | `backend/app/api/v1/viva.py` monolitico (chat+agenda+campanhas+midia+SQL) com alto acoplamento e baixa manutenibilidade | Ativo |
-| BUG-063 | Alta | VIVA/Agenda UX | Fallback rigido de agenda exige formato textual prescritivo, reduz fluidez conversacional e gera efeito de "bot travado" | Em validacao |
-| BUG-064 | Alta | VIVA->Viviane Orquestracao | Nao existe handoff operacional completo para aviso programado no WhatsApp (agenda da VIVA disparando persona Viviane no horario) | Em validacao |
+| BUG-063 | Alta | VIVA/Agenda UX | Fallback rigido de agenda exige formato textual prescritivo, reduz fluidez conversacional e gera efeito de "bot travado" | Resolvido |
+| BUG-064 | Alta | VIVA->Viviane Orquestracao | Nao existe handoff operacional completo para aviso programado no WhatsApp (agenda da VIVA disparando persona Viviane no horario) | Resolvido |
+| BUG-065 | Alta | VIVA/Handoff API | `GET /api/v1/viva/handoff` retorna `500` quando `meta_json` vem serializado como string e quebra validacao do schema | Resolvido |
 
 ---
 
@@ -569,6 +570,25 @@
 **Atual:** fluxo parcial, sem motor de handoff operacional fechado.
 **Status:** Ativo
 
+### BUG-065: Falha de serializacao `meta_json` na listagem de handoff
+**Data:** 2026-02-10
+**Severidade:** Alta
+**Descricao:** endpoint `GET /api/v1/viva/handoff` pode retornar `500` quando `meta_json` chega como `str` e o `response_model` espera `dict`.
+**Passos:** 1. autenticar no backend 2. criar handoff via chat ou endpoint 3. consultar `/api/v1/viva/handoff`.
+**Esperado:** listagem responder `200` com `meta_json` em objeto JSON.
+**Atual:** erro de validacao Pydantic (`meta_json` tipo `str`).
+**Status:** Resolvido
+
+### Atualizacao 2026-02-10 (correcao BUG-065)
+- ajuste aplicado em `backend/app/api/v1/viva.py`:
+  - `_handoff_row_to_item` passou a normalizar `meta_json` com `_safe_json(...)` para entradas `dict` e `str`;
+  - `_campaign_row_to_item` recebeu a mesma blindagem para `overlay_json` e `meta_json`.
+- validacao objetiva:
+  - `python -m compileall backend/app/api/v1/viva.py` => OK;
+  - `POST /api/v1/auth/login` => `200`;
+  - `POST /api/v1/viva/chat` com agenda+handoff => `200` com ID de handoff;
+  - `GET /api/v1/viva/handoff?page=1&page_size=5` => `200` e `meta_json` retornando objeto (sem `500`).
+
 ### Atualizacao 2026-02-10 (Aprovado - kickoff redesign VIVA em 3 etapas)
 - Etapa 1 (documentacao + rollback institucional):
   - registrar bugs estruturais (`BUG-062`, `BUG-063`, `BUG-064`);
@@ -611,3 +631,19 @@
   - `POST /api/v1/viva/handoff/schedule` com horario vencido + `POST /api/v1/viva/handoff/process-due` processando envio (`processed=1`, `sent=1`).
 - Status:
   - `BUG-064` movido para **Em validacao**.
+
+### Atualizacao 2026-02-10 (fechamento BUG-063 e BUG-064)
+- Fluidez de agenda validada:
+  - `POST /api/v1/viva/chat` com pedido incompleto de agenda retorna follow-up contextual curto, sem exigir template fixo.
+- Handoff VIVA -> Viviane validado ponta-a-ponta:
+  - tarefa criada via chat/endpoint;
+  - processamento automatico em background no backend (worker de lifespan);
+  - transicao de status observada (`pending -> sent`) em tarefa vencida.
+- Evidencias tecnicas:
+  - health backend `200` apos restart;
+  - `GET /api/v1/viva/capabilities` ativo;
+  - `GET /api/v1/viva/handoff` listando tarefas;
+  - tarefa teste vencida com `attempts=1`, `sent_at` preenchido e `status=sent`.
+- Status:
+  - `BUG-063` => **Resolvido**.
+  - `BUG-064` => **Resolvido**.

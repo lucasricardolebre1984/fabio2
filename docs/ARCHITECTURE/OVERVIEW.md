@@ -84,6 +84,7 @@ Handoff VIVA -> Viviane
 1. Fabio agenda via chat interno VIVA;
 2. VIVA cria tarefa de handoff para aviso WhatsApp;
 3. motor de handoff processa tarefas vencidas e registra status (`pending/sent/failed`).
+4. processamento automatico ocorre no lifespan da API (loop periodico).
 
 ---
 

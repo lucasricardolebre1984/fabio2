@@ -324,3 +324,11 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
   - compile dos arquivos alterados: OK;
   - `GET /api/v1/viva/capabilities`: OK;
   - handoff via chat + listagem + processamento: OK.
+
+## Atualizacao Operacional (2026-02-10 - finalizacao para entrega)
+- Worker automatico de handoff ativado no ciclo de vida da API:
+  - processamento de tarefas vencidas a cada ~30s em `backend/app/main.py`.
+- Ajuste de linguagem da persona VIVA:
+  - reforco para tom mais humano/profissional e anti-rigidez em `backend/app/services/viva_concierge_service.py`.
+- Validacao final:
+  - tarefa de handoff vencida processada automaticamente com status `sent`.

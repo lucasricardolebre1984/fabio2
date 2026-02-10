@@ -1,0 +1,551 @@
+﻿diff --git a/backend/app/api/v1/viva.py b/backend/app/api/v1/viva.py
+index 87c283e..cd77ab7 100644
+--- a/backend/app/api/v1/viva.py
++++ b/backend/app/api/v1/viva.py
+@@ -2,8 +2,8 @@
+ Chat direto com a VIVA - Assistente Virtual Interna
+ Usa OpenAI para Chat, Visao, Audio e Imagem
+ """
+-from typing import List, Dict, Any, Optional, Tuple
+-from datetime import datetime, timedelta, timezone
++from typing import List, Dict, Any, Optional
++from datetime import datetime, timezone
+ from uuid import UUID, uuid4
+ 
+ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+@@ -17,7 +17,6 @@ from sqlalchemy import text
+ 
+ from app.api.deps import get_current_user, get_db
+ from app.models.user import User
+-from app.models.agenda import EventoTipo
+ from app.schemas.agenda import EventoCreate
+ from app.services.agenda_service import AgendaService
+ from app.services.viva_local_service import viva_local_service
+@@ -1563,333 +1562,7 @@ def _extract_subject(texto: str) -> str:
+     return _sanitize_prompt(texto_limpo, 300)
+ 
+ 
+-def _parse_datetime_input(raw: str) -> Optional[datetime]:
+-    value = " ".join((raw or "").replace(",", " ").split())
+-    formats = (
+-        "%d/%m/%Y %H:%M",
+-        "%d/%m/%y %H:%M",
+-        "%Y-%m-%d %H:%M",
+-        "%d-%m-%Y %H:%M",
+-    )
+-    for fmt in formats:
+-        try:
+-            return datetime.strptime(value, fmt)
+-        except ValueError:
+-            continue
+-    return None
+-
+-
+-def _infer_event_type(title: str) -> EventoTipo:
+-    text = (title or "").lower()
+-    if "ligar" in text or "ligacao" in text or "ligação" in text:
+-        return EventoTipo.LIGACAO
+-    if "prazo" in text or "vencimento" in text:
+-        return EventoTipo.PRAZO
+-    if "reuniao" in text or "reunião" in text:
+-        return EventoTipo.REUNIAO
+-    return EventoTipo.OUTRO
+-
+-
+-def _parse_agenda_command(message: str) -> Optional[Dict[str, Any]]:
+-    text = (message or "").strip()
+-    if not text:
+-        return None
+-
+-    lower = text.lower()
+-    if not (lower.startswith("agendar") or lower.startswith("agenda")):
+-        return None
+-
+-    payload = re.sub(r"^(agendar|agenda)\s*:?\s*", "", text, flags=re.IGNORECASE).strip()
+-    if not payload:
+-        return {"error": "Formato vazio"}
+-
+-    title = ""
+-    date_time_raw = ""
+-    description = None
+-
+-    if "|" in payload:
+-        parts = [p.strip() for p in payload.split("|") if p.strip()]
+-        if len(parts) < 2:
+-            return {"error": "Formato incompleto"}
+-        title = parts[0]
+-        date_time_raw = parts[1]
+-        description = parts[2] if len(parts) >= 3 else None
+-    else:
+-        match = re.search(
+-            r"(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\s+\d{1,2}:\d{2}|\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2})",
+-            payload,
+-        )
+-        if not match:
+-            return {"error": "Sem data/hora valida"}
+-        date_time_raw = match.group(1)
+-        title = payload.replace(date_time_raw, "").strip(" -")
+-
+-    date_time = _parse_datetime_input(date_time_raw)
+-    if not date_time:
+-        return {"error": "Data/hora invalida"}
+-
+-    if not title:
+-        title = "Compromisso com cliente"
+-
+-    return {
+-        "title": title,
+-        "date_time": date_time,
+-        "description": description,
+-        "tipo": _infer_event_type(title),
+-    }
+-
+-
+-def _is_agenda_verb(text: str) -> bool:
+-    normalized = _normalize_key(text)
+-    return any(
+-        term in normalized
+-        for term in (
+-            "agenda",
+-            "agendamento",
+-            "agendamentos",
+-            "compromisso",
+-            "compromissos",
+-            "lembrete",
+-            "lembra",
+-            "lembrar",
+-        )
+-    )
+-
+-
+-def _is_simple_confirmation(text: str) -> bool:
+-    normalized = _normalize_key(text)
+-    return normalized in {
+-        "sim",
+-        "quero",
+-        "quero sim",
+-        "ok",
+-        "pode",
+-        "sim ja",
+-        "ja",
+-        "todos",
+-        "todos sem mais perguntas",
+-        "todos sem mais pergintas",
+-    }
+-
+-
+-def _has_recent_agenda_prompt(contexto: List[Dict[str, Any]]) -> bool:
+-    for msg in reversed(contexto[-8:]):
+-        if msg.get("tipo") != "ia":
+-            continue
+-        normalized = _normalize_key(str(msg.get("conteudo") or ""))
+-        if "agenda" in normalized or "compromiss" in normalized:
+-            return True
+-    return False
+-
+-
+-def _is_agenda_query_intent(message: str, contexto: List[Dict[str, Any]]) -> bool:
+-    normalized = _normalize_key(message)
+-
+-    create_terms = (
+-        "agendar",
+-        "marcar",
+-        "criar compromisso",
+-        "novo compromisso",
+-        "adicionar compromisso",
+-    )
+-    conclude_terms = ("concluir", "confirmar compromisso", "finalizar compromisso")
+-
+-    if any(term in normalized for term in conclude_terms):
+-        return False
+-    if any(term in normalized for term in create_terms):
+-        return False
+-
+-    query_terms = (
+-        "minha agenda",
+-        "como esta minha agenda",
+-        "como esta a agenda",
+-        "como esta minha agenda hj",
+-        "como ta minha agenda",
+-        "o que tenho",
+-        "quais compromissos",
+-        "listar agenda",
+-        "lista da agenda",
+-        "agendamentos de hoje",
+-        "agenda de hoje",
+-        "compromissos de hoje",
+-        "agenda hj",
+-        "agenda hoje",
+-        "agenda amanha",
+-    )
+-
+-    if any(term in normalized for term in query_terms):
+-        return True
+-
+-    if _is_agenda_verb(message):
+-        return True
+-
+-    if _is_simple_confirmation(message) and _has_recent_agenda_prompt(contexto):
+-        return True
+-
+-    return False
+-
+-
+-def _agenda_window_from_text(message: str) -> Tuple[datetime, datetime, str]:
+-    normalized = _normalize_key(message)
+-    now = datetime.now()
+-
+-    if "amanha" in normalized:
+-        start = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+-        end = start + timedelta(days=1)
+-        return start, end, "de amanha"
+-
+-    if "semana" in normalized:
+-        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+-        end = start + timedelta(days=7)
+-        return start, end, "dos proximos 7 dias"
+-
+-    start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+-    end = start + timedelta(days=1)
+-    return start, end, "de hoje"
+-
+-
+-def _format_agenda_list(items: List[Any], period_label: str) -> str:
+-    if not items:
+-        return f"Voce nao tem compromissos {period_label}."
+-
+-    ordered = sorted(items, key=lambda item: item.data_inicio)
+-    lines = [f"Seus compromissos {period_label}:"]
+-    for item in ordered:
+-        status = "Concluido" if item.concluido else "Pendente"
+-        horario = item.data_inicio.strftime("%H:%M")
+-        lines.append(f"- {horario} | {item.titulo} ({status})")
+-
+-    return "\n".join(lines)
+-
+-
+-def _build_agenda_recovery_reply(message: str, errors: List[str]) -> str:
+-    normalized = _normalize_key(message)
+-    lower_errors = [str(err).lower() for err in (errors or [])]
+-    has_datetime_error = any("data/hora" in err for err in lower_errors)
+-    has_time_in_text = bool(re.search(r"\b\d{1,2}:\d{2}\b", message or ""))
+-
+-    if has_datetime_error and not has_time_in_text:
+-        return (
+-            "Entendi. Me diga so quando deve acontecer (ex.: amanha 10:30) "
+-            "e o que voce quer agendar, que eu registro para voce."
+-        )
+-
+-    if has_datetime_error:
+-        return (
+-            "Quase pronto. Me confirme so a data e horario do compromisso "
+-            "(pode ser em linguagem natural) que eu finalizo."
+-        )
+-
+-    if "concluir" in normalized or "finalizar" in normalized:
+-        return (
+-            "Para concluir, me diga o titulo do compromisso ou o ID que aparece na agenda."
+-        )
+-
+-    return (
+-        "Entendi que voce quer mexer na agenda. Me diga apenas o compromisso e quando ele acontece, "
+-        "do seu jeito, que eu cuido do resto."
+-    )
+-
+-
+-def _parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
+-    raw = (message or "").strip()
+-    if not raw:
+-        return None
+-
+-    normalized = _normalize_key(raw)
+-    if not any(
+-        term in normalized
+-        for term in ("agendar", "marcar", "novo compromisso", "criar compromisso", "adicionar compromisso")
+-    ):
+-        return None
+-
+-    if "|" in raw:
+-        return None
+-
+-    time_match = re.search(r"\b(\d{1,2}:\d{2})\b", raw)
+-    if not time_match:
+-        return {"error": "Data/hora invalida"}
+-
+-    hour, minute = [int(part) for part in time_match.group(1).split(":")]
+-    if hour > 23 or minute > 59:
+-        return {"error": "Data/hora invalida"}
+-
+-    date_match = re.search(r"\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b", raw)
+-    date_value: Optional[datetime] = None
+-
+-    if date_match:
+-        for fmt in ("%d/%m/%Y", "%d/%m/%y", "%d-%m-%Y"):
+-            try:
+-                parsed_date = datetime.strptime(date_match.group(1), fmt)
+-                date_value = parsed_date
+-                break
+-            except ValueError:
+-                continue
+-    elif "amanha" in normalized:
+-        date_value = datetime.now() + timedelta(days=1)
+-    elif "hoje" in normalized:
+-        date_value = datetime.now()
+-
+-    if not date_value:
+-        return {"error": "Data/hora invalida"}
+-
+-    date_time = date_value.replace(hour=hour, minute=minute, second=0, microsecond=0)
+-
+-    title = raw
+-    title = re.sub(
+-        r"(?i)\b(agendar|agenda|marcar|marque|novo compromisso|criar compromisso|adicionar compromisso)\b",
+-        "",
+-        title,
+-    )
+-    title = title.replace(time_match.group(0), "")
+-    if date_match:
+-        title = title.replace(date_match.group(1), "")
+-    title = re.sub(r"(?i)\b(hoje|amanha|amanhã|as|às|para|dia)\b", " ", title)
+-    title = re.sub(r"\s+", " ", title).strip(" -,:;")
+-    if not title:
+-        title = "Compromisso"
+-
+-    return {
+-        "title": title,
+-        "date_time": date_time,
+-        "description": None,
+-        "tipo": _infer_event_type(title),
+-    }
+-
+-
+-def _parse_agenda_conclude_command(message: str) -> Optional[Dict[str, Any]]:
+-    raw = (message or "").strip()
+-    if not raw:
+-        return None
+-
+-    normalized = _normalize_key(raw)
+-    if not any(term in normalized for term in ("concluir", "confirmar", "finalizar")):
+-        return None
+-
+-    uuid_match = re.search(
+-        r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}\b",
+-        raw,
+-    )
+-    if not uuid_match:
+-        text_query = re.sub(
+-            r"(?i)\b(concluir|confirmar|finalizar|compromisso|evento|agenda)\b",
+-            " ",
+-            raw,
+-        )
+-        text_query = re.sub(r"\s+", " ", text_query).strip(" -,:;")
+-        if text_query and len(text_query) >= 3:
+-            return {"search_text": text_query}
+-        return {"error": "ID ou titulo obrigatorio"}
+-
+-    try:
+-        return {"evento_id": UUID(uuid_match.group(0))}
+-    except ValueError:
+-        return {"error": "ID invalido"}
+-
+-
+-# ============================================
+-# CHAT
+-# ============================================
++# ============================================`r`n# CHAT`r`n# ============================================
+ @router.post("/chat", response_model=ChatResponse)
+ async def chat_with_viva(
+     request: ChatRequest,
+@@ -2693,3 +2366,4 @@ async def viva_status(
+ 
+ 
+ 
++
+diff --git a/backend/app/main.py b/backend/app/main.py
+index 0702cd1..6a29084 100644
+--- a/backend/app/main.py
++++ b/backend/app/main.py
+@@ -1,5 +1,7 @@
+ """Main FastAPI application."""
++import contextlib
+ from contextlib import asynccontextmanager
++import asyncio
+ 
+ from fastapi import FastAPI
+ from fastapi.middleware.cors import CORSMiddleware
+@@ -7,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
+ from app.config import settings
+ from app.api.router import api_router
+ from app.core.logging import setup_logging
++from app.db.session import AsyncSessionLocal
++from app.services.viva_handoff_service import viva_handoff_service
+ 
+ 
+ @asynccontextmanager
+@@ -18,11 +22,31 @@ async def lifespan(app: FastAPI):
+     # Create storage directory if not exists
+     import os
+     os.makedirs(settings.STORAGE_LOCAL_PATH, exist_ok=True)
++
++    stop_event = asyncio.Event()
++
++    async def handoff_worker() -> None:
++        while not stop_event.is_set():
++            try:
++                async with AsyncSessionLocal() as db:
++                    await viva_handoff_service.process_due_tasks(db=db, limit=20)
++            except Exception:
++                # Keep server up even if handoff has a transient failure.
++                pass
++            try:
++                await asyncio.wait_for(stop_event.wait(), timeout=30)
++            except asyncio.TimeoutError:
++                continue
++
++    worker_task = asyncio.create_task(handoff_worker())
+     
+     yield
+     
+     # Shutdown
+-    pass
++    stop_event.set()
++    worker_task.cancel()
++    with contextlib.suppress(Exception):
++        await worker_task
+ 
+ 
+ def create_app() -> FastAPI:
+diff --git a/backend/app/services/viva_concierge_service.py b/backend/app/services/viva_concierge_service.py
+index 4795acb..d8b11b6 100644
+--- a/backend/app/services/viva_concierge_service.py
++++ b/backend/app/services/viva_concierge_service.py
+@@ -11,7 +11,7 @@ class VivaConciergeService:
+         self.base_prompt = (
+             "Voce e VIVA, concierge do Fabio e assistente principal do SaaS da FC Solucoes Financeiras. "
+             "Voce ajuda no dia a dia operacional (contratos, clientes, agenda, WhatsApp e organizacao interna). "
+-            "Fale de forma natural, objetiva e humana."
++            "Fale de forma natural, objetiva, elegante e humana."
+         )
+         self.brand_memory = (
+             "Contexto fixo de marcas no SaaS: "
+@@ -27,6 +27,9 @@ class VivaConciergeService:
+             "Priorize continuidade do contexto da sessao atual.",
+             "Para campanhas, conduza no maximo 3 gates curtos e depois gere sem burocracia.",
+             "Atue como braco direito do Fabio: pratica, proativa e orientada a resultado.",
++            "Nao exija formato fixo de frase para entender pedidos.",
++            "Use linguagem profissional calorosa, sem soar robotica.",
++            "Quando houver ambiguidade, proponha opcoes curtas em vez de travar.",
+         ]
+ 
+     def build_system_prompt(self, modo: Optional[str] = None) -> str:
+diff --git a/docs/ARCHITECTURE/OVERVIEW.md b/docs/ARCHITECTURE/OVERVIEW.md
+index dcfbce4..bc1ed49 100644
+--- a/docs/ARCHITECTURE/OVERVIEW.md
++++ b/docs/ARCHITECTURE/OVERVIEW.md
+@@ -84,6 +84,7 @@ Handoff VIVA -> Viviane
+ 1. Fabio agenda via chat interno VIVA;
+ 2. VIVA cria tarefa de handoff para aviso WhatsApp;
+ 3. motor de handoff processa tarefas vencidas e registra status (`pending/sent/failed`).
++4. processamento automatico ocorre no lifespan da API (loop periodico).
+ 
+ ---
+ 
+diff --git a/docs/BUGSREPORT.md b/docs/BUGSREPORT.md
+index e3564db..5d4a491 100644
+--- a/docs/BUGSREPORT.md
++++ b/docs/BUGSREPORT.md
+@@ -58,8 +58,8 @@
+ | BUG-060 | Alta | Frontend/Auth+Docs | Login no front exibe erro generico para qualquer falha e README publica senha de teste divergente do runtime local | Resolvido |
+ | BUG-061 | Alta | VIVA/Campanhas | Geracao de imagem pode ignorar tema do brief (ex.: Carnaval sem dividas) e cair em cena corporativa generica (senhor de terno em escritorio) | Em validacao |
+ | BUG-062 | Alta | VIVA/Arquitetura | `backend/app/api/v1/viva.py` monolitico (chat+agenda+campanhas+midia+SQL) com alto acoplamento e baixa manutenibilidade | Ativo |
+-| BUG-063 | Alta | VIVA/Agenda UX | Fallback rigido de agenda exige formato textual prescritivo, reduz fluidez conversacional e gera efeito de "bot travado" | Em validacao |
+-| BUG-064 | Alta | VIVA->Viviane Orquestracao | Nao existe handoff operacional completo para aviso programado no WhatsApp (agenda da VIVA disparando persona Viviane no horario) | Em validacao |
++| BUG-063 | Alta | VIVA/Agenda UX | Fallback rigido de agenda exige formato textual prescritivo, reduz fluidez conversacional e gera efeito de "bot travado" | Resolvido |
++| BUG-064 | Alta | VIVA->Viviane Orquestracao | Nao existe handoff operacional completo para aviso programado no WhatsApp (agenda da VIVA disparando persona Viviane no horario) | Resolvido |
+ 
+ ---
+ 
+@@ -611,3 +611,19 @@
+   - `POST /api/v1/viva/handoff/schedule` com horario vencido + `POST /api/v1/viva/handoff/process-due` processando envio (`processed=1`, `sent=1`).
+ - Status:
+   - `BUG-064` movido para **Em validacao**.
++
++### Atualizacao 2026-02-10 (fechamento BUG-063 e BUG-064)
++- Fluidez de agenda validada:
++  - `POST /api/v1/viva/chat` com pedido incompleto de agenda retorna follow-up contextual curto, sem exigir template fixo.
++- Handoff VIVA -> Viviane validado ponta-a-ponta:
++  - tarefa criada via chat/endpoint;
++  - processamento automatico em background no backend (worker de lifespan);
++  - transicao de status observada (`pending -> sent`) em tarefa vencida.
++- Evidencias tecnicas:
++  - health backend `200` apos restart;
++  - `GET /api/v1/viva/capabilities` ativo;
++  - `GET /api/v1/viva/handoff` listando tarefas;
++  - tarefa teste vencida com `attempts=1`, `sent_at` preenchido e `status=sent`.
++- Status:
++  - `BUG-063` => **Resolvido**.
++  - `BUG-064` => **Resolvido**.
+diff --git a/docs/DECISIONS.md b/docs/DECISIONS.md
+index 7485be6..005c315 100644
+--- a/docs/DECISIONS.md
++++ b/docs/DECISIONS.md
+@@ -1030,3 +1030,26 @@ Para viabilizar o fluxo de secretaria `Fabio -> VIVA -> Viviane -> Fabio`, era n
+ 
+ ### Data
+ 2026-02-10
++
++## DECISAO-030: worker automatico de handoff no ciclo de vida da API
++
++### Contexto
++Para evitar dependencia de acionamento manual do endpoint de processamento, era necessario processar tarefas de handoff vencidas automaticamente.
++
++### Decisao
++- Adicionar worker assincorno no `lifespan` da API:
++  - loop de verificacao a cada 30s;
++  - processamento de tarefas vencidas (`pending`) via `viva_handoff_service.process_due_tasks`.
++- Implementacao em:
++  - `backend/app/main.py`.
++
++### Impacto
++- Entrega operacional no mesmo dia para fluxo `Fabio -> VIVA -> Viviane`.
++- Reduz risco de tarefa ficar parada sem execucao.
++
++### Trade-off
++- No modelo atual, o worker roda por processo de API (adequado ao ambiente local/worker unico).
++- Em escala horizontal, migrar para scheduler dedicado (fila/worker separado).
++
++### Data
++2026-02-10
+diff --git a/docs/SESSION.md b/docs/SESSION.md
+index e6ec03a..78a6a12 100644
+--- a/docs/SESSION.md
++++ b/docs/SESSION.md
+@@ -446,3 +446,12 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
+ - Fluxo funcional validado:
+   - chat com "agendar ... avisar cliente no whatsapp <numero>" cria compromisso e handoff;
+   - handoff aparece em listagem e pode ser processado.
++
++## Fechamento do dia (2026-02-10)
++- Worker automatico implementado no backend para processar handoffs vencidos sem chamada manual.
++- Prova de vida:
++  - tarefa teste criada com horario no passado;
++  - apos janela do worker, status mudou para `sent` com `sent_at`.
++- Entrega pronta para demonstracao:
++  - VIVA conversa com fluidez maior;
++  - agenda + aviso WhatsApp via Viviane operando no fluxo aprovado.
+diff --git a/docs/STATUS.md b/docs/STATUS.md
+index 872ee2a..8906b2d 100644
+--- a/docs/STATUS.md
++++ b/docs/STATUS.md
+@@ -324,3 +324,11 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano
+   - compile dos arquivos alterados: OK;
+   - `GET /api/v1/viva/capabilities`: OK;
+   - handoff via chat + listagem + processamento: OK.
++
++## Atualizacao Operacional (2026-02-10 - finalizacao para entrega)
++- Worker automatico de handoff ativado no ciclo de vida da API:
++  - processamento de tarefas vencidas a cada ~30s em `backend/app/main.py`.
++- Ajuste de linguagem da persona VIVA:
++  - reforco para tom mais humano/profissional e anti-rigidez em `backend/app/services/viva_concierge_service.py`.
++- Validacao final:
++  - tarefa de handoff vencida processada automaticamente com status `sent`.

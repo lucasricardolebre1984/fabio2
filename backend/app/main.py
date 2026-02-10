@@ -1,5 +1,7 @@
 """Main FastAPI application."""
+import contextlib
 from contextlib import asynccontextmanager
+import asyncio
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.api.router import api_router
 from app.core.logging import setup_logging
+from app.db.session import AsyncSessionLocal
+from app.services.viva_handoff_service import viva_handoff_service
 
 
 @asynccontextmanager
@@ -18,11 +22,31 @@ async def lifespan(app: FastAPI):
     # Create storage directory if not exists
     import os
     os.makedirs(settings.STORAGE_LOCAL_PATH, exist_ok=True)
+
+    stop_event = asyncio.Event()
+
+    async def handoff_worker() -> None:
+        while not stop_event.is_set():
+            try:
+                async with AsyncSessionLocal() as db:
+                    await viva_handoff_service.process_due_tasks(db=db, limit=20)
+            except Exception:
+                # Keep server up even if handoff has a transient failure.
+                pass
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=30)
+            except asyncio.TimeoutError:
+                continue
+
+    worker_task = asyncio.create_task(handoff_worker())
     
     yield
     
     # Shutdown
-    pass
+    stop_event.set()
+    worker_task.cancel()
+    with contextlib.suppress(Exception):
+        await worker_task
 
 
 def create_app() -> FastAPI:

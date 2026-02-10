@@ -1,0 +1,7 @@
+﻿Rollback institucional - final delivery VIVA
+Data: 2026-02-10 16:26:17
+Escopo:
+- worker automatico de handoff
+- persona VIVA mais natural
+- limpeza de legado de agenda no viva.py
+- docs de fechamento da entrega

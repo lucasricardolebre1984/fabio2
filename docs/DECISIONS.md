@@ -1030,3 +1030,26 @@ Para viabilizar o fluxo de secretaria `Fabio -> VIVA -> Viviane -> Fabio`, era n
 
 ### Data
 2026-02-10
+
+## DECISAO-030: worker automatico de handoff no ciclo de vida da API
+
+### Contexto
+Para evitar dependencia de acionamento manual do endpoint de processamento, era necessario processar tarefas de handoff vencidas automaticamente.
+
+### Decisao
+- Adicionar worker assincorno no `lifespan` da API:
+  - loop de verificacao a cada 30s;
+  - processamento de tarefas vencidas (`pending`) via `viva_handoff_service.process_due_tasks`.
+- Implementacao em:
+  - `backend/app/main.py`.
+
+### Impacto
+- Entrega operacional no mesmo dia para fluxo `Fabio -> VIVA -> Viviane`.
+- Reduz risco de tarefa ficar parada sem execucao.
+
+### Trade-off
+- No modelo atual, o worker roda por processo de API (adequado ao ambiente local/worker unico).
+- Em escala horizontal, migrar para scheduler dedicado (fila/worker separado).
+
+### Data
+2026-02-10

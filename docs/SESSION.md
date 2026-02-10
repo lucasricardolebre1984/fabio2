@@ -446,3 +446,12 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
 - Fluxo funcional validado:
   - chat com "agendar ... avisar cliente no whatsapp <numero>" cria compromisso e handoff;
   - handoff aparece em listagem e pode ser processado.
+
+## Fechamento do dia (2026-02-10)
+- Worker automatico implementado no backend para processar handoffs vencidos sem chamada manual.
+- Prova de vida:
+  - tarefa teste criada com horario no passado;
+  - apos janela do worker, status mudou para `sent` com `sent_at`.
+- Entrega pronta para demonstracao:
+  - VIVA conversa com fluidez maior;
+  - agenda + aviso WhatsApp via Viviane operando no fluxo aprovado.
