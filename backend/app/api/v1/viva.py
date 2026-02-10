@@ -883,6 +883,91 @@ def _is_handoff_whatsapp_intent(texto: str) -> bool:
     return any(term in normalized for term in terms)
 
 
+def _is_viviane_handoff_query_intent(texto: str) -> bool:
+    normalized = _normalize_key(texto)
+    if not normalized:
+        return False
+    if "handoff" in normalized:
+        return True
+
+    has_viviane = "viviane" in normalized
+    handoff_terms = (
+        "lembrete",
+        "lembretes",
+        "pedido",
+        "pedidos",
+        "aviso",
+        "avisos",
+        "whatsapp",
+        "mensagem",
+        "mensagens",
+        "fila",
+        "tarefas",
+    )
+    if has_viviane and any(term in normalized for term in handoff_terms):
+        return True
+    return False
+
+
+def _handoff_status_from_text(texto: str) -> Optional[str]:
+    normalized = _normalize_key(texto)
+    if any(term in normalized for term in ("falhou", "falharam", "erro", "erros")):
+        return "failed"
+    if any(term in normalized for term in ("enviado", "enviados", "concluido", "concluidos")):
+        return "sent"
+    if any(term in normalized for term in ("todos", "historico", "historia", "geral")):
+        return None
+    return "pending"
+
+
+def _normalize_any_datetime(value: Any) -> Optional[datetime]:
+    if isinstance(value, datetime):
+        dt = value
+    elif isinstance(value, str):
+        try:
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except Exception:
+            return None
+    else:
+        return None
+
+    if dt.tzinfo is not None:
+        return dt.astimezone().replace(tzinfo=None)
+    return dt
+
+
+def _format_viviane_handoff_list(items: List[Dict[str, Any]], period_label: str, status_filter: Optional[str]) -> str:
+    if not items:
+        return f"Nao encontrei pedidos de lembrete para a Viviane {period_label}."
+
+    status_label = {
+        "pending": "Pendente",
+        "sent": "Enviado",
+        "failed": "Falhou",
+    }
+    if status_filter:
+        header = f"Pedidos para a Viviane {period_label} ({status_label.get(status_filter, status_filter)}):"
+    else:
+        header = f"Pedidos para a Viviane {period_label}:"
+
+    ordered = sorted(
+        items,
+        key=lambda item: _normalize_any_datetime(item.get("scheduled_for")) or datetime.max,
+    )
+    lines = [header]
+    for item in ordered:
+        scheduled_for = _normalize_any_datetime(item.get("scheduled_for"))
+        horario = scheduled_for.strftime("%H:%M") if scheduled_for else "--:--"
+        status = status_label.get(str(item.get("status") or "").lower(), str(item.get("status") or "Pendente"))
+        cliente_nome = str(item.get("cliente_nome") or "").strip()
+        cliente_numero = str(item.get("cliente_numero") or "").strip()
+        cliente = cliente_nome or cliente_numero or "cliente nao identificado"
+        mensagem = str(item.get("mensagem") or "").strip()
+        resumo_msg = _sanitize_prompt(mensagem, 90) if mensagem else "sem texto definido"
+        lines.append(f"- {horario} | {cliente} ({status}) | {resumo_msg}")
+    return "\n".join(lines)
+
+
 def _extract_phone_candidate(texto: str) -> Optional[str]:
     match = re.search(r"(\+?\d[\d\-\s\(\)]{9,})", texto or "")
     if not match:
@@ -1922,6 +2007,29 @@ async def chat_with_viva(
                     "Compromisso concluido com sucesso: "
                     f"{evento.titulo} ({evento.data_inicio.strftime('%d/%m/%Y %H:%M')})."
                 )
+            )
+
+        viviane_handoff_query_intent = _is_viviane_handoff_query_intent(request.mensagem)
+        if viviane_handoff_query_intent:
+            inicio, fim, period_label = viva_agenda_nlu_service.agenda_window_from_text(request.mensagem)
+            status_filter = _handoff_status_from_text(request.mensagem)
+            handoff_data = await viva_handoff_service.list_tasks(
+                db=db,
+                user_id=current_user.id,
+                status=status_filter,
+                page=1,
+                page_size=200,
+            )
+            tasks = list(handoff_data.get("items", []))
+            filtered_tasks: List[Dict[str, Any]] = []
+            for task in tasks:
+                scheduled_for = _normalize_any_datetime(task.get("scheduled_for"))
+                if not scheduled_for:
+                    continue
+                if inicio <= scheduled_for < fim:
+                    filtered_tasks.append(task)
+            return await finalize(
+                resposta=_format_viviane_handoff_list(filtered_tasks, period_label, status_filter)
             )
 
         if agenda_query_intent:

@@ -62,6 +62,7 @@
 | BUG-064 | Alta | VIVA->Viviane Orquestracao | Nao existe handoff operacional completo para aviso programado no WhatsApp (agenda da VIVA disparando persona Viviane no horario) | Resolvido |
 | BUG-065 | Alta | VIVA/Handoff API | `GET /api/v1/viva/handoff` retorna `500` quando `meta_json` vem serializado como string e quebra validacao do schema | Resolvido |
 | BUG-066 | Alta | VIVA/RAG Runtime | Falha em operacoes vetoriais podia abortar transacao principal do chat (`current transaction is aborted`) | Resolvido |
+| BUG-067 | Alta | VIVA/Handoff UX | Consulta "tem pedidos de lembretes para a Viviane?" era roteada para agenda generica em vez de listar fila real de handoff | Resolvido |
 
 ---
 
@@ -157,6 +158,7 @@
 | BUG-052 | Documentacao/API | API docs alinhada com autenticaÃ§Ã£o obrigatÃ³ria em `whatsapp-chat` | 2026-02-10 |
 | BUG-053 | Frontend/Tooling | Lint frontend automatizado sem wizard (ESLint inicializado) | 2026-02-10 |
 | BUG-055 | VIVA/Prompts | Remocao de prompts duplicados e rota legada de leitura no frontend | 2026-02-10 |
+| BUG-067 | VIVA/Handoff UX | Consulta de pedidos para Viviane passou a retornar fila de handoff real por periodo/status, sem cair em agenda generica | 2026-02-10 |
 
 ---
 
@@ -718,3 +720,21 @@
   - `BUG-056` => **Resolvido**.
   - `BUG-058` => **Resolvido**.
   - `BUG-066` => **Resolvido**.
+
+### BUG-067: Consulta de lembretes da Viviane roteada para agenda generica
+**Data:** 2026-02-10
+**Severidade:** Alta
+**Descricao:** perguntas como "tem pedidos de lembretes para a Viviane?" estavam sendo interpretadas como consulta de agenda comum e nao retornavam a fila de handoff (WhatsApp) da Viviane.
+**Passos:** 1. Criar handoff pendente para amanha 2. Perguntar no chat "tem pedidos de lembretes para a Viviane?" ou "... amanha?".
+**Esperado:** listar pedidos reais de handoff da Viviane por periodo, com status.
+**Atual:** fluxo corrigido com deteccao explicita de intent de handoff, filtro por periodo e resposta dedicada da fila da Viviane.
+**Status:** Resolvido
+
+### Atualizacao 2026-02-10 (query Viviane no chat)
+- backend:
+  - `backend/app/api/v1/viva.py` recebeu deteccao dedicada para consulta de handoff da Viviane;
+  - adicionados filtros de status (`pending/sent/failed`) e periodo (`hoje/amanha/semana`);
+  - resposta agora e formatada como fila de pedidos da Viviane (cliente + horario + status + resumo da mensagem).
+- validacao:
+  - `POST /api/v1/viva/chat` com "tem pedidos de lembretes para a Viviane ?" => resposta dedicada (sem agenda generica);
+  - `POST /api/v1/viva/handoff/schedule` + consulta "tem pedidos ... amanha?" => itens pendentes listados corretamente.
