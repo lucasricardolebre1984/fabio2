@@ -364,3 +364,16 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
   - `npm run type-check` (ok).
 - rastreabilidade:
   - `BUG-071` registrado e resolvido em `docs/BUGSREPORT.md`.
+
+## Atualizacao Operacional (2026-02-10 - avatar holografico 3D VIVA)
+- melhoria visual aplicada no frontend da VIVA:
+  - avatar central com efeito holografico 3D;
+  - movimentos suaves de flutuacao, scanline, rings e pulso de glow;
+  - reforco visual quando VIVA esta ativa (`loading`/gravacao).
+- arquivo alterado:
+  - `frontend/src/app/viva/page.tsx`
+- compatibilidade:
+  - comportamento responsivo preservado para mobile (`@media max-width: 768px`).
+- validacao tecnica:
+  - `npm run lint -- --file src/app/viva/page.tsx` (ok, warnings conhecidos de `<img>`);
+  - `npm run type-check` (ok).

@@ -825,6 +825,8 @@ export default function VivaChatPage() {
     }
   }
 
+  const assistenteFalando = loading || gravandoAudio
+
   return (
     <>
       <div className="flex h-[calc(100vh-4rem)]">
@@ -903,6 +905,20 @@ export default function VivaChatPage() {
         {/* Ãrea de mensagens */}
         <ScrollArea className="flex-1 px-4" ref={scrollAreaRef}>
           <div className="max-w-3xl mx-auto py-6 space-y-6">
+            <div className="flex justify-center">
+              <div className={`holo-stage ${assistenteFalando ? 'is-active' : ''}`}>
+                <div className="holo-ring holo-ring-1" />
+                <div className="holo-ring holo-ring-2" />
+                <div className="holo-ring holo-ring-3" />
+                <div className="holo-grid" />
+                <div className="holo-avatar">
+                  <Bot className="w-20 h-20" />
+                  <span className="holo-name">VIVA</span>
+                </div>
+                <div className="holo-shadow" />
+              </div>
+            </div>
+
             {mensagens.map((msg) => (
               <div
                 key={msg.id}
@@ -1245,6 +1261,198 @@ export default function VivaChatPage() {
           </div>
         </div>
       )}
+
+      <style jsx global>{`
+        .holo-stage {
+          position: relative;
+          width: min(82vw, 280px);
+          aspect-ratio: 3 / 4;
+          border-radius: 24px;
+          margin-bottom: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          perspective: 1000px;
+          transform-style: preserve-3d;
+          background:
+            radial-gradient(circle at 50% 22%, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0) 58%),
+            linear-gradient(160deg, rgba(20, 78, 152, 0.18), rgba(15, 23, 42, 0.42));
+          border: 1px solid rgba(125, 211, 252, 0.35);
+          box-shadow:
+            0 18px 38px rgba(8, 47, 73, 0.26),
+            inset 0 0 40px rgba(56, 189, 248, 0.16);
+          overflow: hidden;
+          animation: viva-holo-float 5.8s ease-in-out infinite;
+        }
+
+        .holo-stage::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background:
+            linear-gradient(transparent 0%, rgba(56, 189, 248, 0.12) 50%, transparent 100%);
+          mix-blend-mode: screen;
+          animation: viva-holo-scan 4.2s linear infinite;
+          pointer-events: none;
+        }
+
+        .holo-stage::after {
+          content: '';
+          position: absolute;
+          inset: -35% -20%;
+          background: radial-gradient(circle, rgba(56, 189, 248, 0.24), rgba(59, 130, 246, 0.02) 58%, transparent 72%);
+          transform: translateZ(-18px);
+          animation: viva-holo-pulse 3.4s ease-in-out infinite;
+          pointer-events: none;
+        }
+
+        .holo-ring {
+          position: absolute;
+          border: 1px solid rgba(125, 211, 252, 0.4);
+          border-radius: 999px;
+          pointer-events: none;
+          transform-style: preserve-3d;
+        }
+
+        .holo-ring-1 {
+          width: 78%;
+          height: 18%;
+          bottom: 14%;
+          transform: rotateX(74deg) translateZ(0);
+          animation: viva-ring-spin 8s linear infinite;
+        }
+
+        .holo-ring-2 {
+          width: 68%;
+          height: 14%;
+          bottom: 16%;
+          border-color: rgba(56, 189, 248, 0.52);
+          transform: rotateX(74deg) translateZ(12px);
+          animation: viva-ring-spin 6s linear infinite reverse;
+        }
+
+        .holo-ring-3 {
+          width: 58%;
+          height: 10%;
+          bottom: 18%;
+          border-color: rgba(147, 197, 253, 0.5);
+          transform: rotateX(74deg) translateZ(20px);
+          animation: viva-ring-spin 4.6s linear infinite;
+        }
+
+        .holo-grid {
+          position: absolute;
+          inset: 0;
+          opacity: 0.26;
+          background-image:
+            linear-gradient(rgba(56, 189, 248, 0.32) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(56, 189, 248, 0.32) 1px, transparent 1px);
+          background-size: 18px 18px;
+          transform: translateZ(-6px);
+          mask-image: radial-gradient(circle at 50% 50%, black 36%, transparent 78%);
+          pointer-events: none;
+        }
+
+        .holo-avatar {
+          position: relative;
+          z-index: 2;
+          width: 64%;
+          aspect-ratio: 1 / 1;
+          border-radius: 999px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-direction: column;
+          color: #e0f2fe;
+          background:
+            radial-gradient(circle at 50% 35%, rgba(125, 211, 252, 0.45), rgba(14, 116, 144, 0.12) 62%, rgba(3, 7, 18, 0.42) 100%);
+          border: 1px solid rgba(186, 230, 253, 0.42);
+          box-shadow:
+            inset 0 0 24px rgba(125, 211, 252, 0.35),
+            0 10px 22px rgba(2, 132, 199, 0.2);
+          transform: translateY(-8px) translateZ(24px) rotateY(-8deg);
+          animation: viva-avatar-bob 3.8s ease-in-out infinite;
+          text-shadow: 0 0 18px rgba(186, 230, 253, 0.66);
+        }
+
+        .holo-name {
+          margin-top: 6px;
+          font-size: 12px;
+          letter-spacing: 0.22em;
+          font-weight: 700;
+          color: rgba(224, 242, 254, 0.92);
+        }
+
+        .holo-shadow {
+          position: absolute;
+          width: 54%;
+          height: 9%;
+          bottom: 10%;
+          border-radius: 999px;
+          background: radial-gradient(circle, rgba(56, 189, 248, 0.38), rgba(2, 6, 23, 0.02) 72%);
+          filter: blur(2px);
+          animation: viva-shadow-pulse 3.8s ease-in-out infinite;
+          pointer-events: none;
+        }
+
+        .holo-stage.is-active {
+          box-shadow:
+            0 24px 44px rgba(8, 47, 73, 0.34),
+            inset 0 0 52px rgba(56, 189, 248, 0.26),
+            0 0 32px rgba(56, 189, 248, 0.28);
+        }
+
+        .holo-stage.is-active .holo-avatar {
+          animation-duration: 2.4s;
+        }
+
+        @keyframes viva-holo-float {
+          0%, 100% { transform: translateY(0) rotateX(2deg) rotateY(-2deg); }
+          50% { transform: translateY(-8px) rotateX(-1deg) rotateY(3deg); }
+        }
+
+        @keyframes viva-holo-scan {
+          0% { transform: translateY(-115%); }
+          100% { transform: translateY(125%); }
+        }
+
+        @keyframes viva-holo-pulse {
+          0%, 100% { opacity: 0.58; }
+          50% { opacity: 0.95; }
+        }
+
+        @keyframes viva-ring-spin {
+          0% { transform: rotateX(74deg) rotateZ(0deg); }
+          100% { transform: rotateX(74deg) rotateZ(360deg); }
+        }
+
+        @keyframes viva-avatar-bob {
+          0%, 100% { transform: translateY(-8px) translateZ(24px) rotateY(-8deg); }
+          50% { transform: translateY(-18px) translateZ(34px) rotateY(9deg); }
+        }
+
+        @keyframes viva-shadow-pulse {
+          0%, 100% { opacity: 0.65; transform: scaleX(0.95); }
+          50% { opacity: 0.92; transform: scaleX(1.08); }
+        }
+
+        @media (max-width: 768px) {
+          .holo-stage {
+            width: min(84vw, 228px);
+            border-radius: 20px;
+          }
+
+          .holo-avatar .lucide {
+            width: 62px;
+            height: 62px;
+          }
+
+          .holo-name {
+            font-size: 11px;
+            letter-spacing: 0.18em;
+          }
+        }
+      `}</style>
     </>
   )
 }
