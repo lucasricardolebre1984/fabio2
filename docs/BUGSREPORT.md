@@ -10,7 +10,7 @@
 | ID | Severidade | MÃ³dulo | DescriÃ§Ã£o | Status |
 |---|---|---|---|---|
 | BUG-010 | Baixa | PDF | WeasyPrint requer GTK+ no Windows | Resolvido (runtime Docker) |
-| BUG-012 | MÃ©dia | VIVA | BotÃ£o de Ã¡udio no chat nÃ£o funciona | Ativo |
+| BUG-012 | MÃ©dia | VIVA | BotÃ£o de Ã¡udio no chat nÃ£o funciona | Resolvido |
 | BUG-013 | MÃ©dia | VIVA | Erro `StackOverflowError` ao gerar imagem com prompt extra longo (REZETA/FC) | Resolvido |
 | BUG-014 | MÃ©dia | VIVA | Upload de imagem falha quando a imagem Ã© PNG (MIME assumido como JPEG) | Resolvido |
 | BUG-015 | Alta | VIVA | Fundo da imagem nÃ£o respeita paleta/brief do prompt (resultado genÃ©rico) | Pendente |
@@ -63,6 +63,8 @@
 | BUG-065 | Alta | VIVA/Handoff API | `GET /api/v1/viva/handoff` retorna `500` quando `meta_json` vem serializado como string e quebra validacao do schema | Resolvido |
 | BUG-066 | Alta | VIVA/RAG Runtime | Falha em operacoes vetoriais podia abortar transacao principal do chat (`current transaction is aborted`) | Resolvido |
 | BUG-067 | Alta | VIVA/Handoff UX | Consulta "tem pedidos de lembretes para a Viviane?" era roteada para agenda generica em vez de listar fila real de handoff | Resolvido |
+| BUG-068 | Media | VIVA/UI Chat | Chat nao auto-rola para o final em toda interacao, obrigando rolagem manual durante conversa longa | Resolvido |
+| BUG-069 | Media | VIVA/UI Chat | Campo de digitacao muito baixo para edicao de mensagens maiores, com baixa visibilidade | Resolvido |
 
 ---
 
@@ -159,6 +161,9 @@
 | BUG-053 | Frontend/Tooling | Lint frontend automatizado sem wizard (ESLint inicializado) | 2026-02-10 |
 | BUG-055 | VIVA/Prompts | Remocao de prompts duplicados e rota legada de leitura no frontend | 2026-02-10 |
 | BUG-067 | VIVA/Handoff UX | Consulta de pedidos para Viviane passou a retornar fila de handoff real por periodo/status, sem cair em agenda generica | 2026-02-10 |
+| BUG-012 | VIVA | Botao de audio passou a gravar/parar no microfone (com fallback para upload manual), anexando audio no chat | 2026-02-10 |
+| BUG-068 | VIVA/UI Chat | Auto-scroll reforcado para manter foco no fim da conversa, inclusive com carregamento de imagem | 2026-02-10 |
+| BUG-069 | VIVA/UI Chat | Campo de digitacao ampliado com autoaltura para melhor visibilidade em mensagens longas | 2026-02-10 |
 
 ---
 
@@ -738,3 +743,36 @@
 - validacao:
   - `POST /api/v1/viva/chat` com "tem pedidos de lembretes para a Viviane ?" => resposta dedicada (sem agenda generica);
   - `POST /api/v1/viva/handoff/schedule` + consulta "tem pedidos ... amanha?" => itens pendentes listados corretamente.
+
+### BUG-068: Chat sem auto-scroll consistente
+**Data:** 2026-02-10
+**Severidade:** Media
+**Descricao:** a conversa podia crescer sem manter o viewport no final, exigindo rolagem manual em mensagens longas.
+**Passos:** 1. conversar por varias mensagens 2. gerar imagem 3. observar necessidade de rolar manualmente para ver o fim.
+**Esperado:** chat acompanhar automaticamente o final da conversa.
+**Atual:** auto-scroll reforcado com sentinela no fim da lista e ajuste apos render/carregamento.
+**Status:** Resolvido
+
+### BUG-069: Campo de digitacao pequeno para mensagens longas
+**Data:** 2026-02-10
+**Severidade:** Media
+**Descricao:** textarea com altura inicial baixa, reduzindo visibilidade ao editar mensagens maiores.
+**Passos:** 1. digitar mensagem com varias linhas 2. tentar revisar/editar antes de enviar.
+**Esperado:** area de digitacao mais alta com crescimento conforme conteudo.
+**Atual:** textarea ampliada (`minHeight=88`, `maxHeight=220`) com autoaltura e melhor legibilidade.
+**Status:** Resolvido
+
+### Atualizacao 2026-02-10 (audio + UX chat VIVA)
+- frontend:
+  - `frontend/src/app/viva/page.tsx`:
+    - botao de microfone passou a gravar/parar audio com `MediaRecorder` (fallback para upload manual quando necessario);
+    - anexos de audio agora podem ser adicionados mesmo em repeticao do mesmo arquivo (reset do input file);
+    - auto-scroll reforcado com sentinela no fim das mensagens e chamada apos novas mensagens/loading/imagens;
+    - campo de digitacao ampliado e com autoajuste de altura para conversa longa.
+- validacao:
+  - `npm run lint -- --file src/app/viva/page.tsx` (ok, apenas avisos existentes de `img`);
+  - `npm run type-check` (ok).
+- status:
+  - `BUG-012` => **Resolvido**.
+  - `BUG-068` => **Resolvido**.
+  - `BUG-069` => **Resolvido**.

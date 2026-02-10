@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Send, Bot, User, Sparkles, Trash2, Copy, Check, ImageIcon, Mic, X, FileUp, Layout, Palette, Image as ImageLucide, FileText, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -274,6 +274,8 @@ export default function VivaChatPage() {
   const [mensagens, setMensagens] = useState<Mensagem[]>([createWelcomeMessage()])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [gravandoAudio, setGravandoAudio] = useState(false)
+  const [erroAudio, setErroAudio] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [anexos, setAnexos] = useState<{ file: File; tipo: 'imagem' | 'audio' | 'arquivo'; preview?: string }[]>([])
@@ -284,8 +286,27 @@ export default function VivaChatPage() {
   const [erroExport, setErroExport] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const textAreaRef = useRef<HTMLTextAreaElement>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
+  const audioChunksRef = useRef<BlobPart[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const audioInputRef = useRef<HTMLInputElement>(null)
+
+  const INPUT_MIN_HEIGHT = 88
+  const INPUT_MAX_HEIGHT = 220
+
+  const scrollToBottom = useCallback((smooth = false) => {
+    const behavior: ScrollBehavior = smooth ? 'smooth' : 'auto'
+    const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement | null
+    if (viewport) {
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior })
+    } else if (scrollRef.current) {
+      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior })
+    }
+    messagesEndRef.current?.scrollIntoView({ block: 'end', behavior })
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -328,15 +349,25 @@ export default function VivaChatPage() {
   }, [])
 
   useEffect(() => {
-    const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement | null
-    if (viewport) {
-      viewport.scrollTop = viewport.scrollHeight
-      return
+    requestAnimationFrame(() => scrollToBottom())
+  }, [mensagens, loading, scrollToBottom])
+
+  useEffect(() => {
+    const textarea = textAreaRef.current
+    if (!textarea) return
+    textarea.style.height = 'auto'
+    const nextHeight = Math.min(Math.max(textarea.scrollHeight, INPUT_MIN_HEIGHT), INPUT_MAX_HEIGHT)
+    textarea.style.height = `${nextHeight}px`
+  }, [input])
+
+  useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop()
+      }
+      mediaStreamRef.current?.getTracks().forEach(track => track.stop())
     }
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-  }, [mensagens, loading])
+  }, [])
 
   const handleSend = async () => {
     if ((!input.trim() && anexos.length === 0) || loading) return
@@ -492,6 +523,80 @@ export default function VivaChatPage() {
     }
   }
 
+  const stopAudioRecording = () => {
+    const recorder = mediaRecorderRef.current
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.stop()
+    }
+    setGravandoAudio(false)
+  }
+
+  const startAudioRecording = async () => {
+    if (typeof window === 'undefined') return
+
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      audioInputRef.current?.click()
+      return
+    }
+
+    try {
+      setErroAudio(null)
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      mediaStreamRef.current = stream
+      audioChunksRef.current = []
+
+      const preferredMime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : ''
+
+      const recorder = preferredMime ? new MediaRecorder(stream, { mimeType: preferredMime }) : new MediaRecorder(stream)
+      mediaRecorderRef.current = recorder
+
+      recorder.ondataavailable = (event: BlobEvent) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
+        }
+      }
+
+      recorder.onerror = () => {
+        setErroAudio('Falha ao gravar audio. Tente novamente.')
+        setGravandoAudio(false)
+      }
+
+      recorder.onstop = () => {
+        setGravandoAudio(false)
+        stream.getTracks().forEach(track => track.stop())
+        mediaStreamRef.current = null
+
+        const mimeType = recorder.mimeType || 'audio/webm'
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType })
+        audioChunksRef.current = []
+        if (!audioBlob.size) return
+
+        const ext = mimeType.includes('mp4') ? 'm4a' : 'webm'
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+        const audioFile = new File([audioBlob], `gravacao-${stamp}.${ext}`, { type: mimeType })
+        setAnexos(prev => [...prev, { file: audioFile, tipo: 'audio' }])
+      }
+
+      recorder.start()
+      setGravandoAudio(true)
+    } catch {
+      setErroAudio('Nao consegui acessar o microfone. Se preferir, selecione um audio manualmente.')
+      audioInputRef.current?.click()
+    }
+  }
+
+  const handleAudioButtonClick = async () => {
+    if (gravandoAudio) {
+      stopAudioRecording()
+      return
+    }
+    await startAudioRecording()
+  }
+
   const selecionarPrompt = async (promptId: string) => {
     setPromptAtivo(promptId)
 
@@ -516,6 +621,9 @@ export default function VivaChatPage() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, tipo: 'imagem' | 'audio' | 'arquivo') => {
     const files = e.target.files
     if (!files) return
+    if (tipo === 'audio') {
+      setErroAudio(null)
+    }
 
     Array.from(files).forEach(file => {
       const reader = new FileReader()
@@ -532,6 +640,7 @@ export default function VivaChatPage() {
         setAnexos(prev => [...prev, { file, tipo }])
       }
     })
+    e.target.value = ''
   }
 
   const removeAnexo = (index: number) => {
@@ -811,6 +920,7 @@ export default function VivaChatPage() {
                                   src={anexo.url} 
                                   alt={anexo.nome || 'Imagem'} 
                                   className="max-w-sm sm:max-w-md rounded-lg cursor-zoom-in"
+                                  onLoad={() => scrollToBottom()}
                                   onClick={() => setImagemAtiva({ url: anexo.url, nome: anexo.nome })}
                                 />
                                 {msg.overlay && (
@@ -891,6 +1001,7 @@ export default function VivaChatPage() {
                 </div>
               </div>
             )}
+            <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
 
@@ -926,7 +1037,7 @@ export default function VivaChatPage() {
         {/* Input area */}
         <div className="p-4 border-t bg-white">
           <div className="max-w-3xl mx-auto">
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-end">
               {/* BotÃµes de anexo */}
               <div className="flex gap-1">
                 <Button
@@ -940,21 +1051,23 @@ export default function VivaChatPage() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-gray-500"
-                  onClick={() => audioInputRef.current?.click()}
+                  className={gravandoAudio ? 'text-red-600 bg-red-50 hover:bg-red-100' : 'text-gray-500'}
+                  onClick={handleAudioButtonClick}
+                  title={gravandoAudio ? 'Parar gravacao' : 'Gravar audio'}
                 >
                   <Mic className="w-5 h-5" />
                 </Button>
               </div>
               
               <textarea
+                ref={textAreaRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Digite sua mensagem para a VIVA..."
-                className="flex-1 px-4 py-3 border rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                rows={1}
-                style={{ minHeight: '48px', maxHeight: '120px' }}
+                className="flex-1 px-4 py-3 border rounded-xl resize-none text-base leading-6 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={3}
+                style={{ minHeight: `${INPUT_MIN_HEIGHT}px`, maxHeight: `${INPUT_MAX_HEIGHT}px` }}
               />
               <Button
                 onClick={handleSend}
@@ -964,6 +1077,17 @@ export default function VivaChatPage() {
                 <Send className="w-5 h-5" />
               </Button>
             </div>
+
+            {gravandoAudio && (
+              <p className="mt-2 text-xs text-red-600 text-center">
+                Gravando audio... clique no microfone para finalizar.
+              </p>
+            )}
+            {erroAudio && (
+              <p className="mt-2 text-xs text-amber-600 text-center">
+                {erroAudio}
+              </p>
+            )}
             
             {/* Inputs escondidos */}
             <input
