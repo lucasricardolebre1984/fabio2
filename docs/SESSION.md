@@ -432,3 +432,17 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
   - reduzir percepcao de bot travado e manter fluidez de conversa.
 - Evidencia:
   - ajuste em `backend/app/api/v1/viva.py` com helper `_build_agenda_recovery_reply(...)`.
+
+## Etapa 2 - progresso (2026-02-10)
+- Componentizacao iniciada:
+  - `viva_agenda_nlu_service` para interpretacao de agenda;
+  - `viva_handoff_service` para tarefas VIVA -> Viviane;
+  - `viva_capabilities_service` para inventario de capacidades.
+- Endpoints novos adicionados em `/api/v1/viva/*`:
+  - `GET /capabilities`
+  - `POST /handoff/schedule`
+  - `GET /handoff`
+  - `POST /handoff/process-due`
+- Fluxo funcional validado:
+  - chat com "agendar ... avisar cliente no whatsapp <numero>" cria compromisso e handoff;
+  - handoff aparece em listagem e pode ser processado.

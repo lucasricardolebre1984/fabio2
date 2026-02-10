@@ -1,0 +1,10 @@
+﻿ M backend/app/api/v1/viva.py
+ M docs/ARCHITECTURE/OVERVIEW.md
+ M docs/BUGSREPORT.md
+ M docs/DECISIONS.md
+ M docs/SESSION.md
+ M docs/STATUS.md
+?? backend/app/services/viva_agenda_nlu_service.py
+?? backend/app/services/viva_capabilities_service.py
+?? backend/app/services/viva_handoff_service.py
+?? docs/ROLLBACK/rollback-20260210-161515-viva-stage2-handoff-baseline.txt

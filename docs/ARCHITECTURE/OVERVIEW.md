@@ -80,6 +80,11 @@ WhatsApp
 2. webhook processa e gera resposta no dominio comercial (Viviane);
 3. conversa e refletida no painel de conversas.
 
+Handoff VIVA -> Viviane
+1. Fabio agenda via chat interno VIVA;
+2. VIVA cria tarefa de handoff para aviso WhatsApp;
+3. motor de handoff processa tarefas vencidas e registra status (`pending/sent/failed`).
+
 ---
 
 ## Stack e Servicos
@@ -117,6 +122,13 @@ Decisao vigente:
 - `/clientes`
 - `/agenda`
 - `/whatsapp`, `/whatsapp/conversas`
+
+## Rotas Backend VIVA (novas de orquestracao)
+
+- `/api/v1/viva/capabilities`
+- `/api/v1/viva/handoff/schedule`
+- `/api/v1/viva/handoff`
+- `/api/v1/viva/handoff/process-due`
 
 ---
 

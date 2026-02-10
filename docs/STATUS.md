@@ -307,3 +307,20 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
   - `backend/app/api/v1/viva.py`
 - Rastreabilidade:
   - `BUG-063` em validacao.
+
+## Atualizacao Operacional (2026-02-10 - etapa 2 avancada: handoff Viviane)
+- Estrutura por dominio iniciada no backend VIVA:
+  - NLU de agenda extraido para `backend/app/services/viva_agenda_nlu_service.py`;
+  - handoff operacional extraido para `backend/app/services/viva_handoff_service.py`;
+  - catalogo de capacidades em `backend/app/services/viva_capabilities_service.py`.
+- Novos endpoints VIVA:
+  - `GET /api/v1/viva/capabilities`
+  - `POST /api/v1/viva/handoff/schedule`
+  - `GET /api/v1/viva/handoff`
+  - `POST /api/v1/viva/handoff/process-due`
+- Fluxo chat atualizado:
+  - pedido de agenda com "avisar cliente no WhatsApp" agora cria compromisso + tarefa de handoff.
+- Validacao tecnica:
+  - compile dos arquivos alterados: OK;
+  - `GET /api/v1/viva/capabilities`: OK;
+  - handoff via chat + listagem + processamento: OK.

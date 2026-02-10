@@ -23,6 +23,9 @@ from app.services.agenda_service import AgendaService
 from app.services.viva_local_service import viva_local_service
 from app.services.viva_model_service import viva_model_service
 from app.services.viva_concierge_service import viva_concierge_service
+from app.services.viva_agenda_nlu_service import viva_agenda_nlu_service
+from app.services.viva_handoff_service import viva_handoff_service
+from app.services.viva_capabilities_service import viva_capabilities_service
 from app.services.openai_service import openai_service
 from app.config import settings
 
@@ -95,6 +98,49 @@ class CampanhaItem(BaseModel):
 class CampanhaListResponse(BaseModel):
     items: List[CampanhaItem]
     total: int
+
+
+class VivaCapabilitiesResponse(BaseModel):
+    items: List[Dict[str, Any]]
+
+
+class HandoffScheduleRequest(BaseModel):
+    cliente_numero: str
+    mensagem: str
+    scheduled_for: datetime
+    cliente_nome: Optional[str] = None
+    agenda_event_id: Optional[UUID] = None
+    meta: Optional[Dict[str, Any]] = None
+
+
+class HandoffItem(BaseModel):
+    id: UUID
+    user_id: UUID
+    agenda_event_id: Optional[UUID] = None
+    cliente_nome: Optional[str] = None
+    cliente_numero: str
+    mensagem: str
+    scheduled_for: datetime
+    status: str
+    attempts: int = 0
+    sent_at: Optional[datetime] = None
+    last_error: Optional[str] = None
+    meta_json: Dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
+class HandoffListResponse(BaseModel):
+    items: List[HandoffItem]
+    total: int
+    page: int
+    page_size: int
+
+
+class HandoffProcessResponse(BaseModel):
+    processed: int
+    sent: int
+    failed: int
 
 
 class ImageAnalysisRequest(BaseModel):
@@ -721,6 +767,65 @@ def _sanitize_fake_asset_delivery_reply(resposta: str, modo: Optional[str]) -> s
     )
 
 
+def _is_handoff_whatsapp_intent(texto: str) -> bool:
+    normalized = _normalize_key(texto)
+    terms = (
+        "avisar cliente",
+        "avise cliente",
+        "avisar no whatsapp",
+        "avise no whatsapp",
+        "lembrar cliente no whatsapp",
+        "chamar cliente no whatsapp",
+        "viviane avisar",
+        "viviane lembrar",
+    )
+    return any(term in normalized for term in terms)
+
+
+def _extract_phone_candidate(texto: str) -> Optional[str]:
+    match = re.search(r"(\+?\d[\d\-\s\(\)]{9,})", texto or "")
+    if not match:
+        return None
+    digits = re.sub(r"\D", "", match.group(1))
+    if len(digits) < 10:
+        return None
+    if len(digits) > 13:
+        digits = digits[-13:]
+    return digits
+
+
+def _extract_cliente_nome(texto: str) -> Optional[str]:
+    match = re.search(r"cliente\s+([A-Za-zÀ-ÿ0-9 ]{2,80})", texto or "", flags=re.IGNORECASE)
+    if not match:
+        return None
+    raw = re.split(r"\b(amanha|hoje|as|às|no|na|dia|whatsapp)\b", match.group(1), flags=re.IGNORECASE)[0]
+    cleaned = " ".join(raw.split()).strip(" -,:;")
+    return cleaned if len(cleaned) >= 2 else None
+
+
+def _extract_handoff_custom_message(texto: str) -> Optional[str]:
+    match = re.search(r"mensagem\s*:\s*(.+)$", texto or "", flags=re.IGNORECASE)
+    if not match:
+        return None
+    msg = str(match.group(1) or "").strip()
+    return msg or None
+
+
+def _build_viviane_handoff_message(
+    cliente_nome: Optional[str],
+    evento_titulo: str,
+    data_inicio: datetime,
+    modo: Optional[str],
+) -> str:
+    company = "FC Solucoes Financeiras" if modo != "REZETA" else "RezetaBrasil"
+    saudacao = f"Oi {cliente_nome}," if cliente_nome else "Oi,"
+    return (
+        f"{saudacao} aqui e a Viviane, secretaria da {company}. "
+        f"Lembrete do seu compromisso: {evento_titulo} em {data_inicio.strftime('%d/%m/%Y as %H:%M')}. "
+        "Se precisar remarcar, me responda por aqui."
+    )
+
+
 def _derive_campaign_title(
     modo: str,
     campaign_copy: Optional[Dict[str, Any]] = None,
@@ -793,6 +898,43 @@ def _campaign_row_to_item(row: Any) -> CampanhaItem:
         overlay=row.overlay_json or {},
         meta=row.meta_json or {},
         created_at=row.created_at,
+    )
+
+
+def _handoff_row_to_item(row: Any) -> HandoffItem:
+    if isinstance(row, dict):
+        return HandoffItem(
+            id=row["id"],
+            user_id=row["user_id"],
+            agenda_event_id=row.get("agenda_event_id"),
+            cliente_nome=row.get("cliente_nome"),
+            cliente_numero=row["cliente_numero"],
+            mensagem=row["mensagem"],
+            scheduled_for=row["scheduled_for"],
+            status=row["status"],
+            attempts=int(row.get("attempts") or 0),
+            sent_at=row.get("sent_at"),
+            last_error=row.get("last_error"),
+            meta_json=row.get("meta_json") or {},
+            created_at=row["created_at"],
+            updated_at=row.get("updated_at"),
+        )
+
+    return HandoffItem(
+        id=row.id,
+        user_id=row.user_id,
+        agenda_event_id=row.agenda_event_id,
+        cliente_nome=row.cliente_nome,
+        cliente_numero=row.cliente_numero,
+        mensagem=row.mensagem,
+        scheduled_for=row.scheduled_for,
+        status=row.status,
+        attempts=int(row.attempts or 0),
+        sent_at=row.sent_at,
+        last_error=row.last_error,
+        meta_json=row.meta_json or {},
+        created_at=row.created_at,
+        updated_at=row.updated_at,
     )
 
 
@@ -1809,9 +1951,9 @@ async def chat_with_viva(
             modo = _normalize_mode(snapshot.modo) or _infer_mode_from_context(contexto_efetivo)
 
         service = AgendaService(db)
-        agenda_query_intent = _is_agenda_query_intent(request.mensagem, contexto_efetivo)
-        agenda_command = _parse_agenda_command(request.mensagem)
-        agenda_natural_command = _parse_agenda_natural_create(request.mensagem)
+        agenda_query_intent = viva_agenda_nlu_service.is_agenda_query_intent(request.mensagem, contexto_efetivo)
+        agenda_command = viva_agenda_nlu_service.parse_agenda_command(request.mensagem)
+        agenda_natural_command = viva_agenda_nlu_service.parse_agenda_natural_create(request.mensagem)
         agenda_errors: List[str] = []
         agenda_create_payload: Optional[Dict[str, Any]] = None
 
@@ -1840,6 +1982,45 @@ async def chat_with_viva(
                 ),
                 current_user.id,
             )
+            if _is_handoff_whatsapp_intent(request.mensagem):
+                numero = _extract_phone_candidate(request.mensagem)
+                cliente_nome = _extract_cliente_nome(request.mensagem)
+                if not numero:
+                    return await finalize(
+                        resposta=(
+                            "Agendamento criado com sucesso: "
+                            f"{evento.titulo} em {evento.data_inicio.strftime('%d/%m/%Y %H:%M')}.\n"
+                            "Para eu acionar a Viviane no horario, me passe o WhatsApp do cliente com DDD."
+                        )
+                    )
+
+                handoff_msg = (
+                    _extract_handoff_custom_message(request.mensagem)
+                    or _build_viviane_handoff_message(
+                        cliente_nome=cliente_nome,
+                        evento_titulo=evento.titulo,
+                        data_inicio=evento.data_inicio,
+                        modo=modo,
+                    )
+                )
+                task_id = await viva_handoff_service.schedule_task(
+                    db=db,
+                    user_id=current_user.id,
+                    cliente_nome=cliente_nome,
+                    cliente_numero=numero,
+                    mensagem=handoff_msg,
+                    scheduled_for=evento.data_inicio,
+                    agenda_event_id=evento.id,
+                    meta=json.dumps({"source": "viva_chat", "session_id": str(session_id)}, ensure_ascii=False),
+                )
+                return await finalize(
+                    resposta=(
+                        "Agendamento criado com sucesso: "
+                        f"{evento.titulo} em {evento.data_inicio.strftime('%d/%m/%Y %H:%M')}.\n"
+                        f"Handoff para Viviane agendado no WhatsApp (ID: {task_id})."
+                    )
+                )
+
             return await finalize(
                 resposta=(
                     "Agendamento criado com sucesso: "
@@ -1847,7 +2028,7 @@ async def chat_with_viva(
                 )
             )
 
-        conclude_command = _parse_agenda_conclude_command(request.mensagem)
+        conclude_command = viva_agenda_nlu_service.parse_agenda_conclude_command(request.mensagem)
         if conclude_command is not None:
             if conclude_command.get("error"):
                 return await finalize(
@@ -1902,7 +2083,7 @@ async def chat_with_viva(
             )
 
         if agenda_query_intent:
-            inicio, fim, period_label = _agenda_window_from_text(request.mensagem)
+            inicio, fim, period_label = viva_agenda_nlu_service.agenda_window_from_text(request.mensagem)
             agenda_data = await service.list(
                 inicio=inicio,
                 fim=fim,
@@ -1912,10 +2093,15 @@ async def chat_with_viva(
                 page_size=120,
             )
             items = list(agenda_data.get("items", []))
-            return await finalize(resposta=_format_agenda_list(items, period_label))
+            return await finalize(resposta=viva_agenda_nlu_service.format_agenda_list(items, period_label))
 
         if agenda_errors and (agenda_command is not None or agenda_natural_command is not None):
-            return await finalize(resposta=_build_agenda_recovery_reply(request.mensagem, agenda_errors))
+            return await finalize(
+                resposta=viva_agenda_nlu_service.build_agenda_recovery_reply(
+                    request.mensagem,
+                    agenda_errors,
+                )
+            )
 
         campaign_flow_requested = False
         campaign_fields: Dict[str, str] = {}
@@ -2140,6 +2326,95 @@ async def create_chat_session(
         return ChatSnapshotResponse(session_id=session_id, modo=_normalize_mode(payload.modo), messages=[])
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao criar sessao: {str(e)}")
+
+
+@router.get("/capabilities", response_model=VivaCapabilitiesResponse)
+async def get_capabilities(
+    current_user: User = Depends(get_current_user),
+):
+    """Retorna o catalogo de capacidades operacionais da VIVA."""
+    return VivaCapabilitiesResponse(items=viva_capabilities_service.get_capabilities())
+
+
+@router.post("/handoff/schedule", response_model=HandoffItem)
+async def schedule_handoff(
+    payload: HandoffScheduleRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        task_id = await viva_handoff_service.schedule_task(
+            db=db,
+            user_id=current_user.id,
+            cliente_nome=payload.cliente_nome,
+            cliente_numero=payload.cliente_numero,
+            mensagem=payload.mensagem,
+            scheduled_for=payload.scheduled_for,
+            agenda_event_id=payload.agenda_event_id,
+            meta=payload.meta or {},
+        )
+        rows = await db.execute(
+            text(
+                """
+                SELECT id, user_id, agenda_event_id, cliente_nome, cliente_numero, mensagem,
+                       scheduled_for, status, attempts, sent_at, last_error, meta_json, created_at, updated_at
+                FROM viva_handoff_tasks
+                WHERE id = :id AND user_id = :user_id
+                """
+            ),
+            {"id": str(task_id), "user_id": str(current_user.id)},
+        )
+        row = rows.first()
+        if not row:
+            raise HTTPException(status_code=500, detail="Falha ao agendar handoff.")
+        return _handoff_row_to_item(row)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao agendar handoff: {str(e)}")
+
+
+@router.get("/handoff", response_model=HandoffListResponse)
+async def list_handoff(
+    status: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        data = await viva_handoff_service.list_tasks(
+            db=db,
+            user_id=current_user.id,
+            status=status,
+            page=max(1, page),
+            page_size=max(1, min(page_size, 200)),
+        )
+        return HandoffListResponse(
+            items=[_handoff_row_to_item(row) for row in data["items"]],
+            total=int(data["total"]),
+            page=int(data["page"]),
+            page_size=int(data["page_size"]),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao listar handoff: {str(e)}")
+
+
+@router.post("/handoff/process-due", response_model=HandoffProcessResponse)
+async def process_handoff_due(
+    limit: int = 20,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        result = await viva_handoff_service.process_due_tasks(db=db, limit=limit)
+        return HandoffProcessResponse(
+            processed=int(result["processed"]),
+            sent=int(result["sent"]),
+            failed=int(result["failed"]),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao processar handoff: {str(e)}")
 
 
 @router.post("/campanhas", response_model=CampanhaItem)

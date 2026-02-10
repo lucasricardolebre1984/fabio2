@@ -1,0 +1,7 @@
+﻿backend/app/services/viva_agenda_nlu_service.py
+backend/app/services/viva_capabilities_service.py
+backend/app/services/viva_handoff_service.py
+docs/ROLLBACK/rollback-20260210-161515-viva-stage2-handoff-baseline.txt
+docs/ROLLBACK/rollback-20260210-161515-viva-stage2-handoff-staged.patch
+docs/ROLLBACK/rollback-20260210-161515-viva-stage2-handoff-untracked.txt
+docs/ROLLBACK/rollback-20260210-161515-viva-stage2-handoff.patch

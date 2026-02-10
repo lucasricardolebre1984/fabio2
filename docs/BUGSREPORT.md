@@ -59,7 +59,7 @@
 | BUG-061 | Alta | VIVA/Campanhas | Geracao de imagem pode ignorar tema do brief (ex.: Carnaval sem dividas) e cair em cena corporativa generica (senhor de terno em escritorio) | Em validacao |
 | BUG-062 | Alta | VIVA/Arquitetura | `backend/app/api/v1/viva.py` monolitico (chat+agenda+campanhas+midia+SQL) com alto acoplamento e baixa manutenibilidade | Ativo |
 | BUG-063 | Alta | VIVA/Agenda UX | Fallback rigido de agenda exige formato textual prescritivo, reduz fluidez conversacional e gera efeito de "bot travado" | Em validacao |
-| BUG-064 | Alta | VIVA->Viviane Orquestracao | Nao existe handoff operacional completo para aviso programado no WhatsApp (agenda da VIVA disparando persona Viviane no horario) | Ativo |
+| BUG-064 | Alta | VIVA->Viviane Orquestracao | Nao existe handoff operacional completo para aviso programado no WhatsApp (agenda da VIVA disparando persona Viviane no horario) | Em validacao |
 
 ---
 
@@ -591,3 +591,23 @@
   - sem exigir frase identica para continuar o fluxo.
 - Status:
   - `BUG-063` movido para **Em validacao**.
+
+### Atualizacao 2026-02-10 (execucao inicial BUG-064 - handoff VIVA -> Viviane)
+- Novos componentes:
+  - `backend/app/services/viva_handoff_service.py`
+  - `backend/app/services/viva_capabilities_service.py`
+  - `backend/app/services/viva_agenda_nlu_service.py`
+- Novos endpoints em `backend/app/api/v1/viva.py`:
+  - `GET /api/v1/viva/capabilities`
+  - `POST /api/v1/viva/handoff/schedule`
+  - `GET /api/v1/viva/handoff`
+  - `POST /api/v1/viva/handoff/process-due`
+- Integracao no chat:
+  - ao detectar pedido de agenda + "avisar cliente no WhatsApp", a VIVA cria compromisso e agenda handoff para Viviane.
+- Validacao objetiva:
+  - `GET /api/v1/viva/capabilities` retornando catalogo (`4` dominios);
+  - `POST /api/v1/viva/chat` com "agendar ... avisar cliente no whatsapp <numero>" retornando handoff ID;
+  - `GET /api/v1/viva/handoff` listando tarefa `pending`;
+  - `POST /api/v1/viva/handoff/schedule` com horario vencido + `POST /api/v1/viva/handoff/process-due` processando envio (`processed=1`, `sent=1`).
+- Status:
+  - `BUG-064` movido para **Em validacao**.

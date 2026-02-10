@@ -1008,3 +1008,25 @@ Foi aprovado iniciar um redesign estrutural da VIVA para eliminar rigidez conver
 
 ### Data
 2026-02-10
+
+## DECISAO-029: introduzir camada de handoff operacional VIVA -> Viviane
+
+### Contexto
+Para viabilizar o fluxo de secretaria `Fabio -> VIVA -> Viviane -> Fabio`, era necessario adicionar uma trilha operacional explicita para avisos no WhatsApp vinculados a compromissos.
+
+### Decisao
+- Criar servico dedicado de handoff:
+  - `backend/app/services/viva_handoff_service.py`
+- Expor endpoints de operacao:
+  - `POST /api/v1/viva/handoff/schedule`
+  - `GET /api/v1/viva/handoff`
+  - `POST /api/v1/viva/handoff/process-due`
+- Integrar ao chat interno:
+  - quando o usuario pedir agenda + aviso no WhatsApp, criar tarefa de handoff automaticamente.
+
+### Impacto
+- Permite operar avisos programados sem acoplar logica de envio diretamente ao parser de chat.
+- Cria trilha auditavel de tarefas pendentes/enviadas/falhas.
+
+### Data
+2026-02-10
