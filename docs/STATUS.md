@@ -298,3 +298,12 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
   - `BUG-064` ausencia de handoff completo VIVA -> Viviane
 - Acao imediata da etapa 1:
   - gerar commit de seguranca baseline com estado atual completo do repositorio.
+
+## Atualizacao Operacional (2026-02-10 - inicio etapa 2)
+- Primeiro corte tecnico executado:
+  - agenda fallback da VIVA ficou contextual e menos prescritivo;
+  - removido texto fixo que exigia formato rigido para continuar.
+- Arquivo alterado:
+  - `backend/app/api/v1/viva.py`
+- Rastreabilidade:
+  - `BUG-063` em validacao.

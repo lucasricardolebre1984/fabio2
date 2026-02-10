@@ -58,7 +58,7 @@
 | BUG-060 | Alta | Frontend/Auth+Docs | Login no front exibe erro generico para qualquer falha e README publica senha de teste divergente do runtime local | Resolvido |
 | BUG-061 | Alta | VIVA/Campanhas | Geracao de imagem pode ignorar tema do brief (ex.: Carnaval sem dividas) e cair em cena corporativa generica (senhor de terno em escritorio) | Em validacao |
 | BUG-062 | Alta | VIVA/Arquitetura | `backend/app/api/v1/viva.py` monolitico (chat+agenda+campanhas+midia+SQL) com alto acoplamento e baixa manutenibilidade | Ativo |
-| BUG-063 | Alta | VIVA/Agenda UX | Fallback rigido de agenda exige formato textual prescritivo, reduz fluidez conversacional e gera efeito de "bot travado" | Ativo |
+| BUG-063 | Alta | VIVA/Agenda UX | Fallback rigido de agenda exige formato textual prescritivo, reduz fluidez conversacional e gera efeito de "bot travado" | Em validacao |
 | BUG-064 | Alta | VIVA->Viviane Orquestracao | Nao existe handoff operacional completo para aviso programado no WhatsApp (agenda da VIVA disparando persona Viviane no horario) | Ativo |
 
 ---
@@ -580,3 +580,14 @@
 - Etapa 3 (orquestracao e memoria evolutiva):
   - implementar fluxo `Fabio -> VIVA -> Viviane -> Fabio`;
   - memoria longa com `pgvector` + filtros contextuais por empresa/modulo/usuario.
+
+### Atualizacao 2026-02-10 (execucao inicial BUG-063 - agenda menos robotica)
+- Ajuste aplicado em `backend/app/api/v1/viva.py`:
+  - substituido fallback fixo de agenda por `_build_agenda_recovery_reply(...)` com resposta contextual;
+  - removida instrucao prescritiva unica "use: agendar TITULO | DD/MM...".
+- Comportamento novo:
+  - quando faltar horario, a VIVA pede apenas data/hora em linguagem natural;
+  - quando horario estiver inconsistente, pede confirmacao curta;
+  - sem exigir frase identica para continuar o fluxo.
+- Status:
+  - `BUG-063` movido para **Em validacao**.

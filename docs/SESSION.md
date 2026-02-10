@@ -424,3 +424,11 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
 - Artefatos criados nesta etapa:
   - `docs/ARCHITECTURE/VIVA_REDESIGN.md`
   - registros `BUG-062`, `BUG-063`, `BUG-064` em `docs/BUGSREPORT.md`.
+
+## Inicio da Etapa 2 (2026-02-10)
+- Mudanca inicial implementada:
+  - substituicao do fallback rigido de agenda por resposta contextual curta.
+- Objetivo:
+  - reduzir percepcao de bot travado e manter fluidez de conversa.
+- Evidencia:
+  - ajuste em `backend/app/api/v1/viva.py` com helper `_build_agenda_recovery_reply(...)`.

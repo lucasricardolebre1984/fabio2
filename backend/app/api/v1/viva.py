@@ -1620,6 +1620,35 @@ def _format_agenda_list(items: List[Any], period_label: str) -> str:
     return "\n".join(lines)
 
 
+def _build_agenda_recovery_reply(message: str, errors: List[str]) -> str:
+    normalized = _normalize_key(message)
+    lower_errors = [str(err).lower() for err in (errors or [])]
+    has_datetime_error = any("data/hora" in err for err in lower_errors)
+    has_time_in_text = bool(re.search(r"\b\d{1,2}:\d{2}\b", message or ""))
+
+    if has_datetime_error and not has_time_in_text:
+        return (
+            "Entendi. Me diga so quando deve acontecer (ex.: amanha 10:30) "
+            "e o que voce quer agendar, que eu registro para voce."
+        )
+
+    if has_datetime_error:
+        return (
+            "Quase pronto. Me confirme so a data e horario do compromisso "
+            "(pode ser em linguagem natural) que eu finalizo."
+        )
+
+    if "concluir" in normalized or "finalizar" in normalized:
+        return (
+            "Para concluir, me diga o titulo do compromisso ou o ID que aparece na agenda."
+        )
+
+    return (
+        "Entendi que voce quer mexer na agenda. Me diga apenas o compromisso e quando ele acontece, "
+        "do seu jeito, que eu cuido do resto."
+    )
+
+
 def _parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
     raw = (message or "").strip()
     if not raw:
@@ -1886,13 +1915,7 @@ async def chat_with_viva(
             return await finalize(resposta=_format_agenda_list(items, period_label))
 
         if agenda_errors and (agenda_command is not None or agenda_natural_command is not None):
-            return await finalize(
-                resposta=(
-                    "Para agendar, use: "
-                    "agendar TITULO | DD/MM/AAAA HH:MM | descricao opcional. "
-                    "Tambem aceito linguagem natural, ex.: agendar reuniao com Fabio amanha 10:30."
-                )
-            )
+            return await finalize(resposta=_build_agenda_recovery_reply(request.mensagem, agenda_errors))
 
         campaign_flow_requested = False
         campaign_fields: Dict[str, str] = {}
