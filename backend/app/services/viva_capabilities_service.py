@@ -59,8 +59,22 @@ class VivaCapabilitiesService:
                     "/api/v1/viva/video/generate",
                 ],
             },
+            {
+                "dominio": "memoria",
+                "acoes": [
+                    "manter memoria media da sessao em Redis",
+                    "indexar memoria longa vetorial em pgvector",
+                    "buscar contexto historico por similaridade",
+                ],
+                "rotas": [
+                    "/api/v1/viva/memory/status",
+                    "/api/v1/viva/memory/search",
+                    "/api/v1/viva/memory/reindex",
+                    "/api/v1/viva/chat/sessions",
+                    "/api/v1/viva/chat/snapshot",
+                ],
+            },
         ]
 
 
 viva_capabilities_service = VivaCapabilitiesService()
-

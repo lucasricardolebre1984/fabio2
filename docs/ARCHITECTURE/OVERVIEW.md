@@ -58,8 +58,9 @@ Arquivos-chave:
 - `frontend/src/app/viva/page.tsx` (envio de mensagem e `session_id`).
 
 Status:
-- memoria de sessao e continuidade operacional estao ativas;
-- camada vetorial RAG de longo prazo ainda pendente (BUG-058 ativo).
+- memoria de sessao e continuidade operacional ativas;
+- memoria media em Redis ativa por sessao;
+- memoria longa vetorial ativa em pgvector (`viva_memory_vectors`).
 
 ---
 
@@ -101,7 +102,7 @@ Backend
 - OpenAI institucional + fallback local da VIVA
 
 Banco/Infra
-- PostgreSQL 15
+- PostgreSQL 15 + pgvector
 - Redis 7
 - Evolution API
 
@@ -112,6 +113,11 @@ Banco/Infra
 Decisao vigente:
 - piloto em `pgvector` no proprio PostgreSQL (DECISAO-025);
 - trilha de escala para Qdrant em fase posterior, se volume/latencia exigirem.
+
+Implementacao atual (DECISAO-031):
+- curta: snapshot de chat;
+- media: Redis por sessao;
+- longa: busca semantica vetorial com embeddings OpenAI.
 
 ---
 
@@ -130,6 +136,10 @@ Decisao vigente:
 - `/api/v1/viva/handoff/schedule`
 - `/api/v1/viva/handoff`
 - `/api/v1/viva/handoff/process-due`
+- `/api/v1/viva/memory/status`
+- `/api/v1/viva/memory/search`
+- `/api/v1/viva/memory/reindex`
+- `/api/v1/viva/chat/sessions`
 
 ---
 

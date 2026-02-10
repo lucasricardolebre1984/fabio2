@@ -3,7 +3,7 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     container_name: fabio2-postgres
     restart: unless-stopped
     environment:

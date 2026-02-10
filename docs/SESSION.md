@@ -455,3 +455,24 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
 - Entrega pronta para demonstracao:
   - VIVA conversa com fluidez maior;
   - agenda + aviso WhatsApp via Viviane operando no fluxo aprovado.
+
+## Atualizacao da sessao (2026-02-10 - fechamento memoria/RAG)
+- pedido do cliente executado:
+  - memoria longa/medio/curta fechada no backend;
+  - capacidade de recuperar historico salvo via API.
+- implementacoes principais:
+  - `backend/app/services/viva_memory_service.py` (Redis + pgvector);
+  - embedding OpenAI em `backend/app/services/openai_service.py`;
+  - chat da VIVA integrado com contexto de memoria recuperado.
+- endpoints entregues:
+  - `GET /api/v1/viva/memory/status`
+  - `GET /api/v1/viva/memory/search`
+  - `POST /api/v1/viva/memory/reindex`
+  - `GET /api/v1/viva/chat/sessions`
+- prova de vida:
+  - status memoria => `vector_enabled=true`, `redis_enabled=true`;
+  - reindexacao processando historico salvo;
+  - busca semantica retornando resultados;
+  - limpeza de chat (`session/new`) mantendo recuperacao de memoria longa.
+- proximo plano executivo registrado em:
+  - `docs/ARCHITECTURE/VIVA_NEXT_EXECUTION_PLAN.md`

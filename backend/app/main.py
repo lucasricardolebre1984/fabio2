@@ -11,6 +11,7 @@ from app.api.router import api_router
 from app.core.logging import setup_logging
 from app.db.session import AsyncSessionLocal
 from app.services.viva_handoff_service import viva_handoff_service
+from app.services.viva_memory_service import viva_memory_service
 
 
 @asynccontextmanager
@@ -22,6 +23,13 @@ async def lifespan(app: FastAPI):
     # Create storage directory if not exists
     import os
     os.makedirs(settings.STORAGE_LOCAL_PATH, exist_ok=True)
+
+    # Pre-flight memory backends (pgvector + redis) without crashing startup.
+    try:
+        async with AsyncSessionLocal() as db:
+            await viva_memory_service.ensure_storage(db)
+    except Exception:
+        pass
 
     stop_event = asyncio.Event()
 

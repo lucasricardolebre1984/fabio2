@@ -4,7 +4,7 @@ version: '3.8'
 services:
   # PostgreSQL Database
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     container_name: fabio2-postgres
     environment:
       POSTGRES_USER: ${DB_USER:-fabio2_user}

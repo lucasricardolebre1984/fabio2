@@ -25,6 +25,7 @@ from app.services.viva_concierge_service import viva_concierge_service
 from app.services.viva_agenda_nlu_service import viva_agenda_nlu_service
 from app.services.viva_handoff_service import viva_handoff_service
 from app.services.viva_capabilities_service import viva_capabilities_service
+from app.services.viva_memory_service import viva_memory_service
 from app.services.openai_service import openai_service
 from app.config import settings
 
@@ -66,6 +67,22 @@ class ChatSnapshotResponse(BaseModel):
     session_id: Optional[UUID] = None
     modo: Optional[str] = None
     messages: List[ChatMessageItem] = Field(default_factory=list)
+
+
+class ChatSessionItem(BaseModel):
+    id: UUID
+    modo: Optional[str] = None
+    message_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+    last_message_at: datetime
+
+
+class ChatSessionListResponse(BaseModel):
+    items: List[ChatSessionItem]
+    total: int
+    page: int
+    page_size: int
 
 
 class ChatSessionStartRequest(BaseModel):
@@ -140,6 +157,33 @@ class HandoffProcessResponse(BaseModel):
     processed: int
     sent: int
     failed: int
+
+
+class VivaMemoryStatusResponse(BaseModel):
+    vector_enabled: bool
+    redis_enabled: bool
+    total_vectors: int
+    medium_items: int
+    embedding_model: str
+
+
+class VivaMemorySearchItem(BaseModel):
+    id: UUID
+    tipo: str
+    modo: Optional[str] = None
+    conteudo: str
+    score: float
+    created_at: datetime
+
+
+class VivaMemorySearchResponse(BaseModel):
+    items: List[VivaMemorySearchItem]
+    total: int
+
+
+class VivaMemoryReindexResponse(BaseModel):
+    processed: int
+    indexed: int
 
 
 class ImageAnalysisRequest(BaseModel):
@@ -256,10 +300,22 @@ def _build_viva_concierge_messages(
     mensagem: str,
     contexto: List[Dict[str, Any]],
     modo: Optional[str],
+    memory_context: Optional[str] = None,
 ) -> List[Dict[str, str]]:
     messages: List[Dict[str, str]] = [
         {"role": "system", "content": viva_concierge_service.build_system_prompt(modo=modo)}
     ]
+    if memory_context:
+        messages.append(
+            {
+                "role": "system",
+                "content": (
+                    "Contexto de memoria para continuidade da conversa. "
+                    "Use apenas se for relevante e nunca invente fatos.\n"
+                    f"{memory_context}"
+                ),
+            }
+        )
     for msg in contexto[-60:]:
         tipo = str(msg.get("tipo") or "")
         conteudo = str(msg.get("conteudo") or "").strip()
@@ -1268,6 +1324,17 @@ def _chat_message_from_row(row: Any) -> ChatMessageItem:
     )
 
 
+def _chat_session_from_row(row: Any) -> ChatSessionItem:
+    return ChatSessionItem(
+        id=row.id,
+        modo=row.modo,
+        message_count=int(row.message_count or 0),
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        last_message_at=row.last_message_at,
+    )
+
+
 async def _load_chat_snapshot(
     db: AsyncSession,
     user_id: UUID,
@@ -1678,6 +1745,15 @@ async def chat_with_viva(
                 anexos=_serialize_media_items(midia),
                 meta=meta or {},
             )
+            await viva_memory_service.append_memory(
+                db=db,
+                user_id=current_user.id,
+                session_id=session_id,
+                tipo="ia",
+                conteudo=resposta,
+                modo=modo,
+                meta={"source": "viva_chat_finalize", **(meta or {})},
+            )
             return ChatResponse(resposta=resposta, midia=midia, session_id=session_id)
 
         await _append_chat_message(
@@ -1689,6 +1765,15 @@ async def chat_with_viva(
             modo=modo,
             meta={"contexto_len": len(request.contexto or [])},
         )
+        await viva_memory_service.append_memory(
+            db=db,
+            user_id=current_user.id,
+            session_id=session_id,
+            tipo="usuario",
+            conteudo=request.mensagem,
+            modo=modo,
+            meta={"source": "viva_chat_input"},
+        )
 
         snapshot = await _load_chat_snapshot(
             db=db,
@@ -1699,6 +1784,13 @@ async def chat_with_viva(
         contexto_efetivo = _context_from_snapshot(snapshot)
         if not modo:
             modo = _normalize_mode(snapshot.modo) or _infer_mode_from_context(contexto_efetivo)
+        memory_context = await viva_memory_service.build_chat_memory_context(
+            db=db,
+            user_id=current_user.id,
+            session_id=session_id,
+            query=request.mensagem,
+            modo=modo,
+        )
 
         service = AgendaService(db)
         agenda_query_intent = viva_agenda_nlu_service.is_agenda_query_intent(request.mensagem, contexto_efetivo)
@@ -1761,7 +1853,7 @@ async def chat_with_viva(
                     mensagem=handoff_msg,
                     scheduled_for=evento.data_inicio,
                     agenda_event_id=evento.id,
-                    meta=json.dumps({"source": "viva_chat", "session_id": str(session_id)}, ensure_ascii=False),
+                    meta={"source": "viva_chat", "session_id": str(session_id)},
                 )
                 return await finalize(
                     resposta=(
@@ -2025,6 +2117,7 @@ async def chat_with_viva(
                 mensagem=request.mensagem,
                 contexto=contexto_efetivo,
                 modo=modo,
+                memory_context=memory_context,
             )
             resposta = await viva_model_service.chat(
                 messages=messages,
@@ -2070,6 +2163,50 @@ async def get_chat_snapshot(
         raise HTTPException(status_code=500, detail=f"Erro ao carregar historico: {str(e)}")
 
 
+@router.get("/chat/sessions", response_model=ChatSessionListResponse)
+async def list_chat_sessions(
+    page: int = 1,
+    page_size: int = 20,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lista sessoes de chat para recuperar contextos antigos."""
+    safe_page = max(1, page)
+    safe_size = max(1, min(page_size, 100))
+    offset = (safe_page - 1) * safe_size
+    try:
+        await _ensure_chat_tables(db)
+        total_result = await db.execute(
+            text("SELECT COUNT(*) FROM viva_chat_sessions WHERE user_id = :user_id"),
+            {"user_id": str(current_user.id)},
+        )
+        total = int(total_result.scalar() or 0)
+
+        rows = await db.execute(
+            text(
+                """
+                SELECT s.id, s.modo, s.created_at, s.updated_at, s.last_message_at,
+                       COALESCE(msg.cnt, 0) AS message_count
+                FROM viva_chat_sessions s
+                LEFT JOIN (
+                    SELECT session_id, COUNT(*) AS cnt
+                    FROM viva_chat_messages
+                    WHERE user_id = :user_id
+                    GROUP BY session_id
+                ) msg ON msg.session_id = s.id
+                WHERE s.user_id = :user_id
+                ORDER BY s.updated_at DESC
+                OFFSET :offset LIMIT :limit
+                """
+            ),
+            {"user_id": str(current_user.id), "offset": offset, "limit": safe_size},
+        )
+        items = [_chat_session_from_row(row) for row in rows.fetchall()]
+        return ChatSessionListResponse(items=items, total=total, page=safe_page, page_size=safe_size)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao listar sessoes: {str(e)}")
+
+
 @router.post("/chat/session/new", response_model=ChatSnapshotResponse)
 async def create_chat_session(
     payload: ChatSessionStartRequest,
@@ -2083,6 +2220,77 @@ async def create_chat_session(
         return ChatSnapshotResponse(session_id=session_id, modo=_normalize_mode(payload.modo), messages=[])
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao criar sessao: {str(e)}")
+
+
+@router.get("/memory/status", response_model=VivaMemoryStatusResponse)
+async def get_memory_status(
+    session_id: Optional[UUID] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        status = await viva_memory_service.memory_status(
+            db=db,
+            user_id=current_user.id,
+            session_id=session_id,
+        )
+        return VivaMemoryStatusResponse(**status)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao consultar memoria: {str(e)}")
+
+
+@router.get("/memory/search", response_model=VivaMemorySearchResponse)
+async def search_memory(
+    q: str,
+    limit: int = 6,
+    modo: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    query = str(q or "").strip()
+    if not query:
+        return VivaMemorySearchResponse(items=[], total=0)
+    try:
+        items_raw = await viva_memory_service.search_long_memory(
+            db=db,
+            user_id=current_user.id,
+            query=query,
+            modo=_normalize_mode(modo),
+            limit=limit,
+        )
+        items = [
+            VivaMemorySearchItem(
+                id=UUID(str(item["id"])),
+                tipo=str(item["tipo"]),
+                modo=item.get("modo"),
+                conteudo=str(item["conteudo"]),
+                score=float(item["score"]),
+                created_at=item["created_at"],
+            )
+            for item in items_raw
+        ]
+        return VivaMemorySearchResponse(items=items, total=len(items))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao buscar memoria: {str(e)}")
+
+
+@router.post("/memory/reindex", response_model=VivaMemoryReindexResponse)
+async def reindex_memory(
+    limit: int = 400,
+    session_id: Optional[UUID] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        result = await viva_memory_service.reindex_from_chat_messages(
+            db=db,
+            user_id=current_user.id,
+            limit=limit,
+            session_id=session_id,
+        )
+        return VivaMemoryReindexResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao reindexar memoria: {str(e)}")
 
 
 @router.get("/capabilities", response_model=VivaCapabilitiesResponse)

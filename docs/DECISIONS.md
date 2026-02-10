@@ -1053,3 +1053,32 @@ Para evitar dependencia de acionamento manual do endpoint de processamento, era 
 
 ### Data
 2026-02-10
+
+## DECISAO-031: memoria hibrida VIVA (curta/snapshot + media/Redis + longa/pgvector)
+
+### Contexto
+Foi solicitada memoria operacional completa da VIVA com continuidade apos limpeza de chat e capacidade de recuperar historico salvo por similaridade semantica.
+
+### Decisao
+- Implementar memoria hibrida em 3 camadas:
+  - curta: snapshot da sessao em `viva_chat_sessions` + `viva_chat_messages`;
+  - media: janela recente em Redis por sessao;
+  - longa: embeddings em `viva_memory_vectors` (pgvector).
+- Expor endpoints de observabilidade/operacao:
+  - `GET /api/v1/viva/memory/status`
+  - `GET /api/v1/viva/memory/search`
+  - `POST /api/v1/viva/memory/reindex`
+  - `GET /api/v1/viva/chat/sessions`
+- Isolar operacoes de memoria em `savepoint` para nao contaminar a transacao principal do chat em caso de erro vetorial.
+
+### Impacto
+- Limpar chat deixa de significar perda de memoria historica (sessao nova + memoria longa preservada).
+- Recuperacao de contexto historico passa a ser rastreavel por API.
+- Base pronta para evolucao de RAG sem migracao imediata para outro vetor store.
+
+### Trade-off
+- Reindexacao inicial pode gerar duplicidade parcial de memorias se executada varias vezes sem deduplicacao semantica.
+- Em escala elevada, avaliar politicas de consolidacao/expurgo e possivel migracao para store vetorial dedicado.
+
+### Data
+2026-02-10

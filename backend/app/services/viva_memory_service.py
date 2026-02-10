@@ -1,0 +1,435 @@
+"""
+Hybrid memory service for VIVA:
+- short memory: current chat session snapshot (PostgreSQL chat tables)
+- medium memory: rolling context in Redis
+- long memory: semantic vectors in pgvector (PostgreSQL)
+"""
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+from uuid import UUID, uuid4
+import json
+import re
+
+from redis import asyncio as redis_asyncio
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.config import settings
+from app.services.openai_service import openai_service
+
+
+class VivaMemoryService:
+    def __init__(self) -> None:
+        self.redis_url = settings.REDIS_URL
+        self._redis: Optional[redis_asyncio.Redis] = None
+        self.embedding_dim = 1536
+        self.medium_ttl_seconds = 60 * 60 * 24 * 7
+        self.medium_max_items = 40
+        self.vector_enabled = False
+        self._storage_checked = False
+
+    async def _get_redis(self) -> Optional[redis_asyncio.Redis]:
+        if self._redis is not None:
+            return self._redis
+        try:
+            client = redis_asyncio.from_url(self.redis_url, decode_responses=True)
+            await client.ping()
+            self._redis = client
+            return client
+        except Exception:
+            return None
+
+    @staticmethod
+    def _normalize_mode(modo: Optional[str]) -> Optional[str]:
+        if not modo:
+            return None
+        normalized = str(modo).strip().upper()
+        if normalized in {"FC", "REZETA", "LOGO", "CRIADORLANDPAGE", "CRIADORPROMPT", "CRIADORWEB"}:
+            return normalized
+        return None
+
+    @staticmethod
+    def _clean_text(value: str) -> str:
+        collapsed = " ".join(str(value or "").replace("\r", " ").replace("\n", " ").split())
+        return collapsed.strip()
+
+    @staticmethod
+    def _vector_literal(embedding: List[float]) -> str:
+        return "[" + ",".join(f"{float(item):.10f}" for item in embedding) + "]"
+
+    async def ensure_storage(self, db: AsyncSession) -> Dict[str, bool]:
+        if self._storage_checked and self.vector_enabled:
+            redis_ok = bool(await self._get_redis())
+            return {"vector": self.vector_enabled, "redis": redis_ok}
+
+        vector_ok = False
+        try:
+            async with db.begin_nested():
+                await db.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+                await db.execute(
+                    text(
+                        f"""
+                        CREATE TABLE IF NOT EXISTS viva_memory_vectors (
+                            id UUID PRIMARY KEY,
+                            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                            session_id UUID NOT NULL,
+                            tipo VARCHAR(16) NOT NULL,
+                            modo VARCHAR(32),
+                            conteudo TEXT NOT NULL,
+                            meta_json JSONB NOT NULL DEFAULT '{{}}'::jsonb,
+                            embedding VECTOR({self.embedding_dim}) NOT NULL,
+                            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                        )
+                        """
+                    )
+                )
+                await db.execute(
+                    text(
+                        """
+                        CREATE INDEX IF NOT EXISTS idx_viva_memory_user_created
+                        ON viva_memory_vectors(user_id, created_at DESC)
+                        """
+                    )
+                )
+                await db.execute(
+                    text(
+                        """
+                        CREATE INDEX IF NOT EXISTS idx_viva_memory_session_created
+                        ON viva_memory_vectors(session_id, created_at DESC)
+                        """
+                    )
+                )
+                await db.execute(
+                    text(
+                        """
+                        CREATE INDEX IF NOT EXISTS idx_viva_memory_embedding_ivfflat
+                        ON viva_memory_vectors USING ivfflat (embedding vector_cosine_ops)
+                        WITH (lists = 100)
+                        """
+                    )
+                )
+            vector_ok = True
+        except Exception:
+            vector_ok = False
+
+        self.vector_enabled = vector_ok
+        self._storage_checked = vector_ok
+        redis_ok = bool(await self._get_redis())
+        return {"vector": vector_ok, "redis": redis_ok}
+
+    async def append_medium_memory(
+        self,
+        session_id: UUID,
+        tipo: str,
+        conteudo: str,
+        modo: Optional[str],
+    ) -> bool:
+        redis_client = await self._get_redis()
+        if not redis_client:
+            return False
+
+        clean = self._clean_text(conteudo)
+        if not clean:
+            return False
+
+        payload = {
+            "tipo": tipo,
+            "conteudo": clean,
+            "modo": self._normalize_mode(modo),
+            "created_at": datetime.utcnow().isoformat(),
+        }
+        key = f"viva:memory:session:{session_id}:medium"
+        try:
+            await redis_client.lpush(key, json.dumps(payload, ensure_ascii=False))
+            await redis_client.ltrim(key, 0, self.medium_max_items - 1)
+            await redis_client.expire(key, self.medium_ttl_seconds)
+            return True
+        except Exception:
+            return False
+
+    async def get_medium_memory(self, session_id: UUID, limit: int = 8) -> List[Dict[str, Any]]:
+        redis_client = await self._get_redis()
+        if not redis_client:
+            return []
+
+        safe_limit = max(1, min(limit, 30))
+        key = f"viva:memory:session:{session_id}:medium"
+        try:
+            raw = await redis_client.lrange(key, 0, safe_limit - 1)
+        except Exception:
+            return []
+
+        items: List[Dict[str, Any]] = []
+        for entry in raw:
+            try:
+                parsed = json.loads(entry)
+                if isinstance(parsed, dict):
+                    items.append(parsed)
+            except Exception:
+                continue
+        items.reverse()
+        return items
+
+    async def append_long_memory(
+        self,
+        db: AsyncSession,
+        user_id: UUID,
+        session_id: UUID,
+        tipo: str,
+        conteudo: str,
+        modo: Optional[str],
+        meta: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        await self.ensure_storage(db)
+        if not self.vector_enabled:
+            return False
+
+        clean = self._clean_text(conteudo)
+        if len(clean) < 12:
+            return False
+
+        embedding = await openai_service.embed_text(clean)
+        if not embedding:
+            return False
+
+        normalized_mode = self._normalize_mode(modo)
+        try:
+            async with db.begin_nested():
+                await db.execute(
+                    text(
+                        """
+                        INSERT INTO viva_memory_vectors (
+                            id, user_id, session_id, tipo, modo, conteudo, meta_json, embedding, created_at
+                        )
+                        VALUES (
+                            :id, :user_id, :session_id, :tipo, :modo, :conteudo,
+                            CAST(:meta_json AS JSONB), CAST(:embedding AS vector), NOW()
+                        )
+                        """
+                    ),
+                    {
+                        "id": str(uuid4()),
+                        "user_id": str(user_id),
+                        "session_id": str(session_id),
+                        "tipo": tipo,
+                        "modo": normalized_mode,
+                        "conteudo": clean,
+                        "meta_json": json.dumps(meta or {}, ensure_ascii=False),
+                        "embedding": self._vector_literal(embedding),
+                    },
+                )
+            return True
+        except Exception:
+            return False
+
+    async def append_memory(
+        self,
+        db: AsyncSession,
+        user_id: UUID,
+        session_id: UUID,
+        tipo: str,
+        conteudo: str,
+        modo: Optional[str],
+        meta: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, bool]:
+        medium_ok = await self.append_medium_memory(session_id=session_id, tipo=tipo, conteudo=conteudo, modo=modo)
+        long_ok = await self.append_long_memory(
+            db=db,
+            user_id=user_id,
+            session_id=session_id,
+            tipo=tipo,
+            conteudo=conteudo,
+            modo=modo,
+            meta=meta,
+        )
+        return {"medium": medium_ok, "long": long_ok}
+
+    async def search_long_memory(
+        self,
+        db: AsyncSession,
+        user_id: UUID,
+        query: str,
+        modo: Optional[str],
+        limit: int = 6,
+    ) -> List[Dict[str, Any]]:
+        await self.ensure_storage(db)
+        if not self.vector_enabled:
+            return []
+
+        clean_query = self._clean_text(query)
+        if not clean_query:
+            return []
+
+        embedding = await openai_service.embed_text(clean_query)
+        if not embedding:
+            return []
+
+        safe_limit = max(1, min(limit, 20))
+        normalized_mode = self._normalize_mode(modo)
+        where = "WHERE user_id = :user_id"
+        params: Dict[str, Any] = {
+            "user_id": str(user_id),
+            "query_embedding": self._vector_literal(embedding),
+            "limit": safe_limit,
+        }
+        if normalized_mode:
+            where += " AND modo = :modo"
+            params["modo"] = normalized_mode
+        rows: List[Any] = []
+        try:
+            async with db.begin_nested():
+                result = await db.execute(
+                    text(
+                        f"""
+                        SELECT id, tipo, modo, conteudo, created_at,
+                               1 - (embedding <=> CAST(:query_embedding AS vector)) AS score
+                        FROM viva_memory_vectors
+                        {where}
+                        ORDER BY embedding <=> CAST(:query_embedding AS vector)
+                        LIMIT :limit
+                        """
+                    ),
+                    params,
+                )
+                rows = result.fetchall()
+        except Exception:
+            return []
+
+        items: List[Dict[str, Any]] = []
+        for row in rows:
+            score = float(row.score or 0.0)
+            items.append(
+                {
+                    "id": row.id,
+                    "tipo": row.tipo,
+                    "modo": row.modo,
+                    "conteudo": row.conteudo,
+                    "score": score,
+                    "created_at": row.created_at,
+                }
+            )
+        return items
+
+    async def build_chat_memory_context(
+        self,
+        db: AsyncSession,
+        user_id: UUID,
+        session_id: UUID,
+        query: str,
+        modo: Optional[str],
+    ) -> str:
+        medium = await self.get_medium_memory(session_id=session_id, limit=8)
+        long_hits = await self.search_long_memory(db=db, user_id=user_id, query=query, modo=modo, limit=6)
+
+        lines: List[str] = []
+        if medium:
+            lines.append("Memoria media recente da sessao:")
+            for item in medium[-6:]:
+                tipo = str(item.get("tipo") or "msg")
+                content = self._clean_text(str(item.get("conteudo") or ""))
+                if content:
+                    lines.append(f"- ({tipo}) {content[:220]}")
+
+        if long_hits:
+            lines.append("Memoria longa recuperada por similaridade:")
+            for hit in long_hits:
+                content = self._clean_text(str(hit.get("conteudo") or ""))
+                if content:
+                    lines.append(f"- {content[:260]}")
+
+        unique_lines: List[str] = []
+        seen: set[str] = set()
+        for line in lines:
+            key = re.sub(r"\s+", " ", line.strip().lower())
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            unique_lines.append(line)
+
+        if not unique_lines:
+            return ""
+        return "\n".join(unique_lines[:14])
+
+    async def reindex_from_chat_messages(
+        self,
+        db: AsyncSession,
+        user_id: UUID,
+        limit: int = 400,
+        session_id: Optional[UUID] = None,
+    ) -> Dict[str, int]:
+        await self.ensure_storage(db)
+        if not self.vector_enabled:
+            return {"processed": 0, "indexed": 0}
+
+        safe_limit = max(1, min(limit, 2000))
+        where = "WHERE m.user_id = :user_id"
+        params: Dict[str, Any] = {"user_id": str(user_id), "limit": safe_limit}
+        if session_id:
+            where += " AND m.session_id = :session_id"
+            params["session_id"] = str(session_id)
+
+        result = await db.execute(
+            text(
+                f"""
+                SELECT m.session_id, m.tipo, m.conteudo, m.modo, m.created_at
+                FROM viva_chat_messages m
+                {where}
+                ORDER BY m.created_at DESC
+                LIMIT :limit
+                """
+            ),
+            params,
+        )
+
+        processed = 0
+        indexed = 0
+        for row in result.fetchall():
+            processed += 1
+            ok = await self.append_long_memory(
+                db=db,
+                user_id=user_id,
+                session_id=row.session_id,
+                tipo=row.tipo,
+                conteudo=row.conteudo,
+                modo=row.modo,
+                meta={"source": "chat_reindex", "created_at": str(row.created_at)},
+            )
+            if ok:
+                indexed += 1
+        return {"processed": processed, "indexed": indexed}
+
+    async def memory_status(
+        self,
+        db: AsyncSession,
+        user_id: UUID,
+        session_id: Optional[UUID],
+    ) -> Dict[str, Any]:
+        availability = await self.ensure_storage(db)
+        total_vectors = 0
+        if availability["vector"]:
+            try:
+                async with db.begin_nested():
+                    count = await db.execute(
+                        text("SELECT COUNT(*) FROM viva_memory_vectors WHERE user_id = :user_id"),
+                        {"user_id": str(user_id)},
+                    )
+                total_vectors = int(count.scalar() or 0)
+            except Exception:
+                total_vectors = 0
+
+        medium_items = 0
+        if session_id and availability["redis"]:
+            medium_items = len(await self.get_medium_memory(session_id=session_id, limit=50))
+
+        return {
+            "vector_enabled": availability["vector"],
+            "redis_enabled": availability["redis"],
+            "total_vectors": total_vectors,
+            "medium_items": medium_items,
+            "embedding_model": settings.OPENAI_EMBEDDING_MODEL,
+        }
+
+
+viva_memory_service = VivaMemoryService()

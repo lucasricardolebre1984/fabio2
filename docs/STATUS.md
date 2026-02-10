@@ -332,3 +332,22 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
   - reforco para tom mais humano/profissional e anti-rigidez em `backend/app/services/viva_concierge_service.py`.
 - Validacao final:
   - tarefa de handoff vencida processada automaticamente com status `sent`.
+
+## Atualizacao Operacional (2026-02-10 - memoria hibrida + RAG pgvector)
+- camada de memoria fechada no backend VIVA:
+  - curta: snapshot por sessao (PostgreSQL);
+  - media: Redis por sessao;
+  - longa: vetores em `pgvector` (`viva_memory_vectors`).
+- endpoints novos para operacao e prova de vida:
+  - `GET /api/v1/viva/memory/status`
+  - `GET /api/v1/viva/memory/search`
+  - `POST /api/v1/viva/memory/reindex`
+  - `GET /api/v1/viva/chat/sessions`
+- infraestrutura atualizada:
+  - stacks compose movidos para `pgvector/pgvector:pg15`.
+- validacao da rodada:
+  - `vector_enabled=true` e `redis_enabled=true` no endpoint de status;
+  - busca semantica retornando resultados com score;
+  - apos `chat/session/new`, memoria longa continua recuperavel por busca.
+- plano das proximas ordens documentado em:
+  - `docs/ARCHITECTURE/VIVA_NEXT_EXECUTION_PLAN.md`

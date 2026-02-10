@@ -51,9 +51,9 @@
 | BUG-053 | Baixa | Frontend/Tooling | `npm run lint` abre wizard interativo do Next.js (ESLint nao inicializado), impedindo lint automatizado | Resolvido |
 | BUG-054 | Alta | VIVA/Persona | Contrato de persona da VIVA (concierge do Fabio) e da Viviane (secretaria humana) nao esta explicitamente separado por dominio, gerando ambiguidade de comportamento | Em validaÃ§Ã£o |
 | BUG-055 | Alta | VIVA/Prompts | Pastas/arquivos de prompt duplicados (`frontend/public/PROMPTS`, `docs/PROMPTS`, `src/app/viva/PROMPTS`) aumentam drift e confusao operacional | Resolvido |
-| BUG-056 | Alta | VIVA/Memoria | Memoria persistida existe, mas contexto do modelo no chat interno ainda depende do recorte do frontend (janela curta), sem reconstrucao server-side robusta por sessao | Em validaÃ§Ã£o |
+| BUG-056 | Alta | VIVA/Memoria | Memoria persistida existe, mas contexto do modelo no chat interno ainda depende do recorte do frontend (janela curta), sem reconstrucao server-side robusta por sessao | Resolvido |
 | BUG-057 | Media | VIVA/Agenda | Interpretacao de agenda em linguagem natural ainda depende de regex/comandos rigidos em parte dos casos, elevando atrito conversacional | Em validaÃ§Ã£o |
-| BUG-058 | Alta | VIVA/RAG | Ausencia de camada vetorial moderna (RAG) para memoria/conhecimento evolutivo de longo prazo no piloto | Ativo |
+| BUG-058 | Alta | VIVA/RAG | Ausencia de camada vetorial moderna (RAG) para memoria/conhecimento evolutivo de longo prazo no piloto | Resolvido |
 | BUG-059 | Alta | Frontend/NextDev | `next dev` pode quebrar com `MODULE_NOT_FOUND` apontando para rota removida (`/api/viva/prompts/[promptId]/route`) por cache `.next` stale | Resolvido |
 | BUG-060 | Alta | Frontend/Auth+Docs | Login no front exibe erro generico para qualquer falha e README publica senha de teste divergente do runtime local | Resolvido |
 | BUG-061 | Alta | VIVA/Campanhas | Geracao de imagem pode ignorar tema do brief (ex.: Carnaval sem dividas) e cair em cena corporativa generica (senhor de terno em escritorio) | Em validacao |
@@ -61,6 +61,7 @@
 | BUG-063 | Alta | VIVA/Agenda UX | Fallback rigido de agenda exige formato textual prescritivo, reduz fluidez conversacional e gera efeito de "bot travado" | Resolvido |
 | BUG-064 | Alta | VIVA->Viviane Orquestracao | Nao existe handoff operacional completo para aviso programado no WhatsApp (agenda da VIVA disparando persona Viviane no horario) | Resolvido |
 | BUG-065 | Alta | VIVA/Handoff API | `GET /api/v1/viva/handoff` retorna `500` quando `meta_json` vem serializado como string e quebra validacao do schema | Resolvido |
+| BUG-066 | Alta | VIVA/RAG Runtime | Falha em operacoes vetoriais podia abortar transacao principal do chat (`current transaction is aborted`) | Resolvido |
 
 ---
 
@@ -672,3 +673,48 @@
 - Status:
   - `BUG-063` => **Resolvido**.
   - `BUG-064` => **Resolvido**.
+
+### BUG-066: Falha de transacao no chat com memoria vetorial
+**Data:** 2026-02-10
+**Severidade:** Alta
+**Descricao:** em falhas internas de memoria vetorial (DDL/query), a transacao do request podia ficar abortada e quebrar o fluxo do chat com erro SQL subsequente.
+**Passos:** 1. enviar mensagem no chat com memoria vetorial ativa 2. ocorrer erro interno em operacao RAG 3. observar `current transaction is aborted`.
+**Esperado:** falhas de memoria nao derrubarem a transacao principal do chat.
+**Atual:** operacoes de memoria isoladas com savepoint, sem contaminar fluxo principal.
+**Status:** Resolvido
+
+### Atualizacao 2026-02-10 (execucao RAG vetorial + memoria hibrida)
+- infraestrutura:
+  - Postgres migrado para imagem com extensao vetorial:
+    - `docker-compose.yml`, `docker-compose.local.yml`, `docker-compose-prod.yml`, `docker-compose.prod.yml` usando `pgvector/pgvector:pg15`;
+  - extensao `vector` validada no runtime local.
+- backend:
+  - novo servico `backend/app/services/viva_memory_service.py`:
+    - memoria media (Redis) por sessao;
+    - memoria longa (pgvector) por usuario/sessao;
+    - busca semantica (`memory/search`);
+    - reindexacao de historico salvo (`memory/reindex`);
+    - status operacional (`memory/status`).
+  - `backend/app/services/openai_service.py`:
+    - suporte a embeddings (`OPENAI_EMBEDDING_MODEL`, endpoint `/embeddings`).
+  - `backend/app/api/v1/viva.py`:
+    - ingestao de memoria em mensagens de usuario/IA;
+    - contexto de memoria recuperado e injetado no prompt de sistema;
+    - novos endpoints:
+      - `GET /api/v1/viva/memory/status`
+      - `GET /api/v1/viva/memory/search`
+      - `POST /api/v1/viva/memory/reindex`
+      - `GET /api/v1/viva/chat/sessions` (recuperacao de sessoes salvas)
+    - ajuste de handoff para evitar serializacao indevida de `meta`.
+  - blindagem de runtime:
+    - operacoes de memoria isoladas em `savepoint` para impedir quebra da transacao principal do chat.
+- validacao objetiva:
+  - `GET /health` => `200`;
+  - `GET /api/v1/viva/memory/status` => `vector_enabled=true`, `redis_enabled=true`;
+  - `POST /api/v1/viva/memory/reindex?limit=120` => processa/indexa historico;
+  - `GET /api/v1/viva/memory/search?q=...` => retorna itens com score;
+  - `POST /api/v1/viva/chat/session/new` + busca de memoria => historico longo continua acessivel apos limpar chat.
+- status:
+  - `BUG-056` => **Resolvido**.
+  - `BUG-058` => **Resolvido**.
+  - `BUG-066` => **Resolvido**.

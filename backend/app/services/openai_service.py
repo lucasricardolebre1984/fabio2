@@ -18,6 +18,7 @@ class OpenAIService:
         self.model_audio = settings.OPENAI_AUDIO_MODEL
         self.model_image = settings.OPENAI_IMAGE_MODEL
         self.model_vision = settings.OPENAI_VISION_MODEL
+        self.model_embedding = settings.OPENAI_EMBEDDING_MODEL
         self.timeout = float(settings.OPENAI_TIMEOUT_SECONDS)
 
     def _headers(self) -> Dict[str, str]:
@@ -302,6 +303,46 @@ class OpenAIService:
 
         return f"Erro OpenAI vision ({response.status_code}): {response.text[:300]}"
 
+    async def embed_text(self, text: str) -> Optional[List[float]]:
+        if not self.api_key:
+            return None
+
+        clean = str(text or "").strip()
+        if not clean:
+            return None
+
+        payload: Dict[str, Any] = {
+            "model": self.model_embedding,
+            "input": clean,
+        }
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.post(
+                f"{self.base_url}/embeddings",
+                headers=self._headers(),
+                json=payload,
+            )
+
+        if response.status_code != 200:
+            return None
+
+        data = response.json()
+        items = data.get("data")
+        if not isinstance(items, list) or not items:
+            return None
+
+        first = items[0] if isinstance(items[0], dict) else {}
+        embedding = first.get("embedding")
+        if not isinstance(embedding, list):
+            return None
+
+        vector: List[float] = []
+        for item in embedding:
+            try:
+                vector.append(float(item))
+            except Exception:
+                return None
+        return vector
+
     def get_status(self) -> Dict[str, Any]:
         return {
             "api_configurada": bool(self.api_key),
@@ -310,6 +351,7 @@ class OpenAIService:
                 "audio": self.model_audio,
                 "image": self.model_image,
                 "vision": self.model_vision,
+                "embedding": self.model_embedding,
             },
         }
 
