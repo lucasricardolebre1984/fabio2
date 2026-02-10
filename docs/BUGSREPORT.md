@@ -543,6 +543,31 @@
 - Status:
   - `BUG-061` movido para **Em validacao** (pendente validacao visual final no chat `/viva` com geracao real de imagem).
 
+### Atualizacao 2026-02-10 (reabertura BUG-061 - repeticao de personagem)
+- incidente observado no front `/campanhas`: multiplas artes com composicao visual muito semelhante (mesmo personagem masculino em escritorio), mesmo em briefs de temas diferentes.
+- impacto: queda de aderencia de campanha por marca/tema e percepcao de baixa inteligencia criativa da VIVA.
+- acao planejada nesta rodada:
+  - reforcar prompt de cena com anti-repeticao de personagem e composicao;
+  - vincular mais forte tema/publico/oferta na direcao de arte;
+  - aplicar variacao controlada de enquadramento e situacao por geracao.
+
+### Atualizacao 2026-02-10 (execucao BUG-061 - anti-repeticao visual)
+- ajustes aplicados em `backend/app/api/v1/viva.py`:
+  - prompt de imagem de campanha agora injeta direcao obrigatoria por `tema + publico + oferta + objetivo`;
+  - adicionado `variation_id` por geracao para quebrar repeticao de personagem/composicao;
+  - reforco explicito no prompt: nao repetir personagem/rosto de geracoes anteriores;
+  - formatacao de imagem passou a usar tamanho dinamico por `formato` (ex.: `4:5` -> `1024x1536`).
+- validacao objetiva:
+  - `python -m compileall backend/app/api/v1/viva.py` => OK;
+  - `POST /api/v1/viva/chat` (modo FC, tema carnaval sem dividas, desconto 8%, gerar agora) => `200` com midia;
+  - `GET /api/v1/viva/campanhas?modo=FC&page=1&page_size=1` => ultimo item salvo com:
+    - `meta.size = 1024x1536`;
+    - `overlay.publico = Publico geral (PF)`;
+    - `overlay.tema` preenchido;
+    - `overlay.scene` descrevendo grupo diverso e sem terno como padrao.
+- status:
+  - `BUG-061` mantido em **Em validacao** (aguardando validacao visual final do Fabio no front `/campanhas`).
+
 ### BUG-062: Monolito tecnico em `viva.py`
 **Data:** 2026-02-10
 **Severidade:** Alta

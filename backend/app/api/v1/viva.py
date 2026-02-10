@@ -692,6 +692,52 @@ def _build_campaign_brief_reply(modo: str, missing_fields: List[str]) -> str:
     )
 
 
+def _theme_scene_hint(tema: str, objetivo: str, oferta: str) -> str:
+    payload = _normalize_key(f"{tema} {objetivo} {oferta}")
+    if "carnaval" in payload:
+        return "ambiente brasileiro alegre com energia de carnaval, sem fantasia caricata e sem escritorio"
+    if "limpa nome" in payload or "nome limpo" in payload:
+        return "cena de alivio financeiro com atitude positiva, documentos organizados e clima de recomeço"
+    if "rating" in payload or "credito" in payload or "score" in payload:
+        return "cena moderna de consultoria financeira com foco em diagnostico e melhoria de credito"
+    if "mei" in payload or "microempreendedor" in payload:
+        return "cena de pequeno negocio brasileiro em atividade real com foco em crescimento"
+    return "cena autentica no contexto brasileiro, sem estereotipo corporativo repetitivo"
+
+
+def _audience_scene_hint(publico: str) -> str:
+    normalized = _normalize_key(publico)
+    if "mei" in normalized or "microempreendedor" in normalized:
+        return "personagem principal com perfil empreendedor, ambiente comercial real e dinamico"
+    if "jovens" in normalized or "18 35" in normalized:
+        return "personagens jovens adultos em ambiente urbano cotidiano e natural"
+    if "empresarios" in normalized or "gestores" in normalized:
+        return "personagens de perfil executivo moderno, sem rigidez de terno obrigatorio"
+    return "personagens brasileiros diversos (genero, faixa etaria e etnia) com expressao natural"
+
+
+def _composition_variant(seed: str) -> str:
+    variants = [
+        "plano medio horizontal com profundidade de campo suave",
+        "close-up emocional com luz natural e fundo desfocado",
+        "plano americano em ambiente real com movimento sutil",
+        "enquadramento dinamico levemente angular, visual editorial",
+        "cena ampla contextual com personagem em acao principal",
+        "composicao centrada limpa com elementos de apoio da oferta",
+    ]
+    idx = abs(sum(ord(ch) for ch in seed)) % len(variants)
+    return variants[idx]
+
+
+def _resolve_image_size_from_format(formato: str) -> str:
+    normalized = _normalize_formato_value(formato or "4:5")
+    if normalized in ("4:5", "9:16"):
+        return "1024x1536"
+    if normalized == "16:9":
+        return "1536x1024"
+    return "1024x1024"
+
+
 def _build_scene_seed(fields: Dict[str, str], modo: str) -> str:
     tema = str(fields.get("tema") or "").strip()
     objetivo = str(fields.get("objetivo") or "gerar leads").strip()
@@ -703,15 +749,15 @@ def _build_scene_seed(fields: Dict[str, str], modo: str) -> str:
     else:
         brand_style = "estetica Rezeta com verde e azul (#3DAA7F, #1E3A5F)"
 
-    scene_parts: List[str] = [
-        f"cena publicitaria realista com {brand_style}",
-        f"foco em {objetivo}",
-        f"publico {publico}",
-    ]
+    theme_hint = _theme_scene_hint(tema, objetivo, oferta)
+    audience_hint = _audience_scene_hint(publico)
+    scene_parts: List[str] = [f"cena publicitaria realista com {brand_style}", f"foco em {objetivo}", f"publico {publico}"]
     if tema:
         scene_parts.append(f"tema {tema}")
     if oferta:
         scene_parts.append(f"mensagem visual de oferta {oferta}")
+    scene_parts.append(f"direcao visual {theme_hint}")
+    scene_parts.append(f"perfil humano {audience_hint}")
 
     merged = " | ".join(scene_parts)
     low = _normalize_key(merged)
@@ -1431,6 +1477,11 @@ def _fallback_copy(texto: str, modo: str) -> Dict[str, Any]:
 
     return {
         "brand": modo,
+        "formato": _normalize_formato_value(str(fields.get("formato") or "4:5")),
+        "tema": _sanitize_prompt(str(fields.get("tema") or ""), 120),
+        "publico": _sanitize_prompt(str(fields.get("publico") or "Publico geral (PF)"), 120),
+        "objetivo": _sanitize_prompt(str(fields.get("objetivo") or "Geracao de leads"), 120),
+        "oferta": _sanitize_prompt(str(fields.get("oferta") or ""), 120),
         "headline": _sanitize_prompt(headline, 90),
         "subheadline": _sanitize_prompt(subheadline, 130),
         "bullets": [_sanitize_prompt(item, 80) for item in (bullet_lines[:5] or default_bullets)],
@@ -1503,6 +1554,11 @@ async def _generate_campaign_copy(
 
     return {
         "brand": modo,
+        "formato": _normalize_formato_value(str(fields.get("formato") or baseline.get("formato") or "4:5")),
+        "tema": _sanitize_prompt(str(fields.get("tema") or baseline.get("tema") or ""), 120),
+        "publico": _sanitize_prompt(str(fields.get("publico") or baseline.get("publico") or "Publico geral (PF)"), 120),
+        "objetivo": _sanitize_prompt(str(fields.get("objetivo") or baseline.get("objetivo") or "Geracao de leads"), 120),
+        "oferta": _sanitize_prompt(str(fields.get("oferta") or baseline.get("oferta") or ""), 120),
         "headline": _sanitize_prompt(str(parsed.get("headline") or baseline["headline"]), 90),
         "subheadline": _sanitize_prompt(str(parsed.get("subheadline") or baseline["subheadline"]), 130),
         "bullets": bullets or baseline["bullets"],
@@ -1512,8 +1568,17 @@ async def _generate_campaign_copy(
     }
 
 
-def _build_branded_background_prompt(modo: str, campaign_copy: Dict[str, Any]) -> str:
+def _build_branded_background_prompt(modo: str, campaign_copy: Dict[str, Any], variation_id: str) -> str:
     scene = _sanitize_prompt(str(campaign_copy.get("scene") or ""), 240)
+    tema = _sanitize_prompt(str(campaign_copy.get("tema") or ""), 120)
+    publico = _sanitize_prompt(str(campaign_copy.get("publico") or ""), 120)
+    oferta = _sanitize_prompt(str(campaign_copy.get("oferta") or ""), 120)
+    formato = _normalize_formato_value(str(campaign_copy.get("formato") or "4:5"))
+    objective = _sanitize_prompt(str(campaign_copy.get("objetivo") or ""), 120)
+
+    theme_hint = _theme_scene_hint(tema, objective, oferta)
+    audience_hint = _audience_scene_hint(publico)
+    visual_variant = _composition_variant(f"{variation_id}|{tema}|{publico}|{oferta}|{scene}")
     normalized_scene = _normalize_key(scene)
     avoid_corporate_stereotype = (
         " Evitar estereotipo de homem de terno em escritorio, salvo se a cena pedir explicitamente."
@@ -1524,14 +1589,26 @@ def _build_branded_background_prompt(modo: str, campaign_copy: Dict[str, Any]) -
         return (
             "Fotografia publicitaria realista para campanha financeira no Brasil. "
             "Identidade FC: azul e branco (#071c4a, #00a3ff, #010a1c, #f9feff). "
+            f"Formato final: {formato}. "
             "Sem texto, sem letras, sem logotipo. "
-            f"{avoid_corporate_stereotype} Cena principal: {scene}"
+            "Nao repetir personagem de geracoes anteriores; crie rosto e composicao novos nesta imagem. "
+            f"{avoid_corporate_stereotype} "
+            f"Direcao de tema: {theme_hint}. Perfil do publico: {audience_hint}. "
+            f"Variacao de enquadramento: {visual_variant}. "
+            f"Tema: {tema or 'institucional'}. Oferta: {oferta or 'sem oferta explicita'}. "
+            f"Cena principal: {scene}. Codigo de variacao: {variation_id}"
         )
     return (
         "Fotografia publicitaria realista para campanha financeira no Brasil. "
         "Identidade Rezeta: verde e azul (#3DAA7F, #1E3A5F, #2A8B68, #FFFFFF). "
+        f"Formato final: {formato}. "
         "Sem texto, sem letras, sem logotipo. "
-        f"{avoid_corporate_stereotype} Cena principal: {scene}"
+        "Nao repetir personagem de geracoes anteriores; crie rosto e composicao novos nesta imagem. "
+        f"{avoid_corporate_stereotype} "
+        f"Direcao de tema: {theme_hint}. Perfil do publico: {audience_hint}. "
+        f"Variacao de enquadramento: {visual_variant}. "
+        f"Tema: {tema or 'institucional'}. Oferta: {oferta or 'sem oferta explicita'}. "
+        f"Cena principal: {scene}. Codigo de variacao: {variation_id}"
     )
 
 
@@ -1845,6 +1922,8 @@ async def chat_with_viva(
             effective_mode = "LOGO" if logo_request else modo
             hint = _mode_hint(effective_mode)
             campaign_copy: Optional[Dict[str, Any]] = None
+            image_size = "1024x1024"
+            variation_id = uuid4().hex[:10]
 
             if effective_mode in ("FC", "REZETA"):
                 campaign_copy = await _generate_campaign_copy(
@@ -1852,12 +1931,17 @@ async def chat_with_viva(
                     None,
                     effective_mode,
                 )
-                prompt = _build_branded_background_prompt(effective_mode, campaign_copy)
+                image_size = _resolve_image_size_from_format(str(campaign_copy.get("formato") or "4:5"))
+                prompt = _build_branded_background_prompt(
+                    effective_mode,
+                    campaign_copy,
+                    variation_id=variation_id,
+                )
             else:
                 prompt = _build_image_prompt(None, hint, request.mensagem)
                 prompt = f"{prompt}\n{BACKGROUND_ONLY_SUFFIX}"
 
-            resultado = await openai_service.generate_image(prompt=prompt, size="1024x1024")
+            resultado = await openai_service.generate_image(prompt=prompt, size=image_size)
             if not resultado.get("success"):
                 erro = resultado.get("error")
                 if _is_stackoverflow_error(erro):
@@ -1865,7 +1949,7 @@ async def chat_with_viva(
                     fallback_prompt = f"{fallback_prompt}\n{BACKGROUND_ONLY_SUFFIX}"
                     resultado = await openai_service.generate_image(
                         prompt=fallback_prompt,
-                        size="1024x1024",
+                        size=image_size,
                     )
                     if resultado.get("success"):
                         url = _extract_image_url(resultado)
@@ -1884,7 +1968,7 @@ async def chat_with_viva(
                                     overlay=campaign_copy or {},
                                     meta={
                                         "source": "viva_chat",
-                                        "size": "1024x1024",
+                                        "size": image_size,
                                         "fallback": True,
                                     },
                                 )
@@ -1918,7 +2002,7 @@ async def chat_with_viva(
                         overlay=campaign_copy or {},
                         meta={
                             "source": "viva_chat",
-                            "size": "1024x1024",
+                            "size": image_size,
                             "fallback": False,
                         },
                     )
