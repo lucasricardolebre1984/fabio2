@@ -65,6 +65,7 @@
 | BUG-067 | Alta | VIVA/Handoff UX | Consulta "tem pedidos de lembretes para a Viviane?" era roteada para agenda generica em vez de listar fila real de handoff | Resolvido |
 | BUG-068 | Media | VIVA/UI Chat | Chat nao auto-rola para o final em toda interacao, obrigando rolagem manual durante conversa longa | Resolvido |
 | BUG-069 | Media | VIVA/UI Chat | Campo de digitacao muito baixo para edicao de mensagens maiores, com baixa visibilidade | Resolvido |
+| BUG-070 | Alta | VIVA/Audio UX | Audio era transcrito no front, mas sem texto digitado a transcricao nao era enviada para `/viva/chat`, entao VIVA nao respondia ao conteudo falado | Resolvido |
 
 ---
 
@@ -164,6 +165,7 @@
 | BUG-012 | VIVA | Botao de audio passou a gravar/parar no microfone (com fallback para upload manual), anexando audio no chat | 2026-02-10 |
 | BUG-068 | VIVA/UI Chat | Auto-scroll reforcado para manter foco no fim da conversa, inclusive com carregamento de imagem | 2026-02-10 |
 | BUG-069 | VIVA/UI Chat | Campo de digitacao ampliado com autoaltura para melhor visibilidade em mensagens longas | 2026-02-10 |
+| BUG-070 | VIVA/Audio UX | Transcricao de audio agora entra no fluxo do `/viva/chat` mesmo sem texto digitado, com fallback claro em caso de baixa qualidade | 2026-02-10 |
 
 ---
 
@@ -762,11 +764,22 @@
 **Atual:** textarea ampliada (`minHeight=88`, `maxHeight=220`) com autoaltura e melhor legibilidade.
 **Status:** Resolvido
 
+### BUG-070: Transcricao de audio nao entrava no fluxo da VIVA
+**Data:** 2026-02-10
+**Severidade:** Alta
+**Descricao:** ao enviar apenas audio, o frontend mostrava a transcricao mas nao encaminhava esse texto para `/viva/chat`, entao a VIVA nao respondia ao conteudo falado.
+**Passos:** 1. gravar audio sem digitar texto 2. enviar 3. observar que aparece transcricao mas sem resposta contextual da VIVA.
+**Esperado:** transcricao deve virar mensagem do usuario para a VIVA responder normalmente.
+**Atual:** fluxo ajustado para enviar a transcricao ao `/viva/chat` mesmo sem texto digitado, com fallback de aviso quando a transcricao vier vazia/ruim.
+**Status:** Resolvido
+
 ### Atualizacao 2026-02-10 (audio + UX chat VIVA)
 - frontend:
   - `frontend/src/app/viva/page.tsx`:
     - botao de microfone passou a gravar/parar audio com `MediaRecorder` (fallback para upload manual quando necessario);
     - anexos de audio agora podem ser adicionados mesmo em repeticao do mesmo arquivo (reset do input file);
+    - transcricao de audio agora entra no `POST /viva/chat` automaticamente quando nao houver texto digitado;
+    - mensagem de fallback clara quando a transcricao do audio vier vazia/baixa qualidade;
     - auto-scroll reforcado com sentinela no fim das mensagens e chamada apos novas mensagens/loading/imagens;
     - campo de digitacao ampliado e com autoajuste de altura para conversa longa.
 - validacao:
@@ -776,3 +789,4 @@
   - `BUG-012` => **Resolvido**.
   - `BUG-068` => **Resolvido**.
   - `BUG-069` => **Resolvido**.
+  - `BUG-070` => **Resolvido**.

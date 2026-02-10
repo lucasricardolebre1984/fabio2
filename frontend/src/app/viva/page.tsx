@@ -401,19 +401,20 @@ export default function VivaChatPage() {
     try {
       let resposta = ''
       const referenciasVisuais: string[] = []
+      const transcricoesAudio: { nome: string; texto: string }[] = []
 
       // Processa anexos primeiro
       for (const anexo of anexos) {
         if (anexo.tipo === 'imagem') {
           const formData = new FormData()
           formData.append('file', anexo.file)
-          formData.append('prompt', input.trim() || 'Descreva esta imagem em detalhes')
+          formData.append('prompt', textoEntrada || 'Descreva esta imagem em detalhes')
           const response = await api.post('/viva/vision/upload', formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
           })
           const analise = String(response.data?.analise || '').trim()
           if (analise) {
-            resposta += `ðŸ“· **AnÃ¡lise da imagem "${anexo.file.name}":**\n${analise}\n\n`
+            resposta += `Analise da imagem "${anexo.file.name}":\n${analise}\n\n`
             referenciasVisuais.push(`Referencia "${anexo.file.name}": ${analise.slice(0, 1200)}`)
           }
         } else if (anexo.tipo === 'audio') {
@@ -422,16 +423,30 @@ export default function VivaChatPage() {
           const response = await api.post('/viva/audio/transcribe', formData, {
             headers: { 'Content-Type': 'multipart/form-data' }
           })
-          resposta += `ðŸŽ¤ **TranscriÃ§Ã£o do Ã¡udio "${anexo.file.name}":**\n${response.data.transcricao}\n\n`
+          const transcricao = String(response.data?.transcricao || '').trim()
+          if (transcricao) {
+            transcricoesAudio.push({ nome: anexo.file.name, texto: transcricao })
+            resposta += `Transcricao do audio "${anexo.file.name}":\n${transcricao}\n\n`
+          }
         }
       }
 
-      // Se tiver mensagem de texto, processa
-      if (textoEntrada) {
+      const textoAudio = transcricoesAudio.map((item) => item.texto).join('\n')
+      const mensagemBase = textoEntrada || textoAudio
+      if (!mensagemBase && anexos.some((item) => item.tipo === 'audio')) {
+        resposta += 'Nao consegui transcrever o audio com qualidade. Tente gravar novamente em ambiente mais silencioso.\n\n'
+      }
+
+      // Processa chat quando houver texto digitado ou texto vindo da transcricao do audio
+      if (mensagemBase) {
+        const mensagemPrincipal = textoEntrada
+          ? mensagemBase
+          : `Mensagem de audio transcrita do usuario:\n${mensagemBase}`
         const mensagemComReferencia =
           referenciasVisuais.length > 0
-            ? `${textoEntrada}\n\nReferencia visual enviada pelo usuario (usar como base):\n${referenciasVisuais.join('\n\n')}`
-            : textoEntrada
+            ? `${mensagemPrincipal}\n\nReferencia visual enviada pelo usuario (usar como base):\n${referenciasVisuais.join('\n\n')}`
+            : mensagemPrincipal
+
         const contexto = mensagens.slice(-10)
         const response = await api.post('/viva/chat', {
           mensagem: mensagemComReferencia,
