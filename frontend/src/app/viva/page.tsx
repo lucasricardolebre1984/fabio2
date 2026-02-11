@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Bot, User, Sparkles, Trash2, Copy, Check, ImageIcon, Mic, X, FileUp, Layout, Palette, Image as ImageLucide, FileText, ChevronRight } from 'lucide-react'
+import { Send, Bot, User, Sparkles, Trash2, Copy, Check, ImageIcon, Mic, X, FileUp, Layout, Palette, Image as ImageLucide, FileText, ChevronRight, Volume2, VolumeX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { api } from '@/lib/api'
@@ -136,7 +136,7 @@ const parseOverlayText = (overlay?: Mensagem['overlay']) => {
   const clamp = (value: string, max: number) => {
     const text = (value || '').trim()
     if (text.length <= max) return text
-    return `${text.slice(0, max - 1).trim()}â€¦`
+    return `${text.slice(0, max - 3).trim()}...`
   }
 
   if (!overlay) {
@@ -181,10 +181,10 @@ const parseOverlayText = (overlay?: Mensagem['overlay']) => {
   const subheadline = remaining[0] || ''
 
   return {
-    headline: clamp(headline, 90),
-    subheadline: clamp(subheadline, 120),
-    bullets: bulletLines.slice(0, 6).map(line => clamp(line, 90)),
-    quote: clamp(quote || '', 120),
+    headline: clamp(headline, 140),
+    subheadline: clamp(subheadline, 200),
+    bullets: bulletLines.slice(0, 6).map(line => clamp(line, 140)),
+    quote: clamp(quote || '', 180),
     cta: ''
   }
 }
@@ -205,6 +205,8 @@ const BRAND_THEMES = {
     light: '#f9feff'
   }
 } as const
+
+const VIVA_AVATAR_SOURCES = ['/viva-avatar.png', '/viva-avatar-3d.png', '/viva.png']
 
 const createWelcomeMessage = (): Mensagem => ({
   id: 'welcome',
@@ -282,11 +284,18 @@ export default function VivaChatPage() {
   const [loading, setLoading] = useState(false)
   const [gravandoAudio, setGravandoAudio] = useState(false)
   const [erroAudio, setErroAudio] = useState<string | null>(null)
+  const [pendingAudioAutoSend, setPendingAudioAutoSend] = useState<ComposerAnexo | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [anexos, setAnexos] = useState<ComposerAnexo[]>([])
   const [promptAtivo, setPromptAtivo] = useState<string | null>(null)
   const [menuAberto, setMenuAberto] = useState(true)
+  const [modoConversacaoAtivo, setModoConversacaoAtivo] = useState(false)
+  const [vozVivaAtiva, setVozVivaAtiva] = useState(true)
+  const [escutaContinuaAtiva, setEscutaContinuaAtiva] = useState(false)
+  const [transcricaoParcial, setTranscricaoParcial] = useState('')
+  const [avatarFallback, setAvatarFallback] = useState(false)
+  const [avatarSourceIndex, setAvatarSourceIndex] = useState(0)
   const [imagemAtiva, setImagemAtiva] = useState<{ url: string; nome?: string } | null>(null)
   const [arteAtiva, setArteAtiva] = useState<{ url: string; nome?: string; overlay: NonNullable<Mensagem['overlay']> } | null>(null)
   const [erroExport, setErroExport] = useState<string | null>(null)
@@ -299,6 +308,13 @@ export default function VivaChatPage() {
   const audioChunksRef = useRef<BlobPart[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const audioInputRef = useRef<HTMLInputElement>(null)
+  const lastSpokenMessageIdRef = useRef<string | null>(null)
+  const speechRecognitionRef = useRef<any>(null)
+  const conversationShouldListenRef = useRef(false)
+  const assistantSpeakingRef = useRef(false)
+  const loadingRef = useRef(false)
+  const modoConversacaoRef = useRef(false)
+  const sendFromVoiceRef = useRef<(text: string) => void>(() => {})
 
   const INPUT_MIN_HEIGHT = 88
   const INPUT_MAX_HEIGHT = 220
@@ -312,6 +328,127 @@ export default function VivaChatPage() {
       scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior })
     }
     messagesEndRef.current?.scrollIntoView({ block: 'end', behavior })
+  }, [])
+
+  const stopContinuousConversation = useCallback((clearIntent = true) => {
+    if (clearIntent) {
+      conversationShouldListenRef.current = false
+    }
+
+    const recognition = speechRecognitionRef.current
+    if (recognition) {
+      try {
+        recognition.stop()
+      } catch {
+        // Ignora erro de stop em estados transientes.
+      }
+    }
+
+    setEscutaContinuaAtiva(false)
+    setTranscricaoParcial('')
+  }, [])
+
+  const startContinuousConversation = useCallback(() => {
+    if (typeof window === 'undefined') return
+    if (!modoConversacaoRef.current || loadingRef.current || assistantSpeakingRef.current) return
+
+    const SpeechCtor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechCtor) {
+      setErroAudio('Seu navegador nao suporta voz continua. Use Chrome ou Edge atualizado.')
+      return
+    }
+
+    if (!speechRecognitionRef.current) {
+      const recognition = new SpeechCtor()
+      recognition.lang = 'pt-BR'
+      recognition.continuous = true
+      recognition.interimResults = true
+      recognition.maxAlternatives = 1
+
+      recognition.onstart = () => {
+        setEscutaContinuaAtiva(true)
+      }
+
+      recognition.onresult = (event: any) => {
+        let interimText = ''
+        let finalText = ''
+
+        for (let i = event.resultIndex; i < event.results.length; i += 1) {
+          const result = event.results[i]
+          const transcript = String(result?.[0]?.transcript || '').trim()
+          if (!transcript) continue
+
+          if (result.isFinal) {
+            finalText += `${transcript} `
+          } else {
+            interimText += `${transcript} `
+          }
+        }
+
+        setTranscricaoParcial(interimText.trim())
+
+        const textoFinal = finalText.trim()
+        if (!textoFinal) return
+
+        setTranscricaoParcial('')
+        conversationShouldListenRef.current = false
+
+        try {
+          recognition.stop()
+        } catch {
+          // No-op
+        }
+
+        if (!loadingRef.current) {
+          sendFromVoiceRef.current(textoFinal)
+        }
+      }
+
+      recognition.onerror = (event: any) => {
+        const code = String(event?.error || '')
+        if (code === 'no-speech') return
+        if (code === 'aborted') return
+
+        if (code === 'not-allowed' || code === 'service-not-allowed') {
+          setErroAudio('Permissao de microfone negada. Ative o microfone no navegador para usar conversa continua.')
+          conversationShouldListenRef.current = false
+          return
+        }
+
+        setErroAudio('Falha de reconhecimento de voz. Tentando reconectar automaticamente.')
+      }
+
+      recognition.onend = () => {
+        setEscutaContinuaAtiva(false)
+        setTranscricaoParcial('')
+        if (!conversationShouldListenRef.current) return
+        if (!modoConversacaoRef.current || loadingRef.current || assistantSpeakingRef.current) return
+
+        window.setTimeout(() => {
+          if (!conversationShouldListenRef.current) return
+          if (!modoConversacaoRef.current || loadingRef.current || assistantSpeakingRef.current) return
+          try {
+            recognition.start()
+          } catch {
+            // Evita quebra quando start ja estiver em progresso.
+          }
+        }, 260)
+      }
+
+      speechRecognitionRef.current = recognition
+    }
+
+    conversationShouldListenRef.current = true
+    setErroAudio(null)
+
+    try {
+      speechRecognitionRef.current.start()
+    } catch (error) {
+      const msg = String(error || '')
+      if (!/already started/i.test(msg)) {
+        setErroAudio('Nao foi possivel iniciar a escuta continua agora.')
+      }
+    }
   }, [])
 
   useEffect(() => {
@@ -367,15 +504,100 @@ export default function VivaChatPage() {
   }, [input])
 
   useEffect(() => {
+    loadingRef.current = loading
+  }, [loading])
+
+  useEffect(() => {
+    modoConversacaoRef.current = modoConversacaoAtivo
+  }, [modoConversacaoAtivo])
+
+  useEffect(() => {
+    if (!modoConversacaoAtivo) {
+      stopContinuousConversation()
+      return
+    }
+
+    conversationShouldListenRef.current = true
+    startContinuousConversation()
+  }, [modoConversacaoAtivo, startContinuousConversation, stopContinuousConversation])
+
+  useEffect(() => {
+    if (!modoConversacaoAtivo) return
+    if (loading || assistantSpeakingRef.current) return
+    if (!conversationShouldListenRef.current) {
+      conversationShouldListenRef.current = true
+    }
+    startContinuousConversation()
+  }, [loading, modoConversacaoAtivo, startContinuousConversation])
+
+  useEffect(() => {
     return () => {
+      stopContinuousConversation()
+      speechRecognitionRef.current = null
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop()
       }
       mediaStreamRef.current?.getTracks().forEach(track => track.stop())
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel()
+      }
     }
-  }, [])
+  }, [stopContinuousConversation])
 
-  const handleSend = async (options?: SendOptions) => {
+  useEffect(() => {
+    if (!modoConversacaoAtivo || !vozVivaAtiva) return
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
+
+    const ultimaMensagemIA = [...mensagens].reverse().find(msg => msg.tipo === 'ia')
+    if (!ultimaMensagemIA) return
+    if (lastSpokenMessageIdRef.current === ultimaMensagemIA.id) return
+
+    const texto = String(ultimaMensagemIA.conteudo || '').replace(/\*\*/g, '').trim()
+    if (!texto) return
+
+    const utterance = new SpeechSynthesisUtterance(texto)
+    utterance.lang = 'pt-BR'
+    utterance.rate = 1
+    utterance.pitch = 1.03
+
+    const voices = window.speechSynthesis.getVoices()
+    const preferredVoice =
+      voices.find(voice => /pt-BR/i.test(voice.lang) && /(female|maria|luciana|francisca|helena)/i.test(voice.name)) ||
+      voices.find(voice => /pt-BR/i.test(voice.lang))
+    if (preferredVoice) {
+      utterance.voice = preferredVoice
+    }
+
+    utterance.onstart = () => {
+      assistantSpeakingRef.current = true
+      if (modoConversacaoRef.current) {
+        conversationShouldListenRef.current = true
+        stopContinuousConversation(false)
+      }
+    }
+
+    utterance.onend = () => {
+      assistantSpeakingRef.current = false
+      if (modoConversacaoRef.current) {
+        conversationShouldListenRef.current = true
+        startContinuousConversation()
+      }
+    }
+
+    utterance.onerror = () => {
+      assistantSpeakingRef.current = false
+      if (modoConversacaoRef.current) {
+        conversationShouldListenRef.current = true
+        startContinuousConversation()
+      }
+    }
+
+    window.speechSynthesis.cancel()
+    window.speechSynthesis.speak(utterance)
+    lastSpokenMessageIdRef.current = ultimaMensagemIA.id
+  }, [mensagens, modoConversacaoAtivo, vozVivaAtiva, startContinuousConversation, stopContinuousConversation])
+
+  const handleSend = useCallback(async (options?: SendOptions) => {
     const anexosAtuais = options?.anexosOverride ?? anexos
     const textoEntrada = (options?.textoOverride ?? input).trim()
     if ((!textoEntrada && anexosAtuais.length === 0) || loading) return
@@ -535,7 +757,25 @@ export default function VivaChatPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [anexos, input, loading, mensagens, promptAtivo, sessionId])
+
+  useEffect(() => {
+    sendFromVoiceRef.current = (texto: string) => {
+      const mensagem = String(texto || '').trim()
+      if (!mensagem) return
+      void handleSend({ textoOverride: mensagem, anexosOverride: [] })
+    }
+  }, [handleSend])
+
+  useEffect(() => {
+    if (loading || !pendingAudioAutoSend) return
+    const queuedAudio = pendingAudioAutoSend
+    setPendingAudioAutoSend(null)
+    void handleSend({
+      anexosOverride: [queuedAudio],
+      textoOverride: ''
+    })
+  }, [loading, pendingAudioAutoSend, handleSend])
 
   const stopAudioRecording = () => {
     const recorder = mediaRecorderRef.current
@@ -595,7 +835,7 @@ export default function VivaChatPage() {
 
         // Fluxo institucional: grava, transcreve e envia direto para a VIVA.
         if (loading) {
-          setAnexos(prev => [...prev, { file: audioFile, tipo: 'audio' }])
+          setPendingAudioAutoSend({ file: audioFile, tipo: 'audio' })
           return
         }
         void handleSend({
@@ -717,7 +957,8 @@ export default function VivaChatPage() {
     y: number,
     maxWidth: number,
     lineHeight: number,
-    maxLines?: number
+    maxLines?: number,
+    maxY?: number
   ) => {
     const words = text.split(' ')
     let line = ''
@@ -725,9 +966,14 @@ export default function VivaChatPage() {
     let currentY = y
 
     words.forEach(word => {
+      if (maxY && currentY > maxY) return
       const testLine = `${line}${word} `
       const metrics = ctx.measureText(testLine)
       if (metrics.width > maxWidth && line) {
+        if (maxY && currentY > maxY) {
+          line = ''
+          return
+        }
         ctx.fillText(line.trim(), x, currentY)
         line = `${word} `
         currentY += lineHeight
@@ -740,7 +986,7 @@ export default function VivaChatPage() {
       }
     })
 
-    if (line && (!maxLines || lines < maxLines)) {
+    if (line && (!maxLines || lines < maxLines) && (!maxY || currentY <= maxY)) {
       ctx.fillText(line.trim(), x, currentY)
       currentY += lineHeight
     }
@@ -781,9 +1027,12 @@ export default function VivaChatPage() {
 
       ctx.drawImage(image, 0, 0, width, height)
 
-      const topHeight = Math.round(height * 0.26)
-      const bottomHeight = Math.round(height * 0.3)
+      const topHeight = Math.round(height * 0.32)
+      const bottomHeight = Math.round(height * 0.4)
       const margin = Math.round(width * 0.06)
+      const topMaxY = topHeight - Math.round(width * 0.02)
+      const bottomStartY = height - bottomHeight + Math.round(bottomHeight * 0.2)
+      const bottomMaxY = height - Math.round(bottomHeight * 0.14)
 
       ctx.fillStyle = hexToRgba(theme.light, 0.86)
       ctx.fillRect(0, 0, width, topHeight)
@@ -795,24 +1044,75 @@ export default function VivaChatPage() {
       ctx.fillRect(0, height - bottomHeight, width, bottomHeight)
 
       ctx.fillStyle = theme.primary
-      ctx.font = `bold ${Math.round(width * 0.045)}px Inter, Arial, sans-serif`
-      wrapText(ctx, parsed.headline, margin, Math.round(topHeight * 0.35), width - margin * 2, Math.round(width * 0.055), 2)
+      ctx.font = `bold ${Math.round(width * 0.042)}px Inter, Arial, sans-serif`
+      wrapText(
+        ctx,
+        parsed.headline,
+        margin,
+        Math.round(topHeight * 0.3),
+        width - margin * 2,
+        Math.round(width * 0.05),
+        3,
+        topMaxY
+      )
 
       if (parsed.subheadline) {
-        ctx.font = `${Math.round(width * 0.03)}px Inter, Arial, sans-serif`
-        wrapText(ctx, parsed.subheadline, margin, Math.round(topHeight * 0.72), width - margin * 2, Math.round(width * 0.04), 2)
+        ctx.font = `${Math.round(width * 0.028)}px Inter, Arial, sans-serif`
+        wrapText(
+          ctx,
+          parsed.subheadline,
+          margin,
+          Math.round(topHeight * 0.66),
+          width - margin * 2,
+          Math.round(width * 0.038),
+          3,
+          topMaxY
+        )
       }
 
       ctx.fillStyle = '#ffffff'
       ctx.font = `${Math.round(width * 0.028)}px Inter, Arial, sans-serif`
-      let currentY = height - bottomHeight + Math.round(bottomHeight * 0.25)
+      let currentY = bottomStartY
       parsed.bullets.forEach((bullet) => {
-        currentY = wrapText(ctx, bullet, margin, currentY, width - margin * 2, Math.round(width * 0.038), 2)
+        if (currentY > bottomMaxY) return
+        currentY = wrapText(
+          ctx,
+          bullet,
+          margin,
+          currentY,
+          width - margin * 2,
+          Math.round(width * 0.036),
+          3,
+          bottomMaxY
+        )
       })
 
-      if (parsed.quote) {
-        ctx.font = `italic ${Math.round(width * 0.025)}px Inter, Arial, sans-serif`
-        wrapText(ctx, parsed.quote, margin, height - Math.round(bottomHeight * 0.18), width - margin * 2, Math.round(width * 0.035), 2)
+      if (parsed.quote && currentY <= bottomMaxY) {
+        ctx.font = `italic ${Math.round(width * 0.024)}px Inter, Arial, sans-serif`
+        currentY = wrapText(
+          ctx,
+          parsed.quote,
+          margin,
+          currentY + Math.round(width * 0.01),
+          width - margin * 2,
+          Math.round(width * 0.032),
+          2,
+          bottomMaxY
+        )
+      }
+
+      if (parsed.cta && currentY <= bottomMaxY) {
+        ctx.font = `bold ${Math.round(width * 0.026)}px Inter, Arial, sans-serif`
+        wrapText(
+          ctx,
+          parsed.cta,
+          margin,
+          currentY + Math.round(width * 0.016),
+          width - margin * 2,
+          Math.round(width * 0.034),
+          2,
+          bottomMaxY
+        )
       }
 
       const dataUrl = canvas.toDataURL('image/png')
@@ -827,6 +1127,31 @@ export default function VivaChatPage() {
 
   const assistenteFalando = loading || gravandoAudio
 
+  const toggleModoConversacao = () => {
+    const novoEstado = !modoConversacaoAtivo
+    setModoConversacaoAtivo(novoEstado)
+    setErroAudio(null)
+    setTranscricaoParcial('')
+
+    if (!novoEstado) {
+      textAreaRef.current?.focus()
+      scrollToBottom(true)
+    }
+
+    if (!novoEstado && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel()
+    }
+    if (!novoEstado) {
+      stopContinuousConversation()
+    } else {
+      conversationShouldListenRef.current = true
+      startContinuousConversation()
+    }
+
+    const ultimaMensagemIA = [...mensagens].reverse().find(msg => msg.tipo === 'ia')
+    lastSpokenMessageIdRef.current = ultimaMensagemIA?.id || null
+  }
+
   return (
     <>
       <div className="flex h-[calc(100vh-4rem)]">
@@ -837,6 +1162,28 @@ export default function VivaChatPage() {
             Modos Especiais
           </h3>
           <div className="space-y-2">
+            <button
+              onClick={toggleModoConversacao}
+              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
+                modoConversacaoAtivo
+                  ? 'bg-white shadow-md ring-2 ring-cyan-500'
+                  : 'bg-white hover:shadow-md border border-gray-200'
+              }`}
+            >
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white ${
+                modoConversacaoAtivo ? 'bg-cyan-600' : 'bg-cyan-500'
+              }`}>
+                {modoConversacaoAtivo ? <Volume2 className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
+              </div>
+              <div className="text-left">
+                <p className="font-medium text-sm">Conversa VIVA</p>
+                <p className="text-xs text-gray-500">Modo fluido com voz da VIVA</p>
+              </div>
+              {modoConversacaoAtivo && (
+                <ChevronRight className="w-4 h-4 text-cyan-600 ml-auto" />
+              )}
+            </button>
+
             {PROMPTS.map((prompt) => (
               <button
                 key={prompt.id}
@@ -902,22 +1249,80 @@ export default function VivaChatPage() {
           </Button>
         </div>
 
+        {modoConversacaoAtivo ? (
+          <div className="flex-1 flex items-center justify-center p-6 bg-[radial-gradient(circle_at_top,rgba(125,211,252,0.2),rgba(248,250,252,0.96)_52%)]">
+            <div className="flex flex-col items-center">
+              <div
+                className={`holo-stage ${assistenteFalando ? 'is-active' : ''}`}
+                role="img"
+                aria-label="Avatar holografico da VIVA"
+              >
+                <div className="holo-grid" />
+                <span className="holo-ring holo-ring-1" />
+                <span className="holo-ring holo-ring-2" />
+                <span className="holo-ring holo-ring-3" />
+                <div className="holo-neural">
+                  <span className="holo-node holo-node-1" />
+                  <span className="holo-node holo-node-2" />
+                  <span className="holo-node holo-node-3" />
+                  <span className="holo-node holo-node-4" />
+                </div>
+                <div className="holo-avatar">
+                  {!avatarFallback ? (
+                    <img
+                      src={VIVA_AVATAR_SOURCES[avatarSourceIndex]}
+                      alt="VIVA"
+                      className="h-full w-full rounded-full object-cover"
+                      onError={() => {
+                        if (avatarSourceIndex < VIVA_AVATAR_SOURCES.length - 1) {
+                          setAvatarSourceIndex((prev) => prev + 1)
+                          return
+                        }
+                        setAvatarFallback(true)
+                      }}
+                    />
+                  ) : (
+                    <Bot className="holo-brain-icon" />
+                  )}
+                </div>
+                <span className="holo-shadow" />
+              </div>
+
+              <div className="mt-3 text-center">
+                <p className="text-xs uppercase tracking-[0.24em] text-cyan-700">
+                  {loading ? 'Processando' : escutaContinuaAtiva ? 'Escutando' : 'Aguardando'}
+                </p>
+                {transcricaoParcial && (
+                  <p className="mt-2 max-w-xl text-sm text-slate-600">{transcricaoParcial}</p>
+                )}
+                {erroAudio && (
+                  <p className="mt-2 max-w-xl text-sm text-amber-700">{erroAudio}</p>
+                )}
+                <div className="mt-3 flex items-center justify-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={vozVivaAtiva ? 'default' : 'outline'}
+                    onClick={() => {
+                      const novoEstado = !vozVivaAtiva
+                      setVozVivaAtiva(novoEstado)
+                      if (!novoEstado && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+                        window.speechSynthesis.cancel()
+                      }
+                    }}
+                  >
+                    {vozVivaAtiva ? <Volume2 className="mr-2 h-4 w-4" /> : <VolumeX className="mr-2 h-4 w-4" />}
+                    {vozVivaAtiva ? 'Voz ativa' : 'Voz pausada'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+        <>
         {/* Ãrea de mensagens */}
         <ScrollArea className="flex-1 px-4" ref={scrollAreaRef}>
           <div className="max-w-3xl mx-auto py-6 space-y-6">
-            <div className="flex justify-center">
-              <div className={`holo-stage ${assistenteFalando ? 'is-active' : ''}`}>
-                <div className="holo-ring holo-ring-1" />
-                <div className="holo-ring holo-ring-2" />
-                <div className="holo-ring holo-ring-3" />
-                <div className="holo-grid" />
-                <div className="holo-avatar">
-                  <Bot className="w-20 h-20" />
-                  <span className="holo-name">VIVA</span>
-                </div>
-                <div className="holo-shadow" />
-              </div>
-            </div>
 
             {mensagens.map((msg) => (
               <div
@@ -1127,6 +1532,11 @@ export default function VivaChatPage() {
                 {erroAudio}
               </p>
             )}
+            {pendingAudioAutoSend && (
+              <p className="mt-2 text-xs text-blue-600 text-center">
+                Audio na fila: envio automatico assim que a VIVA concluir a resposta atual.
+              </p>
+            )}
             
             {/* Inputs escondidos */}
             <input
@@ -1150,6 +1560,8 @@ export default function VivaChatPage() {
             </p>
           </div>
         </div>
+        </>
+        )}
       </div>
     </div>
 
@@ -1221,35 +1633,35 @@ export default function VivaChatPage() {
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
                     />
-                    <div className="absolute inset-x-0 top-0 h-[26%] bg-white/85 px-6 py-4">
+                    <div className="absolute inset-x-0 top-0 h-[32%] overflow-y-auto bg-white/88 px-5 py-4">
                       <p className="text-xs uppercase tracking-widest" style={{ color: theme.accent }}>
                         {theme.label}
                       </p>
-                      <h3 className="mt-2 text-lg sm:text-2xl font-bold" style={{ color: theme.primary }}>
+                      <h3 className="mt-2 break-words text-base sm:text-xl font-bold leading-tight" style={{ color: theme.primary }}>
                         {parsed.headline}
                       </h3>
                       {parsed.subheadline && (
-                        <p className="mt-1 text-sm sm:text-base" style={{ color: theme.primary }}>
+                        <p className="mt-1 break-words text-xs sm:text-sm leading-snug" style={{ color: theme.primary }}>
                           {parsed.subheadline}
                         </p>
                       )}
                     </div>
                     <div
-                      className="absolute inset-x-0 bottom-0 h-[30%] px-6 py-4 text-white"
+                      className="absolute inset-x-0 bottom-0 h-[40%] overflow-y-auto px-5 py-4 text-white"
                       style={{
                         background: `linear-gradient(90deg, ${theme.dark}e6, ${theme.accent}e6)`
                       }}
                     >
-                      <ul className="space-y-1 text-xs sm:text-sm">
+                      <ul className="space-y-1 text-[11px] sm:text-sm leading-snug break-words">
                         {parsed.bullets.map((bullet, idx) => (
                           <li key={idx}>{bullet}</li>
                         ))}
                       </ul>
                       {parsed.quote && (
-                        <p className="mt-3 text-xs sm:text-sm italic">{parsed.quote}</p>
+                        <p className="mt-3 break-words text-[11px] sm:text-sm italic leading-snug">{parsed.quote}</p>
                       )}
                       {parsed.cta && (
-                        <p className="mt-3 inline-block rounded-full bg-white/20 px-3 py-1 text-xs sm:text-sm font-semibold tracking-wide">
+                        <p className="mt-3 inline-block max-w-full break-words rounded-full bg-white/20 px-3 py-1 text-[11px] sm:text-sm font-semibold tracking-wide">
                           {parsed.cta}
                         </p>
                       )}
@@ -1261,198 +1673,6 @@ export default function VivaChatPage() {
           </div>
         </div>
       )}
-
-      <style jsx global>{`
-        .holo-stage {
-          position: relative;
-          width: min(82vw, 280px);
-          aspect-ratio: 3 / 4;
-          border-radius: 24px;
-          margin-bottom: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          perspective: 1000px;
-          transform-style: preserve-3d;
-          background:
-            radial-gradient(circle at 50% 22%, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0) 58%),
-            linear-gradient(160deg, rgba(20, 78, 152, 0.18), rgba(15, 23, 42, 0.42));
-          border: 1px solid rgba(125, 211, 252, 0.35);
-          box-shadow:
-            0 18px 38px rgba(8, 47, 73, 0.26),
-            inset 0 0 40px rgba(56, 189, 248, 0.16);
-          overflow: hidden;
-          animation: viva-holo-float 5.8s ease-in-out infinite;
-        }
-
-        .holo-stage::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background:
-            linear-gradient(transparent 0%, rgba(56, 189, 248, 0.12) 50%, transparent 100%);
-          mix-blend-mode: screen;
-          animation: viva-holo-scan 4.2s linear infinite;
-          pointer-events: none;
-        }
-
-        .holo-stage::after {
-          content: '';
-          position: absolute;
-          inset: -35% -20%;
-          background: radial-gradient(circle, rgba(56, 189, 248, 0.24), rgba(59, 130, 246, 0.02) 58%, transparent 72%);
-          transform: translateZ(-18px);
-          animation: viva-holo-pulse 3.4s ease-in-out infinite;
-          pointer-events: none;
-        }
-
-        .holo-ring {
-          position: absolute;
-          border: 1px solid rgba(125, 211, 252, 0.4);
-          border-radius: 999px;
-          pointer-events: none;
-          transform-style: preserve-3d;
-        }
-
-        .holo-ring-1 {
-          width: 78%;
-          height: 18%;
-          bottom: 14%;
-          transform: rotateX(74deg) translateZ(0);
-          animation: viva-ring-spin 8s linear infinite;
-        }
-
-        .holo-ring-2 {
-          width: 68%;
-          height: 14%;
-          bottom: 16%;
-          border-color: rgba(56, 189, 248, 0.52);
-          transform: rotateX(74deg) translateZ(12px);
-          animation: viva-ring-spin 6s linear infinite reverse;
-        }
-
-        .holo-ring-3 {
-          width: 58%;
-          height: 10%;
-          bottom: 18%;
-          border-color: rgba(147, 197, 253, 0.5);
-          transform: rotateX(74deg) translateZ(20px);
-          animation: viva-ring-spin 4.6s linear infinite;
-        }
-
-        .holo-grid {
-          position: absolute;
-          inset: 0;
-          opacity: 0.26;
-          background-image:
-            linear-gradient(rgba(56, 189, 248, 0.32) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(56, 189, 248, 0.32) 1px, transparent 1px);
-          background-size: 18px 18px;
-          transform: translateZ(-6px);
-          mask-image: radial-gradient(circle at 50% 50%, black 36%, transparent 78%);
-          pointer-events: none;
-        }
-
-        .holo-avatar {
-          position: relative;
-          z-index: 2;
-          width: 64%;
-          aspect-ratio: 1 / 1;
-          border-radius: 999px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-direction: column;
-          color: #e0f2fe;
-          background:
-            radial-gradient(circle at 50% 35%, rgba(125, 211, 252, 0.45), rgba(14, 116, 144, 0.12) 62%, rgba(3, 7, 18, 0.42) 100%);
-          border: 1px solid rgba(186, 230, 253, 0.42);
-          box-shadow:
-            inset 0 0 24px rgba(125, 211, 252, 0.35),
-            0 10px 22px rgba(2, 132, 199, 0.2);
-          transform: translateY(-8px) translateZ(24px) rotateY(-8deg);
-          animation: viva-avatar-bob 3.8s ease-in-out infinite;
-          text-shadow: 0 0 18px rgba(186, 230, 253, 0.66);
-        }
-
-        .holo-name {
-          margin-top: 6px;
-          font-size: 12px;
-          letter-spacing: 0.22em;
-          font-weight: 700;
-          color: rgba(224, 242, 254, 0.92);
-        }
-
-        .holo-shadow {
-          position: absolute;
-          width: 54%;
-          height: 9%;
-          bottom: 10%;
-          border-radius: 999px;
-          background: radial-gradient(circle, rgba(56, 189, 248, 0.38), rgba(2, 6, 23, 0.02) 72%);
-          filter: blur(2px);
-          animation: viva-shadow-pulse 3.8s ease-in-out infinite;
-          pointer-events: none;
-        }
-
-        .holo-stage.is-active {
-          box-shadow:
-            0 24px 44px rgba(8, 47, 73, 0.34),
-            inset 0 0 52px rgba(56, 189, 248, 0.26),
-            0 0 32px rgba(56, 189, 248, 0.28);
-        }
-
-        .holo-stage.is-active .holo-avatar {
-          animation-duration: 2.4s;
-        }
-
-        @keyframes viva-holo-float {
-          0%, 100% { transform: translateY(0) rotateX(2deg) rotateY(-2deg); }
-          50% { transform: translateY(-8px) rotateX(-1deg) rotateY(3deg); }
-        }
-
-        @keyframes viva-holo-scan {
-          0% { transform: translateY(-115%); }
-          100% { transform: translateY(125%); }
-        }
-
-        @keyframes viva-holo-pulse {
-          0%, 100% { opacity: 0.58; }
-          50% { opacity: 0.95; }
-        }
-
-        @keyframes viva-ring-spin {
-          0% { transform: rotateX(74deg) rotateZ(0deg); }
-          100% { transform: rotateX(74deg) rotateZ(360deg); }
-        }
-
-        @keyframes viva-avatar-bob {
-          0%, 100% { transform: translateY(-8px) translateZ(24px) rotateY(-8deg); }
-          50% { transform: translateY(-18px) translateZ(34px) rotateY(9deg); }
-        }
-
-        @keyframes viva-shadow-pulse {
-          0%, 100% { opacity: 0.65; transform: scaleX(0.95); }
-          50% { opacity: 0.92; transform: scaleX(1.08); }
-        }
-
-        @media (max-width: 768px) {
-          .holo-stage {
-            width: min(84vw, 228px);
-            border-radius: 20px;
-          }
-
-          .holo-avatar .lucide {
-            width: 62px;
-            height: 62px;
-          }
-
-          .holo-name {
-            font-size: 11px;
-            letter-spacing: 0.18em;
-          }
-        }
-      `}</style>
     </>
   )
 }

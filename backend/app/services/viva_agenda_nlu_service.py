@@ -1,4 +1,4 @@
-"""
+﻿"""
 NLU helpers for VIVA agenda flows.
 """
 from datetime import datetime, timedelta
@@ -50,10 +50,21 @@ def parse_agenda_command(message: str) -> Optional[Dict[str, Any]]:
         return None
 
     lower = text.lower()
-    if not (lower.startswith("agendar") or lower.startswith("agenda")):
+    if not (
+        lower.startswith("agendar")
+        or lower.startswith("agende")
+        or lower.startswith("agenda")
+        or lower.startswith("marcar")
+        or lower.startswith("marque")
+    ):
         return None
 
-    payload = re.sub(r"^(agendar|agenda)\s*:?\s*", "", text, flags=re.IGNORECASE).strip()
+    payload = re.sub(
+        r"^(agendar|agende|agenda|marcar|marque)\s*:?\s*",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    ).strip()
     if not payload:
         return {"error": "Formato vazio"}
 
@@ -141,10 +152,14 @@ def is_agenda_query_intent(message: str, contexto: List[Dict[str, Any]]) -> bool
 
     create_terms = (
         "agendar",
+        "agende",
         "marcar",
+        "marque",
         "criar compromisso",
+        "crie compromisso",
         "novo compromisso",
         "adicionar compromisso",
+        "adicione compromisso",
     )
     conclude_terms = ("concluir", "confirmar compromisso", "finalizar compromisso")
 
@@ -174,7 +189,23 @@ def is_agenda_query_intent(message: str, contexto: List[Dict[str, Any]]) -> bool
     if any(term in normalized for term in query_terms):
         return True
 
-    if _is_agenda_verb(message):
+    if _is_agenda_verb(message) and any(
+        term in normalized
+        for term in (
+            "quais",
+            "listar",
+            "lista",
+            "mostrar",
+            "mostra",
+            "como esta",
+            "como ta",
+            "o que tenho",
+            "tenho",
+            "consultar",
+            "consulta",
+            "ver minha",
+        )
+    ):
         return True
 
     if _is_simple_confirmation(message) and _has_recent_agenda_prompt(contexto):
@@ -224,18 +255,55 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
     normalized = _normalize_key(raw)
     if not any(
         term in normalized
-        for term in ("agendar", "marcar", "novo compromisso", "criar compromisso", "adicionar compromisso")
+        for term in (
+            "agendar",
+            "agende",
+            "marcar",
+            "marque",
+            "novo compromisso",
+            "criar compromisso",
+            "crie compromisso",
+            "adicionar compromisso",
+            "adicione compromisso",
+        )
     ):
         return None
 
     if "|" in raw:
         return None
 
-    time_match = re.search(r"\b(\d{1,2}:\d{2})\b", raw)
-    if not time_match:
-        return {"error": "Data/hora invalida"}
+    time_token = ""
+    hour = 0
+    minute = 0
+    has_tomorrow_hint = bool(re.search(r"\bamanh\w*\b", normalized))
+    has_today_hint = bool(re.search(r"\bhoj\w*\b", normalized))
 
-    hour, minute = [int(part) for part in time_match.group(1).split(":")]
+    hh_mm_match = re.search(r"\b(\d{1,2}):(\d{2})\b", raw)
+    if hh_mm_match:
+        hour = int(hh_mm_match.group(1))
+        minute = int(hh_mm_match.group(2))
+        time_token = hh_mm_match.group(0)
+    else:
+        short_hour_match = re.search(r"\b(?:as|a|s)\s*(\d{1,2})(?:h(\d{2})?)?\b", normalized)
+        if short_hour_match:
+            hour = int(short_hour_match.group(1))
+            minute = int(short_hour_match.group(2)) if short_hour_match.group(2) else 0
+            time_token = ""
+        else:
+            compact_hour_match = re.search(r"(?i)\b(\d{1,2})h(\d{2})?\b", raw)
+            if compact_hour_match:
+                hour = int(compact_hour_match.group(1))
+                minute = int(compact_hour_match.group(2)) if compact_hour_match.group(2) else 0
+                time_token = compact_hour_match.group(0)
+            else:
+                fallback_hour_match = re.search(r"\b(\d{1,2})(?:h(\d{2})?)?\b", normalized)
+                if fallback_hour_match and (has_tomorrow_hint or has_today_hint):
+                    hour = int(fallback_hour_match.group(1))
+                    minute = int(fallback_hour_match.group(2)) if fallback_hour_match.group(2) else 0
+                    time_token = ""
+                else:
+                    return {"error": "Data/hora invalida"}
+
     if hour > 23 or minute > 59:
         return {"error": "Data/hora invalida"}
 
@@ -250,9 +318,9 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
                 break
             except ValueError:
                 continue
-    elif "amanha" in normalized:
+    elif has_tomorrow_hint:
         date_value = datetime.now() + timedelta(days=1)
-    elif "hoje" in normalized:
+    elif has_today_hint:
         date_value = datetime.now()
 
     if not date_value:
@@ -261,16 +329,30 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
     date_time = date_value.replace(hour=hour, minute=minute, second=0, microsecond=0)
 
     title = raw
-    title = re.sub(
-        r"(?i)\b(agendar|agenda|marcar|marque|novo compromisso|criar compromisso|adicionar compromisso)\b",
-        "",
+    verb_match = re.search(
+        r"(?i)\b(agendar|agende|agenda|marcar|marque|novo compromisso|criar compromisso|crie compromisso|adicionar compromisso|adicione compromisso)\b",
         title,
     )
-    title = title.replace(time_match.group(0), "")
+    if verb_match:
+        title = title[verb_match.end():].strip()
+
+    title = re.split(
+        r"(?i)\b(mande para a agenda|manda para a agenda|coloque na agenda|coloca na agenda|me avise|me lembra|me lembre)\b",
+        title,
+    )[0].strip()
+
+    if time_token:
+        title = title.replace(time_token, "")
+    title = re.sub(r"\b\d{1,2}(?::\d{2})?\b", " ", title)
     if date_match:
         title = title.replace(date_match.group(1), "")
-    title = re.sub(r"(?i)\b(hoje|amanha|amanha|as|as|para|dia)\b", " ", title)
-    title = re.sub(r"\s+", " ", title).strip(" -,:;")
+    title = re.sub(r"(?i)\b(hoje|hoj\w*|amanha|amanhã|amanh\w*|as|às|s|para|pra|dia|de|do|da|no|na|mim|comigo)\b", " ", title)
+    title = re.sub(r"[^0-9A-Za-zÀ-ÿ\s-]+", " ", title)
+    title = re.sub(r"(?i)\b(o|a|os|as|um|uma)\b", " ", title)
+    title = re.sub(r"\s+", " ", title).strip(" -,:;.")
+
+    if len(title.split()) > 8:
+        title = " ".join(title.split()[:8]).strip()
     if not title:
         title = "Compromisso"
 

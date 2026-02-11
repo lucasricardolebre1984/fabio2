@@ -377,3 +377,158 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
 - validacao tecnica:
   - `npm run lint -- --file src/app/viva/page.tsx` (ok, warnings conhecidos de `<img>`);
   - `npm run type-check` (ok).
+
+## Atualizacao Operacional (2026-02-11 - hotfix ultima att VIVA)
+- incidente:
+  - feedback de campo indicou que a ultima att nao estava consistente no fluxo real.
+- correcao aplicada:
+  - `frontend/src/app/viva/page.tsx`:
+    - bloco holografico movido para fora da area de rolagem do chat;
+    - envio de audio pendente reforcado por fila automatica apos encerramento de `loading`;
+    - `handleSend` estabilizado com `useCallback` para evitar efeito instavel no fluxo de audio.
+- validacao:
+  - `npm run type-check` => OK;
+  - `npm run lint -- --file src/app/viva/page.tsx` => OK (somente warnings nao bloqueantes de `<img>`).
+- rastreabilidade:
+  - `BUG-072` movido para **Em validacao** em `docs/BUGSREPORT.md`.
+
+## Atualizacao Operacional (2026-02-11 - incidente agenda em linguagem natural)
+- incidente em producao local (chat `/viva`):
+  - frase de criacao de compromisso foi interpretada como consulta de agenda.
+- evidencia funcional:
+  - entrada: "agende o Andre amanha as 10 para mim. Mande para a agenda."
+  - saida: "Voce nao tem compromissos de amanha."
+- impacto:
+  - perda de confianca no fluxo de secretaria (VIVA nao executa comando imperativo de agenda).
+- acao institucional:
+  - bug formalizado como `BUG-073` (Ativo) em `docs/BUGSREPORT.md`.
+- status da janela:
+  - sem correcao de codigo nesta rodada, por solicitacao de encerramento do usuario.
+- proxima acao planejada (amanha):
+  - corrigir desambiguacao de intencao de agenda priorizando verbos de criacao;
+  - revalidar com cenarios de linguagem natural e confirmar persistencia na agenda.
+
+## Atualizacao Operacional (2026-02-11 - execucao BUG-073 e BUG-076)
+- `BUG-073` (agenda NLU):
+  - parser ajustado para tratar criacao com linguagem natural (`agende ... amanha as 10`);
+  - classificacao de intencao de consulta ficou menos agressiva quando houver verbo de criacao.
+- `BUG-076` (UI conversacao):
+  - modo de conversacao passou para botao lateral dedicado (`Conversa VIVA`);
+  - bloco visual/voz nao fica mais acoplado ao chat padrao;
+  - respostas em voz (TTS) ativadas apenas no modo conversacao, com controle de pausa.
+- validacao:
+  - `frontend`: type-check e lint do arquivo `src/app/viva/page.tsx` sem erros bloqueantes;
+  - `backend`: compileall dos modulos de agenda/chat sem erro;
+  - smoke local do parser confirma criacao de compromisso e desvio de consulta eliminado no caso reportado.
+- status:
+  - `BUG-073` -> Em validacao.
+  - `BUG-076` -> Em validacao.
+
+## Atualizacao Operacional (2026-02-11 - execucao BUG-077 conversa continua VIVA)
+- ajuste funcional concluido no frontend (`frontend/src/app/viva/page.tsx`):
+  - modo `Conversa VIVA` isolado do chat padrao (sem lista de mensagens na tela quando ativo);
+  - captura de voz continua automatica no navegador, sem disparo manual de whisper por turno;
+  - retomada automatica da escuta apos resposta em voz da VIVA (TTS), com pausa durante fala da assistente;
+  - avatar holografico 3D central com fallback de imagem institucional.
+- validacao tecnica:
+  - `npm run type-check` => OK;
+  - `npm run lint -- --file src/app/viva/page.tsx` => OK (warnings nao bloqueantes de `<img>`).
+- rastreabilidade:
+  - `BUG-077` atualizado para **Em validacao** em `docs/BUGSREPORT.md`.
+
+## Atualizacao Operacional (2026-02-11 - prioridade funcional campanhas)
+- diretriz executiva da rodada:
+  - pausar evolucao do modulo de conversa continua/3D da VIVA para concentrar esforco em campanhas e geracao de imagem.
+- status institucional atualizado:
+  - `BUG-076` -> **Em pausa (prioridade campanhas)**;
+  - `BUG-077` -> **Em pausa (prioridade campanhas)**;
+  - `BUG-061` -> **Reaberto (Ativo)** apos nova validacao de repeticao de personagens.
+- prova tecnica (somente leitura):
+  - `backend/app/api/v1/viva.py` permanece monolitico e ativo em backlog (`BUG-062`): ~2769 linhas, 21 rotas HTTP, 90+ funcoes/async funcs.
+
+## Atualizacao Operacional (2026-02-11 - execucao BUG-061 rodada 2)
+- foco da entrega:
+  - reduzir repeticao de personagens e composicoes nas campanhas geradas.
+- backend atualizado em `backend/app/api/v1/viva.py`:
+  - variacao de elenco por seed (`_persona_scene_variant`);
+  - variacao estavel de escolhas visuais (`_stable_pick`);
+  - prompt final com diretriz de elenco + enquadramento + humor visual;
+  - anti-repeticao explicita reforcada (rosto/cabelo/faixa etaria/composicao);
+  - `scene` ampliada para preservar contexto visual e evitar prompt excessivamente generico;
+  - temperatura da copy de campanha elevada para ampliar diversidade controlada.
+- validacao executada:
+  - `python -m compileall app/api/v1/viva.py` => OK;
+  - smoke local com 3 seeds distintos => diretrizes visuais diferentes na saida de prompt.
+- status:
+  - `BUG-061` movido para **Em validacao (rodada 2)**, pendente validacao visual final no front `/campanhas`.
+
+## Atualizacao Operacional (2026-02-11 - execucao BUG-015 + BUG-061 rodada 3)
+- correcoes aplicadas no backend (`backend/app/api/v1/viva.py`):
+  - direcao visual de campanha agora dinamica por briefing (`tema/oferta/objetivo`), sem hardcode de tema especifico;
+  - parser de tema livre para frases naturais (`campanha de/do/da/para ...`);
+  - parser de oferta percentual refinado para extracao limpa sem ruido de campos seguintes;
+  - anti-repeticao de personagens com memoria curta de campanhas recentes:
+    - pool de perfis por publico;
+    - selecao de elenco com exclusao de perfis usados recentemente;
+    - injecao de `cast_profile` + `recent_cast_ids` no prompt final.
+- validacao tecnica:
+  - `python -m py_compile app/api/v1/viva.py` => OK;
+  - smoke em `backend/venv` confirmou:
+    - tema livre extraido corretamente;
+    - oferta percentual extraida corretamente;
+    - prompt com bloco de elenco obrigatorio + historico recente.
+- status:
+  - `BUG-015` => Em validacao (rodada dinamica)
+  - `BUG-061` => Em validacao (rodada 3)
+
+## Atualizacao Operacional (2026-02-11 - execucao adicional BUG-073)
+- backend:
+  - `backend/app/services/viva_agenda_nlu_service.py` atualizado para robustez de acento/encoding em agenda natural:
+    - hora lida em texto normalizado;
+    - data por `amanh*`/`hoj*`;
+    - fallback de hora isolada com contexto temporal.
+- validacao:
+  - `python -m py_compile app/services/viva_agenda_nlu_service.py` => OK;
+  - smoke local com frase `agende ... amanhã às 10` retornou payload de criacao com horario correto.
+- status:
+  - `BUG-073` => Em validacao (aguardando validacao final no navegador/chat real).
+
+## Atualizacao Operacional (2026-02-11 - execucao BUG-016 rodada 2)
+- frontend:
+  - `frontend/src/app/viva/page.tsx` atualizado para reduzir perda de texto no overlay da arte:
+    - parser com limites maiores para headline/subheadline/bullets/quote;
+    - modal de arte final com altura maior de blocos de texto e `overflow-y-auto`;
+    - exportacao em canvas com mais area util para textos e wrap com limite vertical.
+- validacao:
+  - `npm run type-check` => OK;
+  - `npm run lint -- --file src/app/viva/page.tsx` => OK (somente warnings nao bloqueantes de `<img>`).
+- status:
+  - `BUG-016` => Em validacao (rodada 2).
+
+## Atualizacao Operacional (2026-02-11 - execucao BUG-015 + BUG-061 rodada 4)
+- backend:
+  - `backend/app/api/v1/viva.py` reforcado para diversidade visual real em campanhas:
+    - `scene_profile` adicionado como novo eixo de variacao (alem de `cast_profile`);
+    - memoria anti-repeticao agora considera historico recente de elenco e cenario;
+    - pools de cenario ampliados para PF/MEI/PJ;
+    - prompt final com bloqueio explicito de composicoes genericas repetitivas;
+    - chamada de imagem para campanhas com `quality=high`.
+  - robustez extra no fluxo:
+    - `_generate_campaign_copy` com fallback seguro em caso de falha/timeout da etapa de copy, evitando quebra do chat por `500` silencioso.
+- validacao:
+  - `python -m py_compile app/api/v1/viva.py` => OK;
+  - simulacao de selecao sequencial:
+    - `cast_profile`: 8/8 variacoes unicas;
+    - `scene_profile`: 8/8 variacoes unicas.
+- status:
+  - `BUG-015` => Em validacao (rodada 4 - diversidade).
+  - `BUG-061` => Em validacao (rodada 4 - diversidade).
+
+## Atualizacao Operacional (2026-02-11 - snapshot institucional para git)
+- validacao completa antes do commit:
+  - backend `py_compile` dos modulos alterados => OK;
+  - frontend `type-check` => OK;
+  - frontend `lint` de `src/app/viva/page.tsx` => OK (somente warnings nao bloqueantes);
+  - probes read-only de API e auth => todos endpoints criticos em `200`.
+- decisao:
+  - liberar snapshot de seguranca no git (`commit + push`) com estado validado.

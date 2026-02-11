@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 import base64
 import json
+import logging
 import re
 import unicodedata
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,6 +31,7 @@ from app.services.openai_service import openai_service
 from app.config import settings
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class ChatRequest(BaseModel):
@@ -254,7 +256,7 @@ def _is_campaign_request(texto: str) -> bool:
 
 def _is_greeting(texto: str) -> bool:
     lower = texto.lower().strip()
-    termos = ["oi", "olá", "ola", "bom dia", "boa tarde", "boa noite"]
+    termos = ["oi", "olÃ¡", "ola", "bom dia", "boa tarde", "boa noite"]
     return any(lower.startswith(t) for t in termos)
 
 
@@ -266,7 +268,7 @@ def _preferred_greeting(texto: str) -> str:
         return "Boa tarde Fabio!"
     if "bom dia" in lower:
         return "Bom dia Fabio!"
-    return "Olá Fabio!"
+    return "OlÃ¡ Fabio!"
 
 
 def _ensure_fabio_greeting(user_text: str, resposta: str) -> str:
@@ -278,7 +280,7 @@ def _ensure_fabio_greeting(user_text: str, resposta: str) -> str:
 
     greeting = _preferred_greeting(user_text)
     atualizado = re.sub(
-        r"^(boa\s+noite|boa\s+tarde|bom\s+dia|ol[aá]|oi)[!,.\s-]*",
+        r"^(boa\s+noite|boa\s+tarde|bom\s+dia|ol[aÃ¡]|oi)[!,.\s-]*",
         f"{greeting} ",
         resposta,
         flags=re.IGNORECASE,
@@ -424,7 +426,7 @@ def _normalize_publico_value(value: str) -> str:
 
 def _clean_extracted_value(value: str) -> str:
     cleaned = str(value or "").strip(" ,.;:-")
-    cleaned = re.sub(r"\s+(a|o|e|de|do|da|para)$", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+(a|o|e|de|do|da|para|pra|com)$", "", cleaned, flags=re.IGNORECASE)
     return cleaned.strip(" ,.;:-")
 
 
@@ -437,9 +439,9 @@ def _is_affirmative(texto: str) -> bool:
         "pode sim",
         "confirmo",
         "usar cta padrao",
-        "usar cta padrão",
+        "usar cta padrÃ£o",
         "cta padrao",
-        "cta padrão",
+        "cta padrÃ£o",
     }
 
 
@@ -645,13 +647,20 @@ def _infer_campaign_fields_from_free_text(texto: str) -> Dict[str, str]:
 
     if not inferred.get("tema"):
         theme_match = re.search(
-            r"tema(?: da campanha)?(?: e| eh| =)? (.*?)(?= objetivo| publico| formato| cta| oferta| promocao| promo| desconto|$)",
-            normalized,
+            r"tema(?: da campanha)?(?: e| eh| =)? (.*?)(?= objetivo| publico| formato| cta| oferta| promocao| promo| desconto| headline| subheadline| cena|$)",
+            texto or "",
+            flags=re.IGNORECASE,
         )
         if theme_match and str(theme_match.group(1) or "").strip():
             inferred["tema"] = _clean_extracted_value(str(theme_match.group(1)))
-        elif "carnaval" in normalized:
-            inferred["tema"] = "carnaval sem dividas" if "sem divida" in normalized else "carnaval"
+        else:
+            campaign_theme_match = re.search(
+                r"campanha\s+(?:de|do|da|para)\s+(.{3,120}?)(?=\s+\d{1,2}\s*%|\s+(?:objetivo|publico|formato|cta|oferta|promocao|promo|desconto|headline|subheadline|cena)\b|[,\n|;:.]|$)",
+                texto or "",
+                flags=re.IGNORECASE,
+            )
+            if campaign_theme_match and str(campaign_theme_match.group(1) or "").strip():
+                inferred["tema"] = _clean_extracted_value(str(campaign_theme_match.group(1)))
 
     discount_match_raw = re.search(r"(\d{1,2})\s*%", texto or "", flags=re.IGNORECASE)
     discount_match_words = re.search(r"\b(\d{1,2})\s+por cento\b", normalized)
@@ -661,15 +670,15 @@ def _infer_campaign_fields_from_free_text(texto: str) -> Dict[str, str]:
             or (discount_match_words.group(1) if discount_match_words else None)
             or ""
         )
-        service_match = re.search(
-            r"\b(limpa nome|aumento de score|score|rating|diagnostico 360|renegociacao|quitacao|credito)\b",
-            normalized,
+        offer_phrase = re.search(
+            r"(\d{1,2}\s*%\s*(?:de|em|no|na)?\s*[^,\n|;:.]{2,90}?)(?=\s+(?:objetivo|publico|formato|cta|tema|headline|subheadline|cena)\b|[,\n|;:.]|$)",
+            texto or "",
+            flags=re.IGNORECASE,
         )
-        if service_match:
-            service = str(service_match.group(1)).strip()
-            inferred["oferta"] = f"Desconto de {pct}% em {service}"
+        if offer_phrase and str(offer_phrase.group(1) or "").strip():
+            inferred["oferta"] = _clean_extracted_value(str(offer_phrase.group(1)))
         else:
-            inferred["oferta"] = f"Desconto de {pct}% no servico"
+            inferred["oferta"] = f"Desconto de {pct}%"
 
     return inferred
 
@@ -749,17 +758,23 @@ def _build_campaign_brief_reply(modo: str, missing_fields: List[str]) -> str:
 
 
 def _theme_scene_hint(tema: str, objetivo: str, oferta: str) -> str:
-    payload = _normalize_key(f"{tema} {objetivo} {oferta}")
-    if "carnaval" in payload:
-        return "ambiente brasileiro alegre com energia de carnaval, sem fantasia caricata e sem escritorio"
-    if "limpa nome" in payload or "nome limpo" in payload:
-        return "cena de alivio financeiro com atitude positiva, documentos organizados e clima de recomeço"
-    if "rating" in payload or "credito" in payload or "score" in payload:
-        return "cena moderna de consultoria financeira com foco em diagnostico e melhoria de credito"
-    if "mei" in payload or "microempreendedor" in payload:
-        return "cena de pequeno negocio brasileiro em atividade real com foco em crescimento"
+    tema_clean = _sanitize_prompt(str(tema or "").strip(), 120)
+    objetivo_clean = _sanitize_prompt(str(objetivo or "").strip(), 120)
+    oferta_clean = _sanitize_prompt(str(oferta or "").strip(), 120)
+    if tema_clean:
+        return (
+            f"cena autentica e realista alinhada ao tema '{tema_clean}', "
+            "com identidade brasileira, sem estereotipo corporativo repetitivo"
+        )
+    if oferta_clean:
+        return (
+            f"cena focada na proposta comercial '{oferta_clean}', com narrativa visual humana e objetiva"
+        )
+    if objetivo_clean:
+        return (
+            f"cena orientada ao objetivo '{objetivo_clean}', com contexto cotidiano e credibilidade"
+        )
     return "cena autentica no contexto brasileiro, sem estereotipo corporativo repetitivo"
-
 
 def _audience_scene_hint(publico: str) -> str:
     normalized = _normalize_key(publico)
@@ -785,6 +800,171 @@ def _composition_variant(seed: str) -> str:
     return variants[idx]
 
 
+def _stable_pick(seed: str, salt: str, options: List[str]) -> str:
+    if not options:
+        return ""
+    idx = abs(sum(ord(ch) for ch in f"{seed}|{salt}")) % len(options)
+    return options[idx]
+
+
+def _cast_profile_pool(publico: str) -> List[Dict[str, str]]:
+    normalized = _normalize_key(publico)
+    if "mei" in normalized or "microempreendedor" in normalized:
+        return [
+            {"id": "mei_f_01", "prompt": "mulher empreendedora, cerca de 35 anos, pele morena clara, cabelo cacheado preso, avental de trabalho"},
+            {"id": "mei_m_01", "prompt": "homem empreendedor, cerca de 40 anos, pele parda, camisa casual, organizando caixa e estoque"},
+            {"id": "mei_dupla_01", "prompt": "dupla de socios, homem e mulher, perfis brasileiros diversos, em rotina real de pequeno negocio"},
+            {"id": "mei_f_02", "prompt": "mulher madura empreendedora, cerca de 50 anos, postura confiante, atendimento no balcao"},
+            {"id": "mei_m_02", "prompt": "homem jovem empreendedor, cerca de 28 anos, estilo casual, usando celular e caderno de pedidos"},
+            {"id": "mei_dupla_02", "prompt": "duas mulheres socias, perfis diferentes, ambiente de loja com movimento"},
+        ]
+    if "empresario" in normalized or "gestor" in normalized or "pj" in normalized:
+        return [
+            {"id": "pj_f_01", "prompt": "gestora executiva, cerca de 38 anos, blazer azul, liderando reuniao com equipe diversa"},
+            {"id": "pj_m_01", "prompt": "gestor comercial, cerca de 45 anos, camisa social sem gravata, analisando indicadores"},
+            {"id": "pj_dupla_01", "prompt": "casal de socios em decisao estrategica, aparencia brasileira contemporanea"},
+            {"id": "pj_f_02", "prompt": "lider feminina negra, cerca de 42 anos, ambiente corporativo moderno com quadro de planejamento"},
+            {"id": "pj_m_02", "prompt": "lider masculino pardo, cerca de 33 anos, postura colaborativa com time ao fundo"},
+            {"id": "pj_grupo_01", "prompt": "grupo executivo diverso em ambiente moderno, foco em colaboracao e resultado"},
+        ]
+    return [
+        {"id": "pf_f_01", "prompt": "mulher jovem adulta, cerca de 29 anos, cabelo castanho curto, visual casual, revisando contas"},
+        {"id": "pf_m_01", "prompt": "homem adulto, cerca de 34 anos, pele negra, camiseta clara, atitude de recomeco financeiro"},
+        {"id": "pf_f_02", "prompt": "mulher madura, cerca de 47 anos, cabelo ondulado, expressao de alivio e confianca"},
+        {"id": "pf_casal_01", "prompt": "casal brasileiro de faixa etaria entre 30 e 40 anos, planejando vida financeira"},
+        {"id": "pf_grupo_01", "prompt": "grupo de tres pessoas brasileiras diversas em consultoria financeira humanizada"},
+        {"id": "pf_f_03", "prompt": "mulher negra, cerca de 31 anos, sorriso discreto, comemorando conquista de credito"},
+        {"id": "pf_m_02", "prompt": "homem pardo, cerca de 41 anos, postura serena, organizando documentos e celular"},
+        {"id": "pf_f_04", "prompt": "mulher de perfil nordestino, cerca de 36 anos, ambiente domestico acolhedor, atitude otimista"},
+    ]
+
+
+def _select_cast_profile(seed: str, publico: str, recent_cast_ids: Optional[List[str]] = None) -> Dict[str, str]:
+    pool = _cast_profile_pool(publico)
+    if not pool:
+        return {"id": "default_cast", "prompt": "pessoa brasileira diversa em contexto financeiro real"}
+
+    recent = {str(item).strip() for item in (recent_cast_ids or []) if str(item).strip()}
+    fresh_pool = [profile for profile in pool if profile.get("id") not in recent]
+    candidates = fresh_pool or pool
+    ids = [str(item.get("id") or "") for item in candidates]
+    selected_id = _stable_pick(seed, "cast_profile", ids)
+    for profile in candidates:
+        if str(profile.get("id") or "") == selected_id:
+            return profile
+    return candidates[0]
+
+
+def _scene_profile_pool(publico: str) -> List[Dict[str, str]]:
+    normalized = _normalize_key(publico)
+    if "mei" in normalized or "microempreendedor" in normalized:
+        return [
+            {"id": "scene_mei_balcao", "prompt": "cena em balcao de pequeno comercio com atendimento real e fluxo de clientes"},
+            {"id": "scene_mei_estoque", "prompt": "cena de organizacao de estoque e controle financeiro de loja de bairro"},
+            {"id": "scene_mei_servico", "prompt": "cena de prestador de servicos em atividade com materiais de trabalho reais"},
+            {"id": "scene_mei_parceria", "prompt": "cena de socios discutindo estrategia de crescimento em negocio local"},
+            {"id": "scene_mei_delivery", "prompt": "cena de pequena operacao de delivery com controle de pedidos e caixa"},
+            {"id": "scene_mei_feira", "prompt": "cena de empreendedor em ponto de venda popular com atendimento humano"},
+            {"id": "scene_mei_contabilidade", "prompt": "cena de revisao de contas e pagamentos em escritorio simples de microempresa"},
+            {"id": "scene_mei_consultoria", "prompt": "cena de microempreendedor recebendo orientacao financeira pratica"},
+        ]
+    if "empresario" in normalized or "gestor" in normalized or "pj" in normalized:
+        return [
+            {"id": "scene_pj_reuniao", "prompt": "cena de reuniao executiva com equipe diversa e decisao de negocio"},
+            {"id": "scene_pj_planejamento", "prompt": "cena de planejamento estrategico com indicadores e quadro de metas"},
+            {"id": "scene_pj_negociacao", "prompt": "cena de negociacao comercial em ambiente corporativo moderno"},
+            {"id": "scene_pj_colaboracao", "prompt": "cena de colaboracao entre liderancas em espaco de negocios contemporaneo"},
+            {"id": "scene_pj_operacao", "prompt": "cena de lider acompanhando operacao de equipe em ambiente empresarial ativo"},
+            {"id": "scene_pj_financeiro", "prompt": "cena de tomada de decisao financeira com documentos e dashboard real"},
+            {"id": "scene_pj_parceria", "prompt": "cena de handshake comercial em ambiente profissional sem estereotipo rigido"},
+            {"id": "scene_pj_salao", "prompt": "cena de encontro de socios em espaco de coworking com foco em expansao"},
+        ]
+    return [
+        {"id": "scene_pf_residencial", "prompt": "cena residencial brasileira organizada com foco em reorganizacao financeira"},
+        {"id": "scene_pf_consultoria", "prompt": "cena de atendimento de consultoria financeira humanizada com relacao de confianca"},
+        {"id": "scene_pf_comercio", "prompt": "cena de rotina urbana com pequenos gastos e planejamento de pagamento"},
+        {"id": "scene_pf_recomeco", "prompt": "cena de recomeço financeiro com expressao de alivio e objetivo claro"},
+        {"id": "scene_pf_familia", "prompt": "cena familiar planejando objetivos financeiros e retomada de credito"},
+        {"id": "scene_pf_autonomo", "prompt": "cena de trabalhador autonomo organizando contas e cobrancas no celular"},
+        {"id": "scene_pf_bairro", "prompt": "cena em comercio de bairro com cliente resolvendo pendencias financeiras"},
+        {"id": "scene_pf_planejamento", "prompt": "cena de pessoa montando planejamento mensal com caderno e app financeiro"},
+    ]
+
+
+def _select_scene_profile(seed: str, publico: str, recent_scene_ids: Optional[List[str]] = None) -> Dict[str, str]:
+    pool = _scene_profile_pool(publico)
+    if not pool:
+        return {"id": "scene_default", "prompt": "cena financeira brasileira autentica e humana"}
+
+    recent = {str(item).strip() for item in (recent_scene_ids or []) if str(item).strip()}
+    fresh_pool = [profile for profile in pool if profile.get("id") not in recent]
+    candidates = fresh_pool or pool
+    ids = [str(item.get("id") or "") for item in candidates]
+    selected_id = _stable_pick(seed, "scene_profile", ids)
+    for profile in candidates:
+        if str(profile.get("id") or "") == selected_id:
+            return profile
+    return candidates[0]
+
+
+def _persona_scene_variant(seed: str, publico: str) -> str:
+    normalized = _normalize_key(publico)
+    if "mei" in normalized or "microempreendedor" in normalized:
+        personas = [
+            "mulher empreendedora de bairro gerindo caixa e atendimento",
+            "homem empreendedor local organizando estoque e financeiro",
+            "dupla de socios de pequeno negocio em rotina real",
+            "empreendedora madura com foco em reestruturacao do negocio",
+        ]
+        ambientes = [
+            "pequeno comercio brasileiro em horario de atendimento",
+            "loja de rua com movimento moderado",
+            "balcao de servicos com materiais de trabalho reais",
+            "ambiente de oficina ou atelie com atividade em andamento",
+        ]
+    elif "empresario" in normalized or "gestor" in normalized or "pj" in normalized:
+        personas = [
+            "gestora de empresa em reuniao objetiva com equipe diversa",
+            "gestor comercial analisando indicadores com apoio de time",
+            "casal de socios em decisao estrategica no escritorio moderno",
+            "lider executivo com equipe multidisciplinar em ambiente corporativo contemporaneo",
+        ]
+        ambientes = [
+            "sala de reuniao com luz natural e clima colaborativo",
+            "espaco corporativo moderno sem estereotipo rigido",
+            "ambiente profissional com quadro de planejamento e time em acao",
+            "hub de negocios com atmosfera dinamica e realista",
+        ]
+    else:
+        personas = [
+            "mulher jovem adulta confiante revisando contas e metas pessoais",
+            "homem adulto em recomeÃ§o financeiro com postura otimista",
+            "casal brasileiro planejando organizacao financeira da familia",
+            "pessoa negra em destaque celebrando conquista de credito",
+            "mulher madura com documentos organizados e expressao de alivio",
+            "grupo diverso de pessoas em orientacao financeira pratica",
+        ]
+        ambientes = [
+            "ambiente residencial brasileiro organizado e acolhedor",
+            "mesa de atendimento com consultoria financeira humanizada",
+            "espaco urbano cotidiano com elementos financeiros discretos",
+            "ambiente comercial neutro com foco em atendimento humano",
+            "cenario de rotina real com documentos e celular em uso",
+        ]
+
+    acoes = [
+        "interagindo com documentos e celular de forma natural",
+        "conversando com consultor em postura colaborativa",
+        "celebrando resultado financeiro com linguagem corporal autentica",
+        "planejando proximo passo com foco e tranquilidade",
+    ]
+
+    persona = _stable_pick(seed, "persona", personas)
+    ambiente = _stable_pick(seed, "ambiente", ambientes)
+    acao = _stable_pick(seed, "acao", acoes)
+    return f"{persona}; {ambiente}; {acao}"
+
+
 def _resolve_image_size_from_format(formato: str) -> str:
     normalized = _normalize_formato_value(formato or "4:5")
     if normalized in ("4:5", "9:16"):
@@ -807,6 +987,9 @@ def _build_scene_seed(fields: Dict[str, str], modo: str) -> str:
 
     theme_hint = _theme_scene_hint(tema, objetivo, oferta)
     audience_hint = _audience_scene_hint(publico)
+    seed = f"{modo}|{tema}|{objetivo}|{publico}|{oferta}"
+    persona_variant = _persona_scene_variant(seed, publico)
+    composition_variant = _composition_variant(seed)
     scene_parts: List[str] = [f"cena publicitaria realista com {brand_style}", f"foco em {objetivo}", f"publico {publico}"]
     if tema:
         scene_parts.append(f"tema {tema}")
@@ -814,12 +997,14 @@ def _build_scene_seed(fields: Dict[str, str], modo: str) -> str:
         scene_parts.append(f"mensagem visual de oferta {oferta}")
     scene_parts.append(f"direcao visual {theme_hint}")
     scene_parts.append(f"perfil humano {audience_hint}")
+    scene_parts.append(f"elenco sugerido {persona_variant}")
+    scene_parts.append(f"enquadramento sugerido {composition_variant}")
 
     merged = " | ".join(scene_parts)
     low = _normalize_key(merged)
     if "escritorio" not in low and "terno" not in low and "corporativo" not in low:
         merged += " | evitar homem de terno e escritorio como padrao"
-    return _sanitize_prompt(merged, 240)
+    return _sanitize_prompt(merged, 420)
 
 
 def _build_campaign_quick_plan(modo: str, fields: Dict[str, str]) -> str:
@@ -981,10 +1166,10 @@ def _extract_phone_candidate(texto: str) -> Optional[str]:
 
 
 def _extract_cliente_nome(texto: str) -> Optional[str]:
-    match = re.search(r"cliente\s+([A-Za-zÀ-ÿ0-9 ]{2,80})", texto or "", flags=re.IGNORECASE)
+    match = re.search(r"cliente\s+([A-Za-zÃ€-Ã¿0-9 ]{2,80})", texto or "", flags=re.IGNORECASE)
     if not match:
         return None
-    raw = re.split(r"\b(amanha|hoje|as|às|no|na|dia|whatsapp)\b", match.group(1), flags=re.IGNORECASE)[0]
+    raw = re.split(r"\b(amanha|hoje|as|Ã s|no|na|dia|whatsapp)\b", match.group(1), flags=re.IGNORECASE)[0]
     cleaned = " ".join(raw.split()).strip(" -,:;")
     return cleaned if len(cleaned) >= 2 else None
 
@@ -1169,6 +1354,82 @@ async def _save_campaign_record(
         },
     )
     return campaign_id
+
+
+async def _get_recent_campaign_cast_ids(
+    db: AsyncSession,
+    user_id: Optional[UUID],
+    modo: str,
+    limit: int = 10,
+) -> List[str]:
+    if not user_id:
+        return []
+
+    await _ensure_campaigns_table(db)
+    result = await db.execute(
+        text(
+            """
+            SELECT overlay_json
+            FROM viva_campanhas
+            WHERE user_id = :user_id AND modo = :modo
+            ORDER BY created_at DESC
+            LIMIT :limit
+            """
+        ),
+        {
+            "user_id": str(user_id),
+            "modo": modo,
+            "limit": max(1, min(int(limit), 30)),
+        },
+    )
+    rows = result.fetchall()
+    cast_ids: List[str] = []
+    for row in rows:
+        overlay_raw = row.overlay_json if hasattr(row, "overlay_json") else None
+        overlay = _safe_json(overlay_raw, {})
+        cast_profile = overlay.get("cast_profile") if isinstance(overlay, dict) else {}
+        cast_id = str(cast_profile.get("id") if isinstance(cast_profile, dict) else "").strip()
+        if cast_id and cast_id not in cast_ids:
+            cast_ids.append(cast_id)
+    return cast_ids
+
+
+async def _get_recent_campaign_scene_ids(
+    db: AsyncSession,
+    user_id: Optional[UUID],
+    modo: str,
+    limit: int = 10,
+) -> List[str]:
+    if not user_id:
+        return []
+
+    await _ensure_campaigns_table(db)
+    result = await db.execute(
+        text(
+            """
+            SELECT overlay_json
+            FROM viva_campanhas
+            WHERE user_id = :user_id AND modo = :modo
+            ORDER BY created_at DESC
+            LIMIT :limit
+            """
+        ),
+        {
+            "user_id": str(user_id),
+            "modo": modo,
+            "limit": max(1, min(int(limit), 30)),
+        },
+    )
+    rows = result.fetchall()
+    scene_ids: List[str] = []
+    for row in rows:
+        overlay_raw = row.overlay_json if hasattr(row, "overlay_json") else None
+        overlay = _safe_json(overlay_raw, {})
+        scene_profile = overlay.get("scene_profile") if isinstance(overlay, dict) else {}
+        scene_id = str(scene_profile.get("id") if isinstance(scene_profile, dict) else "").strip()
+        if scene_id and scene_id not in scene_ids:
+            scene_ids.append(scene_id)
+    return scene_ids
 
 
 async def _ensure_chat_tables(db: AsyncSession) -> None:
@@ -1565,12 +1826,12 @@ def _extract_overlay_source(texto: str) -> str:
 def _brand_guardrail(modo: str) -> str:
     if modo == "FC":
         return (
-            "Marca FC Soluções Financeiras. Paleta obrigatória: #071c4a, #00a3ff, #010a1c, #f9feff. "
-            "Não usar verde. Tom corporativo premium."
+            "Marca FC SoluÃ§Ãµes Financeiras. Paleta obrigatÃ³ria: #071c4a, #00a3ff, #010a1c, #f9feff. "
+            "NÃ£o usar verde. Tom corporativo premium."
         )
     return (
-        "Marca RezetaBrasil. Paleta obrigatória: #1E3A5F, #3DAA7F, #2A8B68, #FFFFFF. "
-        "Tom humano, confiável e promocional."
+        "Marca RezetaBrasil. Paleta obrigatÃ³ria: #1E3A5F, #3DAA7F, #2A8B68, #FFFFFF. "
+        "Tom humano, confiÃ¡vel e promocional."
     )
 
 
@@ -1639,7 +1900,7 @@ def _fallback_copy(texto: str, modo: str) -> Dict[str, Any]:
         "bullets": [_sanitize_prompt(item, 80) for item in (bullet_lines[:5] or default_bullets)],
         "quote": _sanitize_prompt(quote, 120) if quote else "",
         "cta": _sanitize_prompt(cta, 40),
-        "scene": _sanitize_prompt(scene, 240),
+        "scene": _sanitize_prompt(scene, 420),
     }
 
 
@@ -1655,6 +1916,7 @@ async def _generate_campaign_copy(
     inferred = _infer_campaign_fields_from_free_text(fonte)
     fields = _apply_campaign_defaults({**explicit, **inferred})
     scene_seed = _build_scene_seed(fields, modo)
+    human_seed = _persona_scene_variant(f"{modo}|{fonte}", str(fields.get("publico") or ""))
 
     if modo == "REZETA":
         guardrail = (
@@ -1672,7 +1934,8 @@ async def _generate_campaign_copy(
         "Voce e diretor(a) de criacao de campanhas financeiras. "
         "Responda apenas JSON valido e siga o brief. "
         "Nunca imponha homem de terno ou escritorio como padrao, "
-        "a menos que o brief peca isso explicitamente."
+        "a menos que o brief peca isso explicitamente. "
+        "Varie personagens, faixa etaria, genero aparente, etnia e composicao entre campanhas."
     )
 
     brand_reference = _sanitize_prompt(prompt_extra_image or "", 1800)
@@ -1682,20 +1945,29 @@ async def _generate_campaign_copy(
         f"Campos inferidos: objetivo={fields.get('objetivo')}; publico={fields.get('publico')}; "
         f"formato={fields.get('formato')}; tema={fields.get('tema')}; oferta={fields.get('oferta')}; cta={fields.get('cta')}.\n"
         f"Seed de cena: {scene_seed}\n"
+        f"Seed humana obrigatoria: {human_seed}\n"
         f"Referencia de marca: {brand_reference or 'nao informada'}\n\n"
         "Retorne JSON com chaves exatas:\n"
         "headline, subheadline, bullets (array 3-5), quote, cta, scene.\n"
-        "scene deve refletir o tema/oferta do brief sem texto na imagem."
+        "scene deve refletir o tema/oferta do brief sem texto na imagem e sem repetir o mesmo perfil humano de campanhas recentes."
     )
 
-    resposta = await openai_service.chat(
-        [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        temperature=0.35,
-        max_tokens=800,
-    )
+    try:
+        resposta = await openai_service.chat(
+            [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            temperature=0.6,
+            max_tokens=800,
+        )
+    except Exception as exc:
+        logger.warning("viva_campaign_copy_fallback_exception: %s", repr(exc))
+        return baseline
+
+    if str(resposta or "").strip().lower().startswith("erro openai chat:"):
+        logger.warning("viva_campaign_copy_fallback_model_error: %s", str(resposta)[:280])
+        return baseline
 
     parsed = _extract_json_block(resposta)
     if not parsed:
@@ -1716,12 +1988,12 @@ async def _generate_campaign_copy(
         "bullets": bullets or baseline["bullets"],
         "quote": _sanitize_prompt(str(parsed.get("quote") or baseline.get("quote") or ""), 120),
         "cta": _sanitize_prompt(str(parsed.get("cta") or baseline["cta"]), 40),
-        "scene": _sanitize_prompt(str(parsed.get("scene") or baseline["scene"]), 240),
+        "scene": _sanitize_prompt(str(parsed.get("scene") or baseline["scene"]), 420),
     }
 
 
 def _build_branded_background_prompt(modo: str, campaign_copy: Dict[str, Any], variation_id: str) -> str:
-    scene = _sanitize_prompt(str(campaign_copy.get("scene") or ""), 240)
+    scene = _sanitize_prompt(str(campaign_copy.get("scene") or ""), 420)
     tema = _sanitize_prompt(str(campaign_copy.get("tema") or ""), 120)
     publico = _sanitize_prompt(str(campaign_copy.get("publico") or ""), 120)
     oferta = _sanitize_prompt(str(campaign_copy.get("oferta") or ""), 120)
@@ -1730,12 +2002,58 @@ def _build_branded_background_prompt(modo: str, campaign_copy: Dict[str, Any], v
 
     theme_hint = _theme_scene_hint(tema, objective, oferta)
     audience_hint = _audience_scene_hint(publico)
-    visual_variant = _composition_variant(f"{variation_id}|{tema}|{publico}|{oferta}|{scene}")
+    visual_seed = f"{variation_id}|{tema}|{publico}|{oferta}|{scene}"
+    visual_variant = _composition_variant(visual_seed)
+    persona_variant = _persona_scene_variant(visual_seed, publico)
+    mood_variant = _stable_pick(
+        visual_seed,
+        "mood",
+        [
+            "clima de conquista e alivio",
+            "energia de recomeÃ§o com confianca",
+            "postura colaborativa e orientada a resultado",
+            "tom humano acolhedor com credibilidade",
+        ],
+    )
     normalized_scene = _normalize_key(scene)
+    cast_profile = campaign_copy.get("cast_profile") if isinstance(campaign_copy.get("cast_profile"), dict) else {}
+    cast_profile_id = str(cast_profile.get("id") or "").strip()
+    cast_profile_prompt = _sanitize_prompt(str(cast_profile.get("prompt") or "").strip(), 260)
+    recent_cast_ids = campaign_copy.get("recent_cast_ids") if isinstance(campaign_copy.get("recent_cast_ids"), list) else []
+    recent_cast_ids_text = ", ".join(str(item).strip() for item in recent_cast_ids[:6] if str(item).strip())
+    scene_profile = campaign_copy.get("scene_profile") if isinstance(campaign_copy.get("scene_profile"), dict) else {}
+    scene_profile_id = str(scene_profile.get("id") or "").strip()
+    scene_profile_prompt = _sanitize_prompt(str(scene_profile.get("prompt") or "").strip(), 260)
+    recent_scene_ids = campaign_copy.get("recent_scene_ids") if isinstance(campaign_copy.get("recent_scene_ids"), list) else []
+    recent_scene_ids_text = ", ".join(str(item).strip() for item in recent_scene_ids[:6] if str(item).strip())
+    cast_block = (
+        f"Elenco obrigatorio desta peca ({cast_profile_id}): {cast_profile_prompt}. "
+        if cast_profile_prompt
+        else ""
+    )
+    scene_block = (
+        f"Cenario obrigatorio desta peca ({scene_profile_id}): {scene_profile_prompt}. "
+        if scene_profile_prompt
+        else ""
+    )
+    anti_repeat_history = (
+        f"Perfis recentes para evitar repeticao: {recent_cast_ids_text}. "
+        if recent_cast_ids_text
+        else ""
+    )
+    anti_repeat_scene_history = (
+        f"Cenarios recentes para evitar repeticao: {recent_scene_ids_text}. "
+        if recent_scene_ids_text
+        else ""
+    )
     avoid_corporate_stereotype = (
         " Evitar estereotipo de homem de terno em escritorio, salvo se a cena pedir explicitamente."
         if ("terno" not in normalized_scene and "escritorio" not in normalized_scene)
         else ""
+    )
+    anti_repeat_stereotype = (
+        "Evite repetir composicoes genericas de banco de imagem (homem sorrindo sozinho em notebook, "
+        "pessoa segurando dinheiro na mao, retrato corporativo padrao sem relacao com o tema). "
     )
     if modo == "FC":
         return (
@@ -1743,10 +2061,13 @@ def _build_branded_background_prompt(modo: str, campaign_copy: Dict[str, Any], v
             "Identidade FC: azul e branco (#071c4a, #00a3ff, #010a1c, #f9feff). "
             f"Formato final: {formato}. "
             "Sem texto, sem letras, sem logotipo. "
-            "Nao repetir personagem de geracoes anteriores; crie rosto e composicao novos nesta imagem. "
+            "Nao repetir personagem de geracoes anteriores; crie rosto, cabelo, faixa etaria e composicao novos nesta imagem. "
+            f"{cast_block}{scene_block}{anti_repeat_history}{anti_repeat_scene_history}"
+            f"{anti_repeat_stereotype}"
             f"{avoid_corporate_stereotype} "
             f"Direcao de tema: {theme_hint}. Perfil do publico: {audience_hint}. "
-            f"Variacao de enquadramento: {visual_variant}. "
+            f"Diretriz de elenco: {persona_variant}. Variacao de enquadramento: {visual_variant}. "
+            f"Humor visual: {mood_variant}. "
             f"Tema: {tema or 'institucional'}. Oferta: {oferta or 'sem oferta explicita'}. "
             f"Cena principal: {scene}. Codigo de variacao: {variation_id}"
         )
@@ -1755,10 +2076,13 @@ def _build_branded_background_prompt(modo: str, campaign_copy: Dict[str, Any], v
         "Identidade Rezeta: verde e azul (#3DAA7F, #1E3A5F, #2A8B68, #FFFFFF). "
         f"Formato final: {formato}. "
         "Sem texto, sem letras, sem logotipo. "
-        "Nao repetir personagem de geracoes anteriores; crie rosto e composicao novos nesta imagem. "
+        "Nao repetir personagem de geracoes anteriores; crie rosto, cabelo, faixa etaria e composicao novos nesta imagem. "
+        f"{cast_block}{scene_block}{anti_repeat_history}{anti_repeat_scene_history}"
+        f"{anti_repeat_stereotype}"
         f"{avoid_corporate_stereotype} "
         f"Direcao de tema: {theme_hint}. Perfil do publico: {audience_hint}. "
-        f"Variacao de enquadramento: {visual_variant}. "
+        f"Diretriz de elenco: {persona_variant}. Variacao de enquadramento: {visual_variant}. "
+        f"Humor visual: {mood_variant}. "
         f"Tema: {tema or 'institucional'}. Oferta: {oferta or 'sem oferta explicita'}. "
         f"Cena principal: {scene}. Codigo de variacao: {variation_id}"
     )
@@ -2126,11 +2450,37 @@ async def chat_with_viva(
             variation_id = uuid4().hex[:10]
 
             if effective_mode in ("FC", "REZETA"):
+                recent_cast_ids = await _get_recent_campaign_cast_ids(
+                    db=db,
+                    user_id=current_user.id,
+                    modo=effective_mode,
+                    limit=12,
+                )
+                recent_scene_ids = await _get_recent_campaign_scene_ids(
+                    db=db,
+                    user_id=current_user.id,
+                    modo=effective_mode,
+                    limit=12,
+                )
                 campaign_copy = await _generate_campaign_copy(
                     campaign_prompt_source,
                     None,
                     effective_mode,
                 )
+                cast_profile = _select_cast_profile(
+                    seed=f"{variation_id}|{campaign_prompt_source}",
+                    publico=str(campaign_copy.get("publico") or ""),
+                    recent_cast_ids=recent_cast_ids,
+                )
+                scene_profile = _select_scene_profile(
+                    seed=f"{variation_id}|scene|{campaign_prompt_source}",
+                    publico=str(campaign_copy.get("publico") or ""),
+                    recent_scene_ids=recent_scene_ids,
+                )
+                campaign_copy["cast_profile"] = cast_profile
+                campaign_copy["recent_cast_ids"] = recent_cast_ids
+                campaign_copy["scene_profile"] = scene_profile
+                campaign_copy["recent_scene_ids"] = recent_scene_ids
                 image_size = _resolve_image_size_from_format(str(campaign_copy.get("formato") or "4:5"))
                 prompt = _build_branded_background_prompt(
                     effective_mode,
@@ -2141,7 +2491,8 @@ async def chat_with_viva(
                 prompt = _build_image_prompt(None, hint, request.mensagem)
                 prompt = f"{prompt}\n{BACKGROUND_ONLY_SUFFIX}"
 
-            resultado = await openai_service.generate_image(prompt=prompt, size=image_size)
+            image_quality = "high" if effective_mode in ("FC", "REZETA") else None
+            resultado = await openai_service.generate_image(prompt=prompt, size=image_size, quality=image_quality)
             if not resultado.get("success"):
                 erro = resultado.get("error")
                 if _is_stackoverflow_error(erro):
@@ -2150,6 +2501,7 @@ async def chat_with_viva(
                     resultado = await openai_service.generate_image(
                         prompt=fallback_prompt,
                         size=image_size,
+                        quality=image_quality,
                     )
                     if resultado.get("success"):
                         url = _extract_image_url(resultado)
@@ -2623,7 +2975,7 @@ async def get_campanha(
         raise HTTPException(status_code=500, detail=f"Erro ao buscar campanha: {str(e)}")
 
 # ============================================
-# VISÃO - Análise de Imagens
+# VISÃƒO - AnÃ¡lise de Imagens
 # ============================================
 @router.post("/vision")
 async def analyze_image(
@@ -2670,7 +3022,7 @@ async def analyze_image_upload(
         raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
 
 # ============================================
-# ÁUDIO - Transcrição
+# ÃUDIO - TranscriÃ§Ã£o
 # ============================================
 @router.post("/audio/transcribe")
 async def transcribe_audio(
@@ -2699,7 +3051,7 @@ async def transcribe_audio(
         raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
 
 # ============================================
-# IMAGEM - Geração
+# IMAGEM - GeraÃ§Ã£o
 # ============================================
 @router.post("/image/generate")
 async def generate_image(
@@ -2722,7 +3074,7 @@ async def generate_image(
         raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
 
 # ============================================
-# VÍDEO - Geração
+# VÃDEO - GeraÃ§Ã£o
 # ============================================
 @router.post("/video/generate")
 async def generate_video(
@@ -2757,6 +3109,7 @@ async def viva_status(
     if settings.OPENAI_API_KEY:
         return viva_model_service.get_status()
     return viva_local_service.get_status()
+
 
 
 
