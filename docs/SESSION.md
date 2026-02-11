@@ -669,3 +669,17 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
     - `/api/v1/clientes?limit=5` => 200.
 - objetivo:
   - registrar prova viva de estado funcional antes de seguir para novos blocos de correcao.
+
+## Atualizacao da sessao (2026-02-11 - bloco adicional de baixa)
+- execucao:
+  - rodada de prova viva para baixar bugs em validacao com evidencias objetivas de API e leitura de codigo.
+- ajuste de codigo desta rodada:
+  - `backend/app/services/viva_agenda_nlu_service.py`:
+    - `parse_agenda_natural_create` passou a aceitar tambem o gatilho `agenda ...` em linguagem natural.
+- validacoes chave:
+  - persistencia de campanhas (`POST/GET /api/v1/viva/campanhas`) validada;
+  - sessao/historico do chat (`/viva/chat/session/new` + `/viva/chat/snapshot`) validada;
+  - agenda real sem loop e com filtro por usuario validada em dois usuarios QA;
+  - frase real do incidente de agendamento natural voltou a criar compromisso com sucesso.
+- resultado documental:
+  - `BUG-037`, `BUG-038`, `BUG-040`, `BUG-041`, `BUG-042`, `BUG-045`, `BUG-046`, `BUG-047`, `BUG-054`, `BUG-057`, `BUG-073` baixados para **Resolvido** em `docs/BUGSREPORT.md`.

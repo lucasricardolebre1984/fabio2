@@ -33,26 +33,26 @@
 | BUG-032 | Alta | Contratos/CADIN | Texto jurÃ­dico do CADIN estava incompleto (clÃ¡usulas ausentes) e com perda de acentuaÃ§Ã£o no preview/PDF/template, divergindo do `cadinpfpjmodelo.docx` | Resolvido |
 | BUG-033 | Alta | Contratos/Layout | Texto do preview de contrato apresentou caracteres corrompidos de acentuaÃ§Ã£o (mojibake), afetando leitura jurÃ­dica e identidade visual | Resolvido |
 | BUG-034 | Baixa | Contratos/Layout | Campo `local_assinatura` legado (ex.: texto com encoding quebrado) ainda aparecia quebrado no rodapÃ© da assinatura em preview/PDF | Resolvido |
-| BUG-037 | Alta | VIVA/Campanhas | Chat interno podia simular publicaÃ§Ã£o/links/download sem gerar e salvar arquivos reais no SaaS | Em validaÃ§Ã£o |
-| BUG-038 | MÃ©dia | VIVA/Campanhas | Menu histÃ³rico de campanhas nÃ£o estava disponÃ­vel no dashboard e imagens geradas nÃ£o ficavam persistidas para revisÃ£o | Em validaÃ§Ã£o |
+| BUG-037 | Alta | VIVA/Campanhas | Chat interno podia simular publicaÃ§Ã£o/links/download sem gerar e salvar arquivos reais no SaaS | Resolvido |
+| BUG-038 | MÃ©dia | VIVA/Campanhas | Menu histÃ³rico de campanhas nÃ£o estava disponÃ­vel no dashboard e imagens geradas nÃ£o ficavam persistidas para revisÃ£o | Resolvido |
 | BUG-039 | MÃ©dia | VIVA/Briefing | Fluxo de campanha podia travar pedindo o brief completo repetidamente quando faltava apenas CTA, sem resposta curta de continuidade | Resolvido |
-| BUG-040 | MÃ©dia | VIVA/UI | BotÃ£o `Abrir imagem` no modal da VIVA abria aba em branco/sem conteÃºdo em parte dos navegadores | Em validaÃ§Ã£o |
-| BUG-041 | MÃ©dia | VIVA/Briefing | ReferÃªncia visual anexada no chat nÃ£o era injetada no prompt final da campanha (imagem de saÃ­da sem aderÃªncia) | Em validaÃ§Ã£o |
-| BUG-042 | MÃ©dia | Campanhas/UI | BotÃ£o `Abrir imagem` em `/campanhas` podia falhar por popup/blank tab, sem preview confiÃ¡vel no SaaS | Em validaÃ§Ã£o |
+| BUG-040 | MÃ©dia | VIVA/UI | BotÃ£o `Abrir imagem` no modal da VIVA abria aba em branco/sem conteÃºdo em parte dos navegadores | Resolvido |
+| BUG-041 | MÃ©dia | VIVA/Briefing | ReferÃªncia visual anexada no chat nÃ£o era injetada no prompt final da campanha (imagem de saÃ­da sem aderÃªncia) | Resolvido |
+| BUG-042 | MÃ©dia | Campanhas/UI | BotÃ£o `Abrir imagem` em `/campanhas` podia falhar por popup/blank tab, sem preview confiÃ¡vel no SaaS | Resolvido |
 | BUG-044 | Alta | VIVA/Prompts | Drift entre `src/app/viva/PROMPTS`, `public/PROMPTS` e `docs/PROMPTS` podia carregar prompt divergente por fallback legado | Resolvido |
-| BUG-045 | Alta | VIVA/Chat | Chat interno da VIVA nÃ£o persistia sessÃ£o/histÃ³rico por usuÃ¡rio e perdia contexto ao reabrir `/viva` | Em validaÃ§Ã£o |
-| BUG-046 | Alta | VIVA/Agenda | Perguntas sobre agenda no chat interno entravam em loop de confirmaÃ§Ã£o e nÃ£o consultavam a agenda real automaticamente | Em validaÃ§Ã£o |
-| BUG-047 | Alta | Agenda/API | Listagem/consulta de agenda nÃ£o filtrava por usuÃ¡rio, com risco de exibir/editar compromissos de terceiros | Em validaÃ§Ã£o |
+| BUG-045 | Alta | VIVA/Chat | Chat interno da VIVA nÃ£o persistia sessÃ£o/histÃ³rico por usuÃ¡rio e perdia contexto ao reabrir `/viva` | Resolvido |
+| BUG-046 | Alta | VIVA/Agenda | Perguntas sobre agenda no chat interno entravam em loop de confirmaÃ§Ã£o e nÃ£o consultavam a agenda real automaticamente | Resolvido |
+| BUG-047 | Alta | Agenda/API | Listagem/consulta de agenda nÃ£o filtrava por usuÃ¡rio, com risco de exibir/editar compromissos de terceiros | Resolvido |
 | BUG-048 | Alta | Frontend/Build | `npm run build` falha por `useSearchParams()` sem `Suspense` em `/campanhas`, `/contratos/novo` e `/whatsapp/conversas` | Resolvido |
 | BUG-049 | Alta | Backend/Testes | `pytest` interrompe na coleta por `ModuleNotFoundError: app.services.glm_image_service` em `backend/test_glm.py` | Resolvido |
 | BUG-050 | Alta | Seguranca/Testes | Credenciais sensiveis hardcoded em `test_db.py` e `test_db2.py` (host, usuario e senha) | Resolvido |
 | BUG-051 | Media | Documentacao/API | `docs/DEPLOY_UBUNTU_DOCKER.md` referencia `GET /api/v1/health`, endpoint inexistente no runtime atual | Resolvido |
 | BUG-052 | Media | Documentacao/API | `docs/API.md` informa ausencia de auth em `/whatsapp-chat/*`, mas o backend exige token (`require_operador`) | Resolvido |
 | BUG-053 | Baixa | Frontend/Tooling | `npm run lint` abre wizard interativo do Next.js (ESLint nao inicializado), impedindo lint automatizado | Resolvido |
-| BUG-054 | Alta | VIVA/Persona | Contrato de persona da VIVA (concierge do Fabio) e da Viviane (secretaria humana) nao esta explicitamente separado por dominio, gerando ambiguidade de comportamento | Em validaÃ§Ã£o |
+| BUG-054 | Alta | VIVA/Persona | Contrato de persona da VIVA (concierge do Fabio) e da Viviane (secretaria humana) nao esta explicitamente separado por dominio, gerando ambiguidade de comportamento | Resolvido |
 | BUG-055 | Alta | VIVA/Prompts | Pastas/arquivos de prompt duplicados (`frontend/public/PROMPTS`, `docs/PROMPTS`, `src/app/viva/PROMPTS`) aumentam drift e confusao operacional | Resolvido |
 | BUG-056 | Alta | VIVA/Memoria | Memoria persistida existe, mas contexto do modelo no chat interno ainda depende do recorte do frontend (janela curta), sem reconstrucao server-side robusta por sessao | Resolvido |
-| BUG-057 | Media | VIVA/Agenda | Interpretacao de agenda em linguagem natural ainda depende de regex/comandos rigidos em parte dos casos, elevando atrito conversacional | Em validaÃ§Ã£o |
+| BUG-057 | Media | VIVA/Agenda | Interpretacao de agenda em linguagem natural ainda depende de regex/comandos rigidos em parte dos casos, elevando atrito conversacional | Resolvido |
 | BUG-058 | Alta | VIVA/RAG | Ausencia de camada vetorial moderna (RAG) para memoria/conhecimento evolutivo de longo prazo no piloto | Resolvido |
 | BUG-059 | Alta | Frontend/NextDev | `next dev` pode quebrar com `MODULE_NOT_FOUND` apontando para rota removida (`/api/viva/prompts/[promptId]/route`) por cache `.next` stale | Resolvido |
 | BUG-060 | Alta | Frontend/Auth+Docs | Login no front exibe erro generico para qualquer falha e README publica senha de teste divergente do runtime local | Resolvido |
@@ -68,7 +68,7 @@
 | BUG-070 | Alta | VIVA/Audio UX | Audio era transcrito no front, mas sem texto digitado a transcricao nao era enviada para `/viva/chat`, entao VIVA nao respondia ao conteudo falado | Resolvido |
 | BUG-071 | Media | VIVA/Audio UX | Gravacao de audio ainda ficava anexada aguardando Enter, em vez de fluxo direto institucional (parar > transcrever > enviar) | Resolvido |
 | BUG-072 | Media | VIVA/UI+Audio UX | Atualizacao holografica ficou pouco perceptivel (avatar dentro da area rolavel) e audio gravado durante resposta podia voltar para anexo manual | Em validacao |
-| BUG-073 | Alta | VIVA/Agenda NLU | Comando de agendamento em linguagem natural foi interpretado como consulta de agenda (nao criou compromisso) | Em validacao |
+| BUG-073 | Alta | VIVA/Agenda NLU | Comando de agendamento em linguagem natural foi interpretado como consulta de agenda (nao criou compromisso) | Resolvido |
 | BUG-074 | Media | VIVA/UI Holograma | Bloco de estilo do holograma ficava acoplado ao JSX da pagina e o cerebro 3D nao era interativo para iniciar conversa | Resolvido |
 | BUG-075 | Alta | LP/HTML | Landing page externa exibindo trecho de JavaScript como texto por bloco duplicado apos fechamento estrutural do documento | Resolvido |
 | BUG-076 | Alta | VIVA/UI Conversacao | Modo de conversacao da VIVA ficou acoplado ao chat normal (topo da pagina) em vez de ativacao dedicada por botao lateral/submenu | Em pausa (prioridade campanhas) |
@@ -79,8 +79,8 @@
 ## Atualizacao 2026-02-11 (triagem geral de status)
 
 - total no quadro: `64` bugs.
-- resolvidos: `46`.
-- pendentes/ativos/validacao/pausa: `18`.
+- resolvidos: `57`.
+- pendentes/ativos/validacao/pausa: `7`.
 - prioridade funcional atual aprovada:
   - foco em campanhas e geracao de imagem (`BUG-061`);
   - modulo conversa continua em pausa (`BUG-076`, `BUG-077`);
@@ -1074,3 +1074,34 @@
   - API read-only: health/auth/viva/agenda/clientes respondendo `200`.
 - acao:
   - estado liberado para commit de seguranca e push no branch principal.
+
+### Atualizacao 2026-02-11 (bloco adicional de baixa por prova viva)
+- validacao executada (runtime local, somente leitura + smoke API):
+  - `BUG-038`:
+    - `POST /api/v1/viva/campanhas` => `200`;
+    - `GET /api/v1/viva/campanhas?limit=20` => `200` com item salvo (`QA Persistencia Campanha`).
+  - `BUG-045`:
+    - `POST /api/v1/viva/chat/session/new` => `200`;
+    - `POST /api/v1/viva/chat` + `GET /api/v1/viva/chat/snapshot` => sessao persistida com mensagens.
+  - `BUG-046`:
+    - `POST /api/v1/viva/chat` com `como esta minha agenda hoje?` => resposta direta da agenda real (`Seus compromissos de hoje`), sem loop rigido.
+  - `BUG-047`:
+    - criacao de eventos em dois usuarios QA distintos;
+    - `GET /api/v1/agenda` por token mostrou isolamento correto (sem vazamento cruzado).
+  - `BUG-073`:
+    - frase real do incidente (`agende o Andre amanha as 10...`) voltou a criar compromisso;
+    - listagem de amanha confirmou evento criado.
+- validacao por leitura de codigo (frontend/backend):
+  - `BUG-037`: sanitizacao anti-publicacao fake confirmada por teste direto de `_sanitize_fake_asset_delivery_reply`.
+  - `BUG-040`/`BUG-042`:
+    - `Abrir imagem` usa modal interno (`setImagemAtiva`) em `frontend/src/app/viva/page.tsx` e `frontend/src/app/(dashboard)/campanhas/page.tsx`;
+    - sem `window.open`/`_blank` nesses fluxos.
+  - `BUG-041`:
+    - analise de imagem via `/viva/vision/upload` e injecao de `Referencia visual enviada pelo usuario` no payload de `/viva/chat`.
+  - `BUG-054`:
+    - persona interna separada em `viva_concierge_service.py` (VIVA concierge do Fabio);
+    - persona WhatsApp separada em `viva_ia_service.py` (Viviane consultora da Rezeta), acionada por `evolution_webhook_service.py`.
+  - `BUG-057`:
+    - parser natural reforcado para mais verbos (incluindo `agenda ...`) e tolerancia temporal; smoke confirmou criacao sem formato rigido.
+- status baixado neste bloco:
+  - `BUG-037`, `BUG-038`, `BUG-040`, `BUG-041`, `BUG-042`, `BUG-045`, `BUG-046`, `BUG-047`, `BUG-054`, `BUG-057`, `BUG-073` => **Resolvidos**.

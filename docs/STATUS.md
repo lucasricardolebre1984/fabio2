@@ -532,3 +532,14 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
   - probes read-only de API e auth => todos endpoints criticos em `200`.
 - decisao:
   - liberar snapshot de seguranca no git (`commit + push`) com estado validado.
+
+## Atualizacao Operacional (2026-02-11 - bloco de baixa por validacao)
+- rodada concluida com foco em reduzir pendencias em `Em validacao`.
+- ajuste tecnico aplicado:
+  - `backend/app/services/viva_agenda_nlu_service.py` aceitando comando natural iniciado por `agenda ...` para criacao de compromisso.
+- baixa de bugs confirmada por evidencia:
+  - API/sessao/agenda/campanhas: `BUG-038`, `BUG-045`, `BUG-046`, `BUG-047`, `BUG-073`;
+  - leitura de codigo + smoke funcional: `BUG-037`, `BUG-040`, `BUG-041`, `BUG-042`, `BUG-054`, `BUG-057`.
+- saldo atualizado:
+  - resolvidos: `57`;
+  - pendentes/ativos/pausa/validacao: `7`.

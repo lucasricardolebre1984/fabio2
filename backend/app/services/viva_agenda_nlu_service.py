@@ -256,6 +256,7 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
     if not any(
         term in normalized
         for term in (
+            "agenda",
             "agendar",
             "agende",
             "marcar",
