@@ -118,6 +118,25 @@ Atualizado em: 10/02/2026
 - Historico persistente de campanhas IA em banco (`viva_campanhas`) com data, modo, imagem e briefing.
 - Geracoes FC/REZETA no `/viva` salvam automaticamente no historico e retornam `campanha_id`.
 - Chat bloqueia resposta operacional ficticia de upload/publicacao/link quando nao houve operacao real.
+
+## Estado Contratos (2026-02-11 - piloto CNH)
+- template piloto novo habilitado: `CNH`.
+- cobertura ponta a ponta concluida:
+  - menu `/contratos`;
+  - criacao `/contratos/novo?template=cnh`;
+  - preview `/contratos/[id]`;
+  - PDF frontend e PDF backend.
+- artefatos tecnicos:
+  - `contratos/templates/cnh.json`;
+  - `backend/app/services/contrato_service.py` (fallback `cnh`);
+  - `backend/app/services/pdf_service_playwright.py` (ramo clausulas CNH);
+  - `frontend/src/app/(dashboard)/contratos/page.tsx`;
+  - `frontend/src/app/(dashboard)/contratos/novo/page.tsx`;
+  - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`;
+  - `frontend/src/lib/pdf.ts`.
+- status operacional:
+  - pronto para homologacao do cliente no piloto;
+  - proximo gate: replicar o mesmo padrao para os demais modelos padronizados enviados.
 - Briefing de campanha com contexto acumulado e destrave de CTA:
   - aceita entrada em texto livre;
   - quando faltar apenas CTA, nao repete o template completo em loop.

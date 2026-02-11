@@ -116,8 +116,28 @@ Atualizado em: 10/02/2026
 - Rollback snapshot criado antes desta fase:
   - `rollback-20260209-layout-cadin-pre`
 - Correcao institucional de branding em contratos:
-  - logo oficial `logo2.png` aplicada no preview de contrato;
-  - logo oficial aplicada na geracao PDF frontend (`frontend/src/lib/pdf.ts`);
+- logo oficial `logo2.png` aplicada no preview de contrato;
+- logo oficial aplicada na geracao PDF frontend (`frontend/src/lib/pdf.ts`);
+
+## Atualizacao tecnica (2026-02-11 - piloto template CNH)
+- objetivo da rodada:
+  - subir um modelo novo padronizado para teste antes da carga dos demais.
+- modelo piloto aplicado:
+  - `CNH` com base em `CNH.md` (fonte enviada pelo cliente).
+- entregas tecnicas:
+  - template novo criado em `contratos/templates/cnh.json`;
+  - fallback backend para template `cnh` em `backend/app/services/contrato_service.py`;
+  - fluxo de criacao habilitado no frontend (`/contratos` e `/contratos/novo?template=cnh`);
+  - preview contratual de CNH em `/contratos/[id]` com campo opcional `cnh_numero`;
+  - PDF frontend/backend com subtitulo e clausulas especificas de CNH.
+- validacoes executadas:
+  - `python -m py_compile backend/app/services/contrato_service.py backend/app/services/pdf_service_playwright.py` => OK;
+  - `frontend`: `npm run type-check` => OK;
+  - `frontend`: `npm run lint` direcionado nas telas de contrato alteradas => OK (warnings conhecidos nao bloqueantes);
+  - `frontend`: `npm run build` => compilacao concluida; warning residual de copia `standalone` no Windows sem bloquear entrega funcional.
+- status:
+  - piloto CNH pronto para validacao funcional do cliente;
+  - apos validacao visual/operacional, liberar carga dos modelos restantes no mesmo padrao.
   - logo oficial aplicada na geracao PDF backend (Playwright).
 - Inclusao do novo contrato CADIN PF/PJ:
   - template `contratos/templates/cadin.json` criado com base em `contratos/cadinpfpjmodelo.docx`;

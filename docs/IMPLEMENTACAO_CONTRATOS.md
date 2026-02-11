@@ -160,3 +160,29 @@ numeroPorExtenso(12)      # → "doze"
 
 *Documentado em: 2026-02-03*  
 *Responsável: Lucas Lebre (Automania-AI)*
+
+---
+
+## Atualizacao 2026-02-11 - Piloto CNH (modelo de teste)
+- Objetivo: subir 1 modelo padronizado ponta a ponta para homologacao antes da carga dos demais.
+- Modelo piloto: `CNH` (fonte: `C:/Users/Lucas/Downloads/CNH.md`).
+
+### Entregas aplicadas
+- Template criado: `contratos/templates/cnh.json`.
+- Fallback backend para template `cnh`: `backend/app/services/contrato_service.py`.
+- Menu de contratos com card CNH ativo: `frontend/src/app/(dashboard)/contratos/page.tsx`.
+- Fluxo de criacao com campo opcional `cnh_numero`: `frontend/src/app/(dashboard)/contratos/novo/page.tsx`.
+- Preview contratual com clausulas CNH: `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`.
+- PDF frontend/backend com ramificacao CNH:
+  - `frontend/src/lib/pdf.ts`
+  - `backend/app/services/pdf_service_playwright.py`
+
+### Validacao tecnica da rodada
+- `python -m py_compile backend/app/services/contrato_service.py backend/app/services/pdf_service_playwright.py` -> OK
+- `npm run type-check` (frontend) -> OK
+- `npm run lint` direcionado nas telas alteradas -> OK (warnings conhecidos nao bloqueantes)
+- `npm run build` (frontend) -> OK para o piloto funcional
+
+### Proximo gate
+- Homologar visual/funcional do CNH em ambiente local do Fabio.
+- Aprovado o piloto, replicar padrao para os modelos restantes.

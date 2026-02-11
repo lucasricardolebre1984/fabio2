@@ -14,10 +14,12 @@ function NovoContratoPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const templateQuery = (searchParams.get('template') || 'bacen').toLowerCase()
-  const selectedTemplate = templateQuery === 'cadin' ? 'cadin' : 'bacen'
+  const selectedTemplate = ['bacen', 'cadin', 'cnh'].includes(templateQuery) ? templateQuery : 'bacen'
   const tituloTemplate = selectedTemplate === 'cadin'
     ? 'Instrumento de PrestaÃ§Ã£o de ServiÃ§os - CADIN PF/PJ'
-    : 'Contrato de Adesao ao Bacen'
+    : selectedTemplate === 'cnh'
+      ? 'Contrato de Prestacao de Servicos - CNH Cassada e Recurso de Multas'
+      : 'Contrato de Adesao ao Bacen'
   const [loading, setLoading] = useState(false)
   const [checkingCliente, setCheckingCliente] = useState(false)
   const [error, setError] = useState('')
@@ -27,6 +29,7 @@ function NovoContratoPageContent() {
   const [formData, setFormData] = useState({
     contratante_nome: '',
     contratante_documento: '',
+    cnh_numero: '',
     contratante_email: '',
     contratante_telefone: '',
     contratante_endereco: '',
@@ -109,11 +112,16 @@ function NovoContratoPageContent() {
         valor_parcela_extenso: null,
         prazo_1_extenso: null,
         prazo_2_extenso: null,
-        dados_extras: selectedTemplate === 'cadin'
-          ? {
-              forma_pagamento: `Entrada ${formData.valor_entrada || '0'} + ${formData.qtd_parcelas || '0'} parcelas`,
-            }
-          : null,
+        dados_extras:
+          selectedTemplate === 'cadin'
+            ? {
+                forma_pagamento: `Entrada ${formData.valor_entrada || '0'} + ${formData.qtd_parcelas || '0'} parcelas`,
+              }
+            : selectedTemplate === 'cnh'
+              ? {
+                  cnh_numero: formData.cnh_numero || null,
+                }
+              : null,
       }
 
       console.log('Enviando dados:', contratoData)
@@ -211,6 +219,18 @@ function NovoContratoPageContent() {
                 <p className="text-xs text-blue-700">{clienteHint}</p>
               )}
             </div>
+
+            {selectedTemplate === 'cnh' && (
+              <div className="space-y-2">
+                <Label htmlFor="cnh_numero">Numero da CNH (opcional)</Label>
+                <Input
+                  id="cnh_numero"
+                  placeholder="00000000000"
+                  value={formData.cnh_numero}
+                  onChange={handleChange}
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

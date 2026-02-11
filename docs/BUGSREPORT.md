@@ -1132,3 +1132,28 @@
 - status desta rodada:
   - `BUG-072`, `BUG-076`, `BUG-077` => **Resolvidos**.
   - `BUG-015`, `BUG-016`, `BUG-061`, `BUG-062` => **Em validacao** (aguardando prova visual/funcional final em ambiente do Fabio).
+
+### BUG-078: Template CNH ausente no fluxo operacional de contratos
+**Data:** 2026-02-11
+**Severidade:** Media
+**Descricao:** o fluxo operacional de contratos estava disponivel com BACEN e CADIN, sem template CNH ativo ponta a ponta (menu, formulario, preview e PDF).
+**Passos:** 1. abrir `/contratos` 2. tentar criar contrato CNH 3. validar indisponibilidade de fluxo completo.
+**Esperado:** template CNH disponivel no menu, criacao em `/contratos/novo`, preview em `/contratos/[id]` e PDF institucional com clausulas CNH.
+**Atual:** fluxo CNH agora habilitado ponta a ponta para piloto institucional.
+**Status:** Resolvido
+
+### Atualizacao 2026-02-11 (execucao BUG-078 - piloto CNH)
+- backend:
+  - `contratos/templates/cnh.json` criado com estrutura institucional;
+  - fallback `cnh` adicionado em `backend/app/services/contrato_service.py`;
+  - geracao PDF backend com ramo CNH em `backend/app/services/pdf_service_playwright.py`.
+- frontend:
+  - menu de contratos habilitado com card `CNH` em `frontend/src/app/(dashboard)/contratos/page.tsx`;
+  - fluxo de novo contrato com campo adicional `cnh_numero` em `frontend/src/app/(dashboard)/contratos/novo/page.tsx`;
+  - preview contratual com clausulas CNH em `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`;
+  - PDF frontend com subtitulo e clausulas CNH em `frontend/src/lib/pdf.ts`.
+- validacao tecnica:
+  - `python -m py_compile backend/app/services/contrato_service.py backend/app/services/pdf_service_playwright.py` => OK;
+  - `frontend`: `npm run type-check` => OK;
+  - `frontend`: `npm run lint -- --file src/app/(dashboard)/contratos/page.tsx --file src/app/(dashboard)/contratos/novo/page.tsx --file src/app/(dashboard)/contratos/[id]/page.tsx --file src/lib/pdf.ts` => OK (warnings nao bloqueantes conhecidos);
+  - `frontend`: `npm run build` => compilacao concluida (com warning residual de copy standalone no Windows sem impacto no piloto CNH).

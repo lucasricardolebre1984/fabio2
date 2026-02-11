@@ -56,6 +56,14 @@ export default function ContratosMenuPage() {
           ativo: true,
         },
         {
+          id: 'cnh',
+          nome: 'Contrato CNH e Multas',
+          categoria: 'CNH',
+          descricao: 'Defesa administrativa/judicial para CNH cassada ou suspensa e recursos de multas.',
+          icone: 'scale',
+          ativo: true,
+        },
+        {
           id: 'serasa',
           nome: 'Contrato Serasa',
           categoria: 'Serasa',

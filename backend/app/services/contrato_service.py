@@ -60,6 +60,16 @@ FALLBACK_TEMPLATES: Dict[str, Dict[str, Any]] = {
         "campos": [],
         "secoes": [],
     },
+    "cnh": {
+        "id": "cnh",
+        "nome": "Contrato CNH Cassada e Recurso de Multas",
+        "tipo": "cnh",
+        "descricao": "Template institucional para defesa de CNH e multas",
+        "versao": "1.0.0",
+        "ativo": True,
+        "campos": [],
+        "secoes": [],
+    },
 }
 
 logger = logging.getLogger(__name__)
@@ -464,5 +474,4 @@ class ContratoService:
         except Exception:
             logger.exception("WeasyPrint falhou na geracao do contrato %s", contrato.id)
             return None
-
 
