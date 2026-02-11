@@ -543,3 +543,25 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
 - saldo atualizado:
   - resolvidos: `57`;
   - pendentes/ativos/pausa/validacao: `7`.
+
+## Atualizacao Operacional (2026-02-11 - fechamento do bloco final dos 7 pendentes)
+- arquitetura/backend:
+  - SQL de chat/campanhas removido do router `viva.py` e movido para repositórios dedicados:
+    - `backend/app/services/viva_chat_repository_service.py`
+    - `backend/app/services/viva_campaign_repository_service.py`
+  - objetivo: reduzir acoplamento entre rota HTTP e persistencia (passo de fatiamento do `BUG-062`).
+- campanhas:
+  - inferencia de tema livre reforcada para texto natural sem formato fixo;
+  - prompt visual com ancora obrigatoria de tema/oferta/cena + reforco de paleta por marca;
+  - variacao adicional de aparencia para reduzir repeticao de personagens.
+- UX VIVA:
+  - overlay/export da arte final com truncamento seguro (ellipsis) e mais area de texto;
+  - audio manual convertido para fluxo direto (sem anexo pendente);
+  - modo `Conversa VIVA` mantido no submenu dedicado, com avatar central e movimento 3D por ponteiro.
+- validacao tecnica:
+  - `python -m py_compile app/api/v1/viva.py app/services/viva_chat_repository_service.py app/services/viva_campaign_repository_service.py` => OK;
+  - `npm run type-check` => OK;
+  - `npm run lint -- --file src/app/viva/page.tsx` => OK (warnings nao bloqueantes de `<img>`).
+- status consolidado:
+  - resolvidos: `60`;
+  - pendentes em validacao: `4` (`BUG-015`, `BUG-016`, `BUG-061`, `BUG-062`).

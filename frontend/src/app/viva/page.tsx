@@ -153,7 +153,7 @@ const parseOverlayText = (overlay?: Mensagem['overlay']) => {
     return {
       headline: overlay.copy?.headline || 'Mensagem principal',
       subheadline: overlay.copy?.subheadline || '',
-      bullets: (overlay.copy?.bullets || []).slice(0, 6),
+      bullets: (overlay.copy?.bullets || []).slice(0, 4),
       quote: overlay.copy?.quote || '',
       cta: overlay.copy?.cta || ''
     }
@@ -183,7 +183,7 @@ const parseOverlayText = (overlay?: Mensagem['overlay']) => {
   return {
     headline: clamp(headline, 140),
     subheadline: clamp(subheadline, 200),
-    bullets: bulletLines.slice(0, 6).map(line => clamp(line, 140)),
+    bullets: bulletLines.slice(0, 4).map(line => clamp(line, 140)),
     quote: clamp(quote || '', 180),
     cta: ''
   }
@@ -303,6 +303,7 @@ export default function VivaChatPage() {
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textAreaRef = useRef<HTMLTextAreaElement>(null)
+  const holoStageRef = useRef<HTMLDivElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const audioChunksRef = useRef<BlobPart[]>([])
@@ -886,6 +887,20 @@ export default function VivaChatPage() {
     if (!files) return
     if (tipo === 'audio') {
       setErroAudio(null)
+      const selectedAudio = Array.from(files)[0]
+      if (selectedAudio) {
+        const queuedAudio: ComposerAnexo = { file: selectedAudio, tipo: 'audio' }
+        if (loading) {
+          setPendingAudioAutoSend(queuedAudio)
+        } else {
+          void handleSend({
+            anexosOverride: [queuedAudio],
+            textoOverride: ''
+          })
+        }
+      }
+      e.target.value = ''
+      return
     }
 
     Array.from(files).forEach(file => {
@@ -960,38 +975,65 @@ export default function VivaChatPage() {
     maxLines?: number,
     maxY?: number
   ) => {
-    const words = text.split(' ')
-    let line = ''
-    let lines = 0
-    let currentY = y
+    const words = String(text || '').trim().split(/\s+/).filter(Boolean)
+    if (words.length === 0) return y
 
-    words.forEach(word => {
-      if (maxY && currentY > maxY) return
+    const lines: string[] = []
+    let line = ''
+    let truncated = false
+
+    for (let i = 0; i < words.length; i += 1) {
+      const word = words[i]
       const testLine = `${line}${word} `
       const metrics = ctx.measureText(testLine)
+
       if (metrics.width > maxWidth && line) {
-        if (maxY && currentY > maxY) {
-          line = ''
-          return
-        }
-        ctx.fillText(line.trim(), x, currentY)
+        lines.push(line.trim())
         line = `${word} `
-        currentY += lineHeight
-        lines += 1
-        if (maxLines && lines >= maxLines) {
-          line = ''
+        if (maxLines && lines.length >= maxLines) {
+          truncated = true
+          break
         }
       } else {
         line = testLine
       }
-    })
+    }
 
-    if (line && (!maxLines || lines < maxLines) && (!maxY || currentY <= maxY)) {
-      ctx.fillText(line.trim(), x, currentY)
+    if (!truncated && line.trim()) {
+      lines.push(line.trim())
+    }
+
+    let currentY = y
+    const allowedLines: string[] = []
+    for (const candidate of lines) {
+      if (maxY && currentY > maxY) {
+        truncated = true
+        break
+      }
+      allowedLines.push(candidate)
       currentY += lineHeight
     }
 
-    return currentY
+    if (allowedLines.length > 0) {
+      const lastIndex = allowedLines.length - 1
+      if (truncated) {
+        let ellipsisLine = allowedLines[lastIndex]
+        while (ctx.measureText(`${ellipsisLine}...`).width > maxWidth && ellipsisLine.length > 3) {
+          ellipsisLine = ellipsisLine.slice(0, -1).trimEnd()
+        }
+        allowedLines[lastIndex] = `${ellipsisLine}...`
+      }
+
+      let drawY = y
+      for (const ln of allowedLines) {
+        if (maxY && drawY > maxY) break
+        ctx.fillText(ln, x, drawY)
+        drawY += lineHeight
+      }
+      return drawY
+    }
+
+    return y
   }
 
   const exportarArte = async () => {
@@ -1027,8 +1069,8 @@ export default function VivaChatPage() {
 
       ctx.drawImage(image, 0, 0, width, height)
 
-      const topHeight = Math.round(height * 0.32)
-      const bottomHeight = Math.round(height * 0.4)
+      const topHeight = Math.round(height * 0.36)
+      const bottomHeight = Math.round(height * 0.44)
       const margin = Math.round(width * 0.06)
       const topMaxY = topHeight - Math.round(width * 0.02)
       const bottomStartY = height - bottomHeight + Math.round(bottomHeight * 0.2)
@@ -1152,6 +1194,25 @@ export default function VivaChatPage() {
     lastSpokenMessageIdRef.current = ultimaMensagemIA?.id || null
   }
 
+  const handleHoloPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const stage = holoStageRef.current
+    if (!stage) return
+    const rect = stage.getBoundingClientRect()
+    const x = (event.clientX - rect.left) / rect.width
+    const y = (event.clientY - rect.top) / rect.height
+    const rotateY = ((x - 0.5) * 16).toFixed(2)
+    const rotateX = ((0.5 - y) * 12).toFixed(2)
+    stage.style.setProperty('--holo-tilt-y', `${rotateY}deg`)
+    stage.style.setProperty('--holo-tilt-x', `${rotateX}deg`)
+  }
+
+  const resetHoloTilt = () => {
+    const stage = holoStageRef.current
+    if (!stage) return
+    stage.style.setProperty('--holo-tilt-y', '0deg')
+    stage.style.setProperty('--holo-tilt-x', '0deg')
+  }
+
   return (
     <>
       <div className="flex h-[calc(100vh-4rem)]">
@@ -1253,9 +1314,12 @@ export default function VivaChatPage() {
           <div className="flex-1 flex items-center justify-center p-6 bg-[radial-gradient(circle_at_top,rgba(125,211,252,0.2),rgba(248,250,252,0.96)_52%)]">
             <div className="flex flex-col items-center">
               <div
+                ref={holoStageRef}
                 className={`holo-stage ${assistenteFalando ? 'is-active' : ''}`}
                 role="img"
                 aria-label="Avatar holografico da VIVA"
+                onPointerMove={handleHoloPointerMove}
+                onPointerLeave={resetHoloTilt}
               >
                 <div className="holo-grid" />
                 <span className="holo-ring holo-ring-1" />
@@ -1633,7 +1697,7 @@ export default function VivaChatPage() {
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
                     />
-                    <div className="absolute inset-x-0 top-0 h-[32%] overflow-y-auto bg-white/88 px-5 py-4">
+                    <div className="absolute inset-x-0 top-0 h-[36%] overflow-y-auto bg-white/90 px-5 py-4">
                       <p className="text-xs uppercase tracking-widest" style={{ color: theme.accent }}>
                         {theme.label}
                       </p>
@@ -1647,7 +1711,7 @@ export default function VivaChatPage() {
                       )}
                     </div>
                     <div
-                      className="absolute inset-x-0 bottom-0 h-[40%] overflow-y-auto px-5 py-4 text-white"
+                      className="absolute inset-x-0 bottom-0 h-[44%] overflow-y-auto px-5 py-4 text-white"
                       style={{
                         background: `linear-gradient(90deg, ${theme.dark}e6, ${theme.accent}e6)`
                       }}

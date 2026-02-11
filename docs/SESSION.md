@@ -683,3 +683,26 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
   - frase real do incidente de agendamento natural voltou a criar compromisso com sucesso.
 - resultado documental:
   - `BUG-037`, `BUG-038`, `BUG-040`, `BUG-041`, `BUG-042`, `BUG-045`, `BUG-046`, `BUG-047`, `BUG-054`, `BUG-057`, `BUG-073` baixados para **Resolvido** em `docs/BUGSREPORT.md`.
+
+## Atualizacao da sessao (2026-02-11 - bloco final dos 7 pendentes)
+- backend:
+  - `backend/app/api/v1/viva.py` desacoplado de SQL direto de chat/campanhas;
+  - novos repositorios:
+    - `backend/app/services/viva_chat_repository_service.py`
+    - `backend/app/services/viva_campaign_repository_service.py`
+  - campanhas:
+    - inferencia de tema livre reforcada (`_extract_unstructured_theme`);
+    - prompt de imagem com ancora obrigatoria de tema/oferta/cena;
+    - variacao adicional de aparencia para reduzir repeticao de personagem.
+- frontend:
+  - `frontend/src/app/viva/page.tsx`:
+    - overlay/export mais resiliente a texto longo (ellipsis + areas ampliadas);
+    - audio manual em fluxo direto (selecionou -> transcreveu/enviou);
+    - modo `Conversa VIVA` mantido no submenu dedicado com holograma 3D e tilt por ponteiro.
+- validacao tecnica:
+  - `python -m py_compile app/api/v1/viva.py app/services/viva_chat_repository_service.py app/services/viva_campaign_repository_service.py` => OK;
+  - `npm run type-check` => OK;
+  - `npm run lint -- --file src/app/viva/page.tsx` => OK (warnings nao bloqueantes de `<img>`).
+- status consolidado:
+  - resolvidos: `BUG-072`, `BUG-076`, `BUG-077`;
+  - em validacao final: `BUG-015`, `BUG-016`, `BUG-061`, `BUG-062`.

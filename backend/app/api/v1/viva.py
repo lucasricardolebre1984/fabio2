@@ -27,6 +27,8 @@ from app.services.viva_agenda_nlu_service import viva_agenda_nlu_service
 from app.services.viva_handoff_service import viva_handoff_service
 from app.services.viva_capabilities_service import viva_capabilities_service
 from app.services.viva_memory_service import viva_memory_service
+from app.services.viva_chat_repository_service import viva_chat_repository_service
+from app.services.viva_campaign_repository_service import viva_campaign_repository_service
 from app.services.openai_service import openai_service
 from app.config import settings
 
@@ -430,6 +432,46 @@ def _clean_extracted_value(value: str) -> str:
     return cleaned.strip(" ,.;:-")
 
 
+def _extract_unstructured_theme(texto: str) -> Optional[str]:
+    raw = str(texto or "").strip()
+    if not raw:
+        return None
+
+    # Primeiro, tenta capturar trecho natural apos "campanha de/do/da/para ...".
+    campaign_match = re.search(
+        r"campanha\s+(?:de|do|da|para)\s+(.{3,140}?)(?=\s+(?:com|objetivo|publico|formato|cta|oferta|promocao|promo|desconto)\b|[,\n|;:.]|$)",
+        raw,
+        flags=re.IGNORECASE,
+    )
+    if campaign_match:
+        candidate = _clean_extracted_value(str(campaign_match.group(1)))
+        if len(candidate.split()) >= 2:
+            return candidate
+
+    noise = {
+        "vou", "quero", "preciso", "fazer", "criar", "gerar", "campanha", "imagem", "arte",
+        "post", "banner", "um", "uma", "de", "do", "da", "para", "pra", "com", "por",
+        "objetivo", "publico", "formato", "cta", "oferta", "promocao", "promo", "desconto",
+        "marca", "fc", "rezeta", "solucoes", "financeiras", "brasil", "agora", "hoje",
+    }
+    segments = re.split(r"[|\n;,]+", raw)
+    for segment in segments:
+        normalized = _normalize_key(segment)
+        if not normalized:
+            continue
+        if any(
+            f"{label} " in f"{normalized} "
+            for label in ("objetivo", "publico", "formato", "cta", "oferta")
+        ):
+            continue
+        normalized = re.sub(r"\b\d{1,2}\s*%\b.*", "", normalized).strip()
+        tokens = [tok for tok in normalized.split() if tok not in noise]
+        if len(tokens) >= 2:
+            return _clean_extracted_value(" ".join(tokens[:8]))
+
+    return None
+
+
 def _is_affirmative(texto: str) -> bool:
     normalized = _normalize_key(texto)
     return normalized in {
@@ -661,6 +703,10 @@ def _infer_campaign_fields_from_free_text(texto: str) -> Dict[str, str]:
             )
             if campaign_theme_match and str(campaign_theme_match.group(1) or "").strip():
                 inferred["tema"] = _clean_extracted_value(str(campaign_theme_match.group(1)))
+            else:
+                inferred_theme = _extract_unstructured_theme(texto)
+                if inferred_theme:
+                    inferred["tema"] = inferred_theme
 
     discount_match_raw = re.search(r"(\d{1,2})\s*%", texto or "", flags=re.IGNORECASE)
     discount_match_words = re.search(r"\b(\d{1,2})\s+por cento\b", normalized)
@@ -798,6 +844,17 @@ def _composition_variant(seed: str) -> str:
     ]
     idx = abs(sum(ord(ch) for ch in seed)) % len(variants)
     return variants[idx]
+
+
+def _appearance_variant(seed: str) -> str:
+    variants = [
+        "roupa casual elegante, sem figurino repetitivo de banco de imagens",
+        "visual moderno com textura de tecido e cores da marca em destaque",
+        "estilo cotidiano premium, expressao natural e postura espontanea",
+        "apresentacao humanizada com detalhes visuais brasileiros contemporaneos",
+        "linguagem visual diversa, sem repetir corte de cabelo/rosto de pecas anteriores",
+    ]
+    return _stable_pick(seed, "appearance", variants)
 
 
 def _stable_pick(seed: str, salt: str, options: List[str]) -> str:
@@ -990,9 +1047,13 @@ def _build_scene_seed(fields: Dict[str, str], modo: str) -> str:
     seed = f"{modo}|{tema}|{objetivo}|{publico}|{oferta}"
     persona_variant = _persona_scene_variant(seed, publico)
     composition_variant = _composition_variant(seed)
-    scene_parts: List[str] = [f"cena publicitaria realista com {brand_style}", f"foco em {objetivo}", f"publico {publico}"]
+    scene_parts: List[str] = [
+        f"cena publicitaria realista com {brand_style}",
+        f"foco em {objetivo}",
+        f"publico {publico}",
+    ]
     if tema:
-        scene_parts.append(f"tema {tema}")
+        scene_parts.append(f"tema central obrigatorio {tema}")
     if oferta:
         scene_parts.append(f"mensagem visual de oferta {oferta}")
     scene_parts.append(f"direcao visual {theme_hint}")
@@ -1003,7 +1064,7 @@ def _build_scene_seed(fields: Dict[str, str], modo: str) -> str:
     merged = " | ".join(scene_parts)
     low = _normalize_key(merged)
     if "escritorio" not in low and "terno" not in low and "corporativo" not in low:
-        merged += " | evitar homem de terno e escritorio como padrao"
+        merged += " | evitar homem de terno e escritorio como padrao visual"
     return _sanitize_prompt(merged, 420)
 
 
@@ -1213,49 +1274,7 @@ def _derive_campaign_title(
 
 
 async def _ensure_campaigns_table(db: AsyncSession) -> None:
-    await db.execute(
-        text(
-            """
-            CREATE TABLE IF NOT EXISTS viva_campanhas (
-                id UUID PRIMARY KEY,
-                user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-                modo VARCHAR(32) NOT NULL,
-                titulo VARCHAR(255) NOT NULL,
-                briefing TEXT,
-                mensagem_original TEXT,
-                image_url TEXT NOT NULL,
-                overlay_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-                meta_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ
-            )
-            """
-        )
-    )
-    await db.execute(
-        text(
-            """
-            CREATE INDEX IF NOT EXISTS idx_viva_campanhas_created_at
-            ON viva_campanhas(created_at DESC)
-            """
-        )
-    )
-    await db.execute(
-        text(
-            """
-            CREATE INDEX IF NOT EXISTS idx_viva_campanhas_user_id
-            ON viva_campanhas(user_id)
-            """
-        )
-    )
-    await db.execute(
-        text(
-            """
-            CREATE INDEX IF NOT EXISTS idx_viva_campanhas_modo
-            ON viva_campanhas(modo)
-            """
-        )
-    )
+    await viva_campaign_repository_service.ensure_table(db)
 
 
 def _campaign_row_to_item(row: Any) -> CampanhaItem:
@@ -1320,40 +1339,17 @@ async def _save_campaign_record(
     overlay: Optional[Dict[str, Any]],
     meta: Optional[Dict[str, Any]],
 ) -> Optional[UUID]:
-    if not image_url:
-        return None
-
-    await _ensure_campaigns_table(db)
-    campaign_id = uuid4()
-    now = datetime.now(timezone.utc)
-    await db.execute(
-        text(
-            """
-            INSERT INTO viva_campanhas (
-                id, user_id, modo, titulo, briefing, mensagem_original, image_url,
-                overlay_json, meta_json, created_at, updated_at
-            )
-            VALUES (
-                :id, :user_id, :modo, :titulo, :briefing, :mensagem_original, :image_url,
-                CAST(:overlay_json AS JSONB), CAST(:meta_json AS JSONB), :created_at, :updated_at
-            )
-            """
-        ),
-        {
-            "id": str(campaign_id),
-            "user_id": str(user_id) if user_id else None,
-            "modo": modo,
-            "titulo": _sanitize_prompt(titulo or f"Campanha {modo}", 255),
-            "briefing": briefing,
-            "mensagem_original": mensagem_original,
-            "image_url": image_url,
-            "overlay_json": json.dumps(overlay or {}, ensure_ascii=False),
-            "meta_json": json.dumps(meta or {}, ensure_ascii=False),
-            "created_at": now,
-            "updated_at": now,
-        },
+    return await viva_campaign_repository_service.save_campaign(
+        db=db,
+        user_id=user_id,
+        modo=modo,
+        titulo=_sanitize_prompt(titulo or f"Campanha {modo}", 255),
+        briefing=briefing,
+        mensagem_original=mensagem_original,
+        image_url=image_url,
+        overlay=overlay or {},
+        meta=meta or {},
     )
-    return campaign_id
 
 
 async def _get_recent_campaign_cast_ids(
@@ -1362,36 +1358,12 @@ async def _get_recent_campaign_cast_ids(
     modo: str,
     limit: int = 10,
 ) -> List[str]:
-    if not user_id:
-        return []
-
-    await _ensure_campaigns_table(db)
-    result = await db.execute(
-        text(
-            """
-            SELECT overlay_json
-            FROM viva_campanhas
-            WHERE user_id = :user_id AND modo = :modo
-            ORDER BY created_at DESC
-            LIMIT :limit
-            """
-        ),
-        {
-            "user_id": str(user_id),
-            "modo": modo,
-            "limit": max(1, min(int(limit), 30)),
-        },
+    return await viva_campaign_repository_service.get_recent_cast_ids(
+        db=db,
+        user_id=user_id,
+        modo=modo,
+        limit=limit,
     )
-    rows = result.fetchall()
-    cast_ids: List[str] = []
-    for row in rows:
-        overlay_raw = row.overlay_json if hasattr(row, "overlay_json") else None
-        overlay = _safe_json(overlay_raw, {})
-        cast_profile = overlay.get("cast_profile") if isinstance(overlay, dict) else {}
-        cast_id = str(cast_profile.get("id") if isinstance(cast_profile, dict) else "").strip()
-        if cast_id and cast_id not in cast_ids:
-            cast_ids.append(cast_id)
-    return cast_ids
 
 
 async def _get_recent_campaign_scene_ids(
@@ -1400,86 +1372,16 @@ async def _get_recent_campaign_scene_ids(
     modo: str,
     limit: int = 10,
 ) -> List[str]:
-    if not user_id:
-        return []
-
-    await _ensure_campaigns_table(db)
-    result = await db.execute(
-        text(
-            """
-            SELECT overlay_json
-            FROM viva_campanhas
-            WHERE user_id = :user_id AND modo = :modo
-            ORDER BY created_at DESC
-            LIMIT :limit
-            """
-        ),
-        {
-            "user_id": str(user_id),
-            "modo": modo,
-            "limit": max(1, min(int(limit), 30)),
-        },
+    return await viva_campaign_repository_service.get_recent_scene_ids(
+        db=db,
+        user_id=user_id,
+        modo=modo,
+        limit=limit,
     )
-    rows = result.fetchall()
-    scene_ids: List[str] = []
-    for row in rows:
-        overlay_raw = row.overlay_json if hasattr(row, "overlay_json") else None
-        overlay = _safe_json(overlay_raw, {})
-        scene_profile = overlay.get("scene_profile") if isinstance(overlay, dict) else {}
-        scene_id = str(scene_profile.get("id") if isinstance(scene_profile, dict) else "").strip()
-        if scene_id and scene_id not in scene_ids:
-            scene_ids.append(scene_id)
-    return scene_ids
 
 
 async def _ensure_chat_tables(db: AsyncSession) -> None:
-    await db.execute(
-        text(
-            """
-            CREATE TABLE IF NOT EXISTS viva_chat_sessions (
-                id UUID PRIMARY KEY,
-                user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                modo VARCHAR(32),
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                last_message_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            """
-        )
-    )
-    await db.execute(
-        text(
-            """
-            CREATE INDEX IF NOT EXISTS idx_viva_chat_sessions_user_updated
-            ON viva_chat_sessions(user_id, updated_at DESC)
-            """
-        )
-    )
-    await db.execute(
-        text(
-            """
-            CREATE TABLE IF NOT EXISTS viva_chat_messages (
-                id UUID PRIMARY KEY,
-                session_id UUID NOT NULL REFERENCES viva_chat_sessions(id) ON DELETE CASCADE,
-                user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                tipo VARCHAR(16) NOT NULL,
-                conteudo TEXT NOT NULL,
-                modo VARCHAR(32),
-                anexos_json JSONB NOT NULL DEFAULT '[]'::jsonb,
-                meta_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-            """
-        )
-    )
-    await db.execute(
-        text(
-            """
-            CREATE INDEX IF NOT EXISTS idx_viva_chat_messages_session_created
-            ON viva_chat_messages(session_id, created_at DESC)
-            """
-        )
-    )
+    await viva_chat_repository_service.ensure_tables(db)
 
 
 def _safe_json(value: Any, fallback: Any) -> Any:
@@ -1516,41 +1418,15 @@ def _serialize_media_items(items: Optional[List[MediaItem]]) -> List[Dict[str, A
 
 
 async def _create_chat_session(db: AsyncSession, user_id: UUID, modo: Optional[str]) -> UUID:
-    session_id = uuid4()
-    now = datetime.now(timezone.utc)
-    await db.execute(
-        text(
-            """
-            INSERT INTO viva_chat_sessions (id, user_id, modo, created_at, updated_at, last_message_at)
-            VALUES (:id, :user_id, :modo, :created_at, :updated_at, :last_message_at)
-            """
-        ),
-        {
-            "id": str(session_id),
-            "user_id": str(user_id),
-            "modo": _normalize_mode(modo),
-            "created_at": now,
-            "updated_at": now,
-            "last_message_at": now,
-        },
+    return await viva_chat_repository_service.create_session(
+        db=db,
+        user_id=user_id,
+        modo=_normalize_mode(modo),
     )
-    return session_id
 
 
 async def _get_latest_chat_session_row(db: AsyncSession, user_id: UUID) -> Optional[Any]:
-    result = await db.execute(
-        text(
-            """
-            SELECT id, modo
-            FROM viva_chat_sessions
-            WHERE user_id = :user_id
-            ORDER BY updated_at DESC
-            LIMIT 1
-            """
-        ),
-        {"user_id": str(user_id)},
-    )
-    return result.first()
+    return await viva_chat_repository_service.get_latest_session_row(db=db, user_id=user_id)
 
 
 async def _resolve_chat_session(
@@ -1559,51 +1435,12 @@ async def _resolve_chat_session(
     requested_session_id: Optional[UUID],
     modo: Optional[str],
 ) -> UUID:
-    normalized_mode = _normalize_mode(modo)
-
-    if requested_session_id:
-        result = await db.execute(
-            text(
-                """
-                SELECT id
-                FROM viva_chat_sessions
-                WHERE id = :id AND user_id = :user_id
-                LIMIT 1
-                """
-            ),
-            {"id": str(requested_session_id), "user_id": str(user_id)},
-        )
-        row = result.first()
-        if row:
-            await db.execute(
-                text(
-                    """
-                    UPDATE viva_chat_sessions
-                    SET modo = COALESCE(:modo, modo),
-                        updated_at = NOW()
-                    WHERE id = :id
-                    """
-                ),
-                {"id": str(requested_session_id), "modo": normalized_mode},
-            )
-            return requested_session_id
-
-    latest = await _get_latest_chat_session_row(db, user_id)
-    if latest:
-        await db.execute(
-            text(
-                """
-                UPDATE viva_chat_sessions
-                SET modo = COALESCE(:modo, modo),
-                    updated_at = NOW()
-                WHERE id = :id
-                """
-            ),
-            {"id": str(latest.id), "modo": normalized_mode},
-        )
-        return latest.id
-
-    return await _create_chat_session(db, user_id, normalized_mode)
+    return await viva_chat_repository_service.resolve_session(
+        db=db,
+        user_id=user_id,
+        requested_session_id=requested_session_id,
+        modo=_normalize_mode(modo),
+    )
 
 
 async def _append_chat_message(
@@ -1616,45 +1453,15 @@ async def _append_chat_message(
     anexos: Optional[List[Dict[str, Any]]] = None,
     meta: Optional[Dict[str, Any]] = None,
 ) -> None:
-    normalized_mode = _normalize_mode(modo)
-    await db.execute(
-        text(
-            """
-            INSERT INTO viva_chat_messages (
-                id, session_id, user_id, tipo, conteudo, modo, anexos_json, meta_json, created_at
-            )
-            VALUES (
-                :id, :session_id, :user_id, :tipo, :conteudo, :modo,
-                CAST(:anexos_json AS JSONB), CAST(:meta_json AS JSONB), NOW()
-            )
-            """
-        ),
-        {
-            "id": str(uuid4()),
-            "session_id": str(session_id),
-            "user_id": str(user_id),
-            "tipo": tipo,
-            "conteudo": conteudo,
-            "modo": normalized_mode,
-            "anexos_json": json.dumps(anexos or [], ensure_ascii=False),
-            "meta_json": json.dumps(meta or {}, ensure_ascii=False),
-        },
-    )
-    await db.execute(
-        text(
-            """
-            UPDATE viva_chat_sessions
-            SET modo = COALESCE(:modo, modo),
-                updated_at = NOW(),
-                last_message_at = NOW()
-            WHERE id = :id AND user_id = :user_id
-            """
-        ),
-        {
-            "id": str(session_id),
-            "user_id": str(user_id),
-            "modo": normalized_mode,
-        },
+    await viva_chat_repository_service.append_message(
+        db=db,
+        session_id=session_id,
+        user_id=user_id,
+        tipo=tipo,
+        conteudo=conteudo,
+        modo=_normalize_mode(modo),
+        anexos=anexos or [],
+        meta=meta or {},
     )
 
 
@@ -1687,43 +1494,15 @@ async def _load_chat_snapshot(
     session_id: UUID,
     limit: int,
 ) -> ChatSnapshotResponse:
-    result = await db.execute(
-        text(
-            """
-            SELECT id, modo
-            FROM viva_chat_sessions
-            WHERE id = :session_id AND user_id = :user_id
-            LIMIT 1
-            """
-        ),
-        {"session_id": str(session_id), "user_id": str(user_id)},
+    session_row, message_rows = await viva_chat_repository_service.load_snapshot_rows(
+        db=db,
+        user_id=user_id,
+        session_id=session_id,
+        limit=limit,
     )
-    session_row = result.first()
     if not session_row:
         return ChatSnapshotResponse(session_id=None, modo=None, messages=[])
-
-    safe_limit = min(max(limit, 1), 250)
-    messages_result = await db.execute(
-        text(
-            """
-            SELECT id, tipo, conteudo, modo, anexos_json, meta_json, created_at
-            FROM (
-                SELECT m.id, m.tipo, m.conteudo, m.modo, m.anexos_json, m.meta_json, m.created_at
-                FROM viva_chat_messages m
-                WHERE m.session_id = :session_id AND m.user_id = :user_id
-                ORDER BY m.created_at DESC
-                LIMIT :limit
-            ) recent
-            ORDER BY created_at ASC
-            """
-        ),
-        {
-            "session_id": str(session_id),
-            "user_id": str(user_id),
-            "limit": safe_limit,
-        },
-    )
-    messages = [_chat_message_from_row(row) for row in messages_result.fetchall()]
+    messages = [_chat_message_from_row(row) for row in message_rows]
     return ChatSnapshotResponse(session_id=session_row.id, modo=session_row.modo, messages=messages)
 
 
@@ -2005,6 +1784,7 @@ def _build_branded_background_prompt(modo: str, campaign_copy: Dict[str, Any], v
     visual_seed = f"{variation_id}|{tema}|{publico}|{oferta}|{scene}"
     visual_variant = _composition_variant(visual_seed)
     persona_variant = _persona_scene_variant(visual_seed, publico)
+    appearance_variant = _appearance_variant(visual_seed)
     mood_variant = _stable_pick(
         visual_seed,
         "mood",
@@ -2055,36 +1835,49 @@ def _build_branded_background_prompt(modo: str, campaign_copy: Dict[str, Any], v
         "Evite repetir composicoes genericas de banco de imagem (homem sorrindo sozinho em notebook, "
         "pessoa segurando dinheiro na mao, retrato corporativo padrao sem relacao com o tema). "
     )
+    theme_anchor = (
+        f"Tema central obrigatorio: {tema}. " if tema else "Tema central obrigatorio: contexto humano de reorganizacao financeira. "
+    )
+    offer_anchor = (
+        f"Oferta/gancho visual obrigatorio: {oferta}. " if oferta else ""
+    )
+    scene_anchor = (
+        f"Cena principal obrigatoria: {scene}. " if scene else ""
+    )
     if modo == "FC":
         return (
             "Fotografia publicitaria realista para campanha financeira no Brasil. "
             "Identidade FC: azul e branco (#071c4a, #00a3ff, #010a1c, #f9feff). "
             f"Formato final: {formato}. "
+            "Distribuicao de cor: azul/branco dominante, evitando verde como cor principal. "
             "Sem texto, sem letras, sem logotipo. "
             "Nao repetir personagem de geracoes anteriores; crie rosto, cabelo, faixa etaria e composicao novos nesta imagem. "
             f"{cast_block}{scene_block}{anti_repeat_history}{anti_repeat_scene_history}"
             f"{anti_repeat_stereotype}"
             f"{avoid_corporate_stereotype} "
+            f"{theme_anchor}{offer_anchor}{scene_anchor}"
             f"Direcao de tema: {theme_hint}. Perfil do publico: {audience_hint}. "
-            f"Diretriz de elenco: {persona_variant}. Variacao de enquadramento: {visual_variant}. "
+            f"Diretriz de elenco: {persona_variant}. Aparencia obrigatoria: {appearance_variant}. "
+            f"Variacao de enquadramento: {visual_variant}. "
             f"Humor visual: {mood_variant}. "
-            f"Tema: {tema or 'institucional'}. Oferta: {oferta or 'sem oferta explicita'}. "
-            f"Cena principal: {scene}. Codigo de variacao: {variation_id}"
+            f"Codigo de variacao: {variation_id}"
         )
     return (
         "Fotografia publicitaria realista para campanha financeira no Brasil. "
         "Identidade Rezeta: verde e azul (#3DAA7F, #1E3A5F, #2A8B68, #FFFFFF). "
         f"Formato final: {formato}. "
+        "Distribuicao de cor: verde/azul dominante, com contraste limpo e humano. "
         "Sem texto, sem letras, sem logotipo. "
         "Nao repetir personagem de geracoes anteriores; crie rosto, cabelo, faixa etaria e composicao novos nesta imagem. "
         f"{cast_block}{scene_block}{anti_repeat_history}{anti_repeat_scene_history}"
         f"{anti_repeat_stereotype}"
         f"{avoid_corporate_stereotype} "
+        f"{theme_anchor}{offer_anchor}{scene_anchor}"
         f"Direcao de tema: {theme_hint}. Perfil do publico: {audience_hint}. "
-        f"Diretriz de elenco: {persona_variant}. Variacao de enquadramento: {visual_variant}. "
+        f"Diretriz de elenco: {persona_variant}. Aparencia obrigatoria: {appearance_variant}. "
+        f"Variacao de enquadramento: {visual_variant}. "
         f"Humor visual: {mood_variant}. "
-        f"Tema: {tema or 'institucional'}. Oferta: {oferta or 'sem oferta explicita'}. "
-        f"Cena principal: {scene}. Codigo de variacao: {variation_id}"
+        f"Codigo de variacao: {variation_id}"
     )
 
 
@@ -2631,37 +2424,15 @@ async def list_chat_sessions(
     db: AsyncSession = Depends(get_db),
 ):
     """Lista sessoes de chat para recuperar contextos antigos."""
-    safe_page = max(1, page)
-    safe_size = max(1, min(page_size, 100))
-    offset = (safe_page - 1) * safe_size
     try:
         await _ensure_chat_tables(db)
-        total_result = await db.execute(
-            text("SELECT COUNT(*) FROM viva_chat_sessions WHERE user_id = :user_id"),
-            {"user_id": str(current_user.id)},
+        total, rows, safe_page, safe_size = await viva_chat_repository_service.list_sessions_rows(
+            db=db,
+            user_id=current_user.id,
+            page=page,
+            page_size=page_size,
         )
-        total = int(total_result.scalar() or 0)
-
-        rows = await db.execute(
-            text(
-                """
-                SELECT s.id, s.modo, s.created_at, s.updated_at, s.last_message_at,
-                       COALESCE(msg.cnt, 0) AS message_count
-                FROM viva_chat_sessions s
-                LEFT JOIN (
-                    SELECT session_id, COUNT(*) AS cnt
-                    FROM viva_chat_messages
-                    WHERE user_id = :user_id
-                    GROUP BY session_id
-                ) msg ON msg.session_id = s.id
-                WHERE s.user_id = :user_id
-                ORDER BY s.updated_at DESC
-                OFFSET :offset LIMIT :limit
-                """
-            ),
-            {"user_id": str(current_user.id), "offset": offset, "limit": safe_size},
-        )
-        items = [_chat_session_from_row(row) for row in rows.fetchall()]
+        items = [_chat_session_from_row(row) for row in rows]
         return ChatSessionListResponse(items=items, total=total, page=safe_page, page_size=safe_size)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao listar sessoes: {str(e)}")
@@ -2871,18 +2642,7 @@ async def save_campanha(
         )
         if not campaign_id:
             raise HTTPException(status_code=400, detail="URL da imagem obrigatoria.")
-
-        result = await db.execute(
-            text(
-                """
-                SELECT id, modo, titulo, briefing, mensagem_original, image_url, overlay_json, meta_json, created_at
-                FROM viva_campanhas
-                WHERE id = :id
-                """
-            ),
-            {"id": str(campaign_id)},
-        )
-        row = result.first()
+        row = await viva_campaign_repository_service.get_campaign_row(db=db, campaign_id=campaign_id)
         if not row:
             raise HTTPException(status_code=500, detail="Falha ao salvar campanha.")
         return _campaign_row_to_item(row)
@@ -2900,48 +2660,17 @@ async def list_campanhas(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    safe_limit = min(max(limit, 1), 200)
-    safe_offset = max(offset, 0)
     normalized_mode = _normalize_mode(modo) if modo else None
 
     try:
-        await _ensure_campaigns_table(db)
-        params: Dict[str, Any] = {
-            "user_id": str(current_user.id),
-            "limit": safe_limit,
-            "offset": safe_offset,
-        }
-
-        where_clause = "WHERE user_id = :user_id"
-        if normalized_mode in ("FC", "REZETA"):
-            where_clause += " AND modo = :modo"
-            params["modo"] = normalized_mode
-
-        rows_result = await db.execute(
-            text(
-                f"""
-                SELECT id, modo, titulo, briefing, mensagem_original, image_url, overlay_json, meta_json, created_at
-                FROM viva_campanhas
-                {where_clause}
-                ORDER BY created_at DESC
-                LIMIT :limit OFFSET :offset
-                """
-            ),
-            params,
+        rows, total = await viva_campaign_repository_service.list_campaign_rows(
+            db=db,
+            user_id=current_user.id,
+            modo=normalized_mode,
+            limit=limit,
+            offset=offset,
         )
-        items = [_campaign_row_to_item(row) for row in rows_result.fetchall()]
-
-        count_result = await db.execute(
-            text(
-                f"""
-                SELECT COUNT(*) AS total
-                FROM viva_campanhas
-                {where_clause}
-                """
-            ),
-            {k: v for k, v in params.items() if k in ("user_id", "modo")},
-        )
-        total = int(count_result.scalar() or 0)
+        items = [_campaign_row_to_item(row) for row in rows]
         return CampanhaListResponse(items=items, total=total)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao listar campanhas: {str(e)}")
@@ -2954,18 +2683,11 @@ async def get_campanha(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        await _ensure_campaigns_table(db)
-        result = await db.execute(
-            text(
-                """
-                SELECT id, modo, titulo, briefing, mensagem_original, image_url, overlay_json, meta_json, created_at
-                FROM viva_campanhas
-                WHERE id = :id AND user_id = :user_id
-                """
-            ),
-            {"id": str(campanha_id), "user_id": str(current_user.id)},
+        row = await viva_campaign_repository_service.get_campaign_row_by_id(
+            db=db,
+            campaign_id=campanha_id,
+            user_id=current_user.id,
         )
-        row = result.first()
         if not row:
             raise HTTPException(status_code=404, detail="Campanha nao encontrada.")
         return _campaign_row_to_item(row)

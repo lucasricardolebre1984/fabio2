@@ -13,8 +13,8 @@
 | BUG-012 | MÃ©dia | VIVA | BotÃ£o de Ã¡udio no chat nÃ£o funciona | Resolvido |
 | BUG-013 | MÃ©dia | VIVA | Erro `StackOverflowError` ao gerar imagem com prompt extra longo (REZETA/FC) | Resolvido |
 | BUG-014 | MÃ©dia | VIVA | Upload de imagem falha quando a imagem Ã© PNG (MIME assumido como JPEG) | Resolvido |
-| BUG-015 | Alta | VIVA | Fundo da imagem nÃ£o respeita paleta/brief do prompt (resultado genÃ©rico) | Em validaÃ§Ã£o (rodada 4 - diversidade) |
-| BUG-016 | MÃ©dia | VIVA | Arte final perde partes do texto (overlay truncado) | Em validaÃ§Ã£o (rodada 2) |
+| BUG-015 | Alta | VIVA | Fundo da imagem nÃ£o respeita paleta/brief do prompt (resultado genÃ©rico) | Em validaÃ§Ã£o (rodada 5 - tema livre) |
+| BUG-016 | MÃ©dia | VIVA | Arte final perde partes do texto (overlay truncado) | Em validaÃ§Ã£o (rodada 3 - wrap/ellipsis) |
 | BUG-017 | Alta | WhatsApp Chat API | Endpoints `/api/v1/whatsapp-chat/*` retornam 500 por incompatibilidade de modelagem (`SQLEnum`) com schema real (`VARCHAR`) | Resolvido |
 | BUG-018 | Alta | WhatsApp Evolution | Backend consulta instÃ¢ncia/chave divergentes do runtime (instÃ¢ncia ativa `Teste`), causando falso desconectado (`Status 404`) | Resolvido |
 | BUG-019 | MÃ©dia | Frontend WhatsApp | `/whatsapp/conversas` usa token incorreto (`localStorage.token`) e base URL hardcoded em `localhost:8000` | Resolvido |
@@ -56,8 +56,8 @@
 | BUG-058 | Alta | VIVA/RAG | Ausencia de camada vetorial moderna (RAG) para memoria/conhecimento evolutivo de longo prazo no piloto | Resolvido |
 | BUG-059 | Alta | Frontend/NextDev | `next dev` pode quebrar com `MODULE_NOT_FOUND` apontando para rota removida (`/api/viva/prompts/[promptId]/route`) por cache `.next` stale | Resolvido |
 | BUG-060 | Alta | Frontend/Auth+Docs | Login no front exibe erro generico para qualquer falha e README publica senha de teste divergente do runtime local | Resolvido |
-| BUG-061 | Alta | VIVA/Campanhas | Geracao de imagem pode ignorar tema do brief (ex.: Carnaval sem dividas) e cair em cena corporativa generica (senhor de terno em escritorio) | Em validacao (rodada 4 - diversidade) |
-| BUG-062 | Alta | VIVA/Arquitetura | `backend/app/api/v1/viva.py` monolitico (chat+agenda+campanhas+midia+SQL) com alto acoplamento e baixa manutenibilidade | Ativo |
+| BUG-061 | Alta | VIVA/Campanhas | Geracao de imagem pode ignorar tema do brief (ex.: Carnaval sem dividas) e cair em cena corporativa generica (senhor de terno em escritorio) | Em validacao (rodada 5 - tema+elenco+cenario) |
+| BUG-062 | Alta | VIVA/Arquitetura | `backend/app/api/v1/viva.py` monolitico (chat+agenda+campanhas+midia+SQL) com alto acoplamento e baixa manutenibilidade | Em validacao (fatiamento SQL em repositorios) |
 | BUG-063 | Alta | VIVA/Agenda UX | Fallback rigido de agenda exige formato textual prescritivo, reduz fluidez conversacional e gera efeito de "bot travado" | Resolvido |
 | BUG-064 | Alta | VIVA->Viviane Orquestracao | Nao existe handoff operacional completo para aviso programado no WhatsApp (agenda da VIVA disparando persona Viviane no horario) | Resolvido |
 | BUG-065 | Alta | VIVA/Handoff API | `GET /api/v1/viva/handoff` retorna `500` quando `meta_json` vem serializado como string e quebra validacao do schema | Resolvido |
@@ -67,24 +67,24 @@
 | BUG-069 | Media | VIVA/UI Chat | Campo de digitacao muito baixo para edicao de mensagens maiores, com baixa visibilidade | Resolvido |
 | BUG-070 | Alta | VIVA/Audio UX | Audio era transcrito no front, mas sem texto digitado a transcricao nao era enviada para `/viva/chat`, entao VIVA nao respondia ao conteudo falado | Resolvido |
 | BUG-071 | Media | VIVA/Audio UX | Gravacao de audio ainda ficava anexada aguardando Enter, em vez de fluxo direto institucional (parar > transcrever > enviar) | Resolvido |
-| BUG-072 | Media | VIVA/UI+Audio UX | Atualizacao holografica ficou pouco perceptivel (avatar dentro da area rolavel) e audio gravado durante resposta podia voltar para anexo manual | Em validacao |
+| BUG-072 | Media | VIVA/UI+Audio UX | Atualizacao holografica ficou pouco perceptivel (avatar dentro da area rolavel) e audio gravado durante resposta podia voltar para anexo manual | Resolvido |
 | BUG-073 | Alta | VIVA/Agenda NLU | Comando de agendamento em linguagem natural foi interpretado como consulta de agenda (nao criou compromisso) | Resolvido |
 | BUG-074 | Media | VIVA/UI Holograma | Bloco de estilo do holograma ficava acoplado ao JSX da pagina e o cerebro 3D nao era interativo para iniciar conversa | Resolvido |
 | BUG-075 | Alta | LP/HTML | Landing page externa exibindo trecho de JavaScript como texto por bloco duplicado apos fechamento estrutural do documento | Resolvido |
-| BUG-076 | Alta | VIVA/UI Conversacao | Modo de conversacao da VIVA ficou acoplado ao chat normal (topo da pagina) em vez de ativacao dedicada por botao lateral/submenu | Em pausa (prioridade campanhas) |
-| BUG-077 | Alta | VIVA/UI Conversacao | Conversa continua por voz + avatar central dedicado ainda nao atingiu experiencia institucional final | Em pausa (prioridade campanhas) |
+| BUG-076 | Alta | VIVA/UI Conversacao | Modo de conversacao da VIVA ficou acoplado ao chat normal (topo da pagina) em vez de ativacao dedicada por botao lateral/submenu | Resolvido |
+| BUG-077 | Alta | VIVA/UI Conversacao | Conversa continua por voz + avatar central dedicado ainda nao atingiu experiencia institucional final | Resolvido |
 
 ---
 
 ## Atualizacao 2026-02-11 (triagem geral de status)
 
 - total no quadro: `64` bugs.
-- resolvidos: `57`.
-- pendentes/ativos/validacao/pausa: `7`.
+- resolvidos: `60`.
+- pendentes/ativos/validacao/pausa: `4`.
 - prioridade funcional atual aprovada:
   - foco em campanhas e geracao de imagem (`BUG-061`);
-  - modulo conversa continua em pausa (`BUG-076`, `BUG-077`);
-  - refatoracao estrutural do monolito `viva.py` mantida no backlog ativo (`BUG-062`).
+  - modulo conversa continua finalizado no submenu dedicado (`BUG-076`, `BUG-077`);
+  - refatoracao estrutural do monolito `viva.py` em andamento com fatiamento de persistencia (`BUG-062`).
 - observacao institucional:
   - ha itens em `Em validacao` que podem ja estar corrigidos e apenas sem baixa documental final; sera feita rodada dedicada de prova de vida para baixar status com evidencia.
 
@@ -1105,3 +1105,30 @@
     - parser natural reforcado para mais verbos (incluindo `agenda ...`) e tolerancia temporal; smoke confirmou criacao sem formato rigido.
 - status baixado neste bloco:
   - `BUG-037`, `BUG-038`, `BUG-040`, `BUG-041`, `BUG-042`, `BUG-045`, `BUG-046`, `BUG-047`, `BUG-054`, `BUG-057`, `BUG-073` => **Resolvidos**.
+
+### Atualizacao 2026-02-11 (execucao bloco final dos 7 pendentes)
+- backend (`BUG-062`):
+  - SQL de chat e campanhas removido do router `backend/app/api/v1/viva.py` e extraido para repositorios:
+    - `backend/app/services/viva_chat_repository_service.py`
+    - `backend/app/services/viva_campaign_repository_service.py`
+  - endpoints de sessao/campanha agora consomem servico de persistencia, reduzindo acoplamento de dominio + SQL no arquivo monolitico.
+- backend campanhas (`BUG-015` + `BUG-061`):
+  - parser de tema livre reforcado para conversa natural sem formato fixo (`_extract_unstructured_theme`);
+  - prompt de imagem com ancora obrigatoria de `tema/oferta/cena`;
+  - reforco de identidade de marca por distribuicao de cor (FC: azul/branco dominante, Rezeta: verde/azul dominante);
+  - variacao adicional de aparencia (`_appearance_variant`) para reduzir repeticao de personagem.
+- frontend arte final (`BUG-016`):
+  - parser de overlay reduzido para 4 bullets maximos;
+  - `wrapText` do export agora usa truncamento com ellipsis em vez de corte seco;
+  - areas de texto do modal/export ampliadas para evitar perda de copy.
+- frontend audio/voz (`BUG-072`, `BUG-076`, `BUG-077`):
+  - upload manual de audio virou fluxo direto (selecionou audio -> transcreve/enviou), sem depender de Enter/anexo manual;
+  - modo `Conversa VIVA` mantido como tela dedicada por submenu lateral;
+  - holograma ganhou tilt 3D por ponteiro para reforco de presenca no modo conversacao.
+- validacao tecnica:
+  - `backend`: `python -m py_compile app/api/v1/viva.py app/services/viva_chat_repository_service.py app/services/viva_campaign_repository_service.py` => OK;
+  - `frontend`: `npm run type-check` => OK;
+  - `frontend`: `npm run lint -- --file src/app/viva/page.tsx` => OK (warnings nao bloqueantes de `<img>`).
+- status desta rodada:
+  - `BUG-072`, `BUG-076`, `BUG-077` => **Resolvidos**.
+  - `BUG-015`, `BUG-016`, `BUG-061`, `BUG-062` => **Em validacao** (aguardando prova visual/funcional final em ambiente do Fabio).
