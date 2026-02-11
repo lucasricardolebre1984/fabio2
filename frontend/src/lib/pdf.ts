@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Gera PDF via impressao do navegador.
  */
 function normalizeMojibakeText(value?: string | null): string {
@@ -121,20 +121,20 @@ export function generateContractPDF(contractData: any) {
     <body>
       <div style="background: #1e3a5f; color: white; padding: 15px 20px; margin: -20px -20px 20px -20px; display: flex; align-items: center; gap: 15px;">
         <div style="flex-shrink: 0;">
-          <img src="${logoUrl}" alt="FC SoluÃ§Ãµes Financeiras" style="height: 78px; width: auto; display: block;" />
+          <img src="${logoUrl}" alt="FC Soluções Financeiras" style="height: 78px; width: auto; display: block;" />
         </div>
         <div style="flex: 1;">
-          <h1 style="font-size: 22pt; font-weight: bold; margin: 0; color: white;">F C SoluÃ§Ãµes Financeiras</h1>
+          <h1 style="font-size: 22pt; font-weight: bold; margin: 0; color: white;">F C Soluções Financeiras</h1>
         </div>
       </div>
 
       <div class="title">
-        <h2>CONTRATO DE PRESTAÃ‡ÃƒO DE SERVIÃ‡OS</h2>
+        <h2>CONTRATO DE PRESTAÇÃO DE SERVIÇOS</h2>
         <div style="font-size: 11pt; color: #333; margin-top: 8px;">${contractSubtitle}</div>
       </div>
 
       <div style="text-align: center; margin-bottom: 20px; font-size: 11pt;">
-        <span><strong>NÂº:</strong> ${contractData.numero}</span>
+        <span><strong>Nº:</strong> ${contractData.numero}</span>
         <span style="margin: 0 15px;"><strong>Data:</strong> ${contractData.data_assinatura || new Date().toLocaleDateString('pt-BR')}</span>
       </div>
 
@@ -146,21 +146,21 @@ export function generateContractPDF(contractData: any) {
           ${isCnh && contractData?.dados_extras?.cnh_numero ? `<p><strong>CNH:</strong> ${contractData.dados_extras.cnh_numero}</p>` : ''}
           <p><strong>E-mail:</strong> ${contractData.contratante_email}</p>
           ${contractData.contratante_telefone ? `<p><strong>Contato:</strong> ${contractData.contratante_telefone}</p>` : ''}
-          <p><strong>EndereÃ§o:</strong> ${contractData.contratante_endereco}</p>
+          <p><strong>Endereço:</strong> ${contractData.contratante_endereco}</p>
         </div>
         <div class="party-box">
           <h3>CONTRATADA</h3>
-          <p><strong>RazÃ£o Social:</strong> FC SERVIÃ‡OS E SOLUÃ‡Ã•ES ADMINISTRATIVAS LTDA</p>
+          <p><strong>Razão Social:</strong> FC SERVIÇOS E SOLUÇÕES ADMINISTRATIVAS LTDA</p>
           <p><strong>CNPJ:</strong> 57.815.628/0001-62</p>
           <p><strong>E-mail:</strong> contato@fcsolucoesfinanceiras.com</p>
           <p><strong>Contato:</strong> (16) 99301-7396</p>
-          <p><strong>EndereÃ§o:</strong> Rua Maria das GraÃ§as de Negreiros Bonilha, nÂº 30, sala 3, Jardim Nova AlianÃ§a Sul, RibeirÃ£o Preto/SP, CEP 14022-100</p>
+          <p><strong>Endereço:</strong> Rua Maria das Graças de Negreiros Bonilha, nº 30, sala 3, Jardim Nova Aliança Sul, Ribeirão Preto/SP, CEP 14022-100</p>
         </div>
       </div>
 
       <p style="text-align: justify; margin-bottom: 15px; font-size: 11pt;">
-        As partes acima identificadas tÃªm, entre si, justo e acertado o presente Contrato de PrestaÃ§Ã£o de ServiÃ§os,
-        que se regerÃ¡ pelas clÃ¡usulas seguintes e pelas condiÃ§Ãµes descritas no presente.
+        As partes acima identificadas têm, entre si, justo e acertado o presente Contrato de Prestação de Serviços,
+        que se regerá pelas cláusulas seguintes e pelas condições descritas no presente.
       </p>
 
       <div class="clauses" style="font-size: 11pt;">
@@ -179,7 +179,7 @@ export function generateContractPDF(contractData: any) {
         </div>
         <div class="signature">
           <div class="signature-line">
-            <strong>FC SERVIÃ‡OS E SOLUÃ‡Ã•ES ADMINISTRATIVAS LTDA</strong><br>
+            <strong>FC SERVIÇOS E SOLUÇÕES ADMINISTRATIVAS LTDA</strong><br>
             CNPJ: 57.815.628/0001-62<br>
             <strong>CONTRATADA</strong>
           </div>

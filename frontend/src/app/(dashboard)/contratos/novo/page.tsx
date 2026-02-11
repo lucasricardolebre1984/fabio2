@@ -16,7 +16,7 @@ function NovoContratoPageContent() {
   const templateQuery = (searchParams.get('template') || 'bacen').toLowerCase()
   const selectedTemplate = ['bacen', 'cadin', 'cnh'].includes(templateQuery) ? templateQuery : 'bacen'
   const tituloTemplate = selectedTemplate === 'cadin'
-    ? 'Instrumento de PrestaÃ§Ã£o de ServiÃ§os - CADIN PF/PJ'
+    ? 'Instrumento de Prestação de Serviços - CADIN PF/PJ'
     : selectedTemplate === 'cnh'
       ? 'Contrato de Prestacao de Servicos - CNH Cassada e Recurso de Multas'
       : 'Contrato de Adesao ao Bacen'
@@ -139,7 +139,7 @@ function NovoContratoPageContent() {
         const { status, data } = err.response
         
         if (status === 422 && data?.detail) {
-          // Erro de validaÃ§Ã£o do Pydantic
+          // Erro de validação do Pydantic
           if (Array.isArray(data.detail)) {
             // Pydantic v2 retorna array de erros
             errorMessage = data.detail.map((e: any) => {
@@ -256,10 +256,10 @@ function NovoContratoPageContent() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="contratante_endereco">EndereÃ§o Completo</Label>
+              <Label htmlFor="contratante_endereco">Endereço Completo</Label>
               <Input 
                 id="contratante_endereco" 
-                placeholder="Rua, nÃºmero, bairro, cidade - Estado, CEP" 
+                placeholder="Rua, número, bairro, cidade - Estado, CEP" 
                 required 
                 value={formData.contratante_endereco}
                 onChange={handleChange}

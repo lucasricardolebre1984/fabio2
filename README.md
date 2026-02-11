@@ -64,6 +64,7 @@ npm run dev
 | [teste-local.md](./teste-local.md) | Checklist de testes |
 | [DEPLOY_AWS.md](./DEPLOY_AWS.md) | Guia deploy AWS EC2 |
 | [docs/ARCHITECTURE/OVERVIEW.md](./docs/ARCHITECTURE/OVERVIEW.md) | Arquitetura do sistema |
+| [docs/CONTRATOS/PLAYBOOK_MODELOS_MD.md](./docs/CONTRATOS/PLAYBOOK_MODELOS_MD.md) | Metodo oficial para subir novos modelos `.md` |
 
 ### Regra Institucional de Bugs
 - Sempre registrar bug novo em `docs/BUGSREPORT.md` antes da correção.

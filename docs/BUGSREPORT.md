@@ -1157,3 +1157,26 @@
   - `frontend`: `npm run type-check` => OK;
   - `frontend`: `npm run lint -- --file src/app/(dashboard)/contratos/page.tsx --file src/app/(dashboard)/contratos/novo/page.tsx --file src/app/(dashboard)/contratos/[id]/page.tsx --file src/lib/pdf.ts` => OK (warnings nao bloqueantes conhecidos);
   - `frontend`: `npm run build` => compilacao concluida (com warning residual de copy standalone no Windows sem impacto no piloto CNH).
+
+### BUG-079: Acentuacao corrompida no contrato (preview + PDF)
+**Data:** 2026-02-11
+**Severidade:** Alta
+**Descricao:** textos institucionais do contrato apareciam com mojibake (`SoluÃ§Ãµes`, `PrestaÃ§Ã£o`, etc.) no preview e na janela de impressao/PDF.
+**Passos:** 1. abrir contrato CNH em `/contratos/[id]` 2. acionar visualizacao/impressao do PDF 3. observar acentos quebrados no cabecalho, clausulas e assinatura.
+**Esperado:** acentuacao UTF-8 correta em todo o fluxo de contratos (preview + PDF frontend + PDF backend).
+**Atual:** acentuacao normalizada e exibicao institucional correta.
+**Status:** Resolvido
+
+### Atualizacao 2026-02-11 (execucao BUG-079 - normalizacao de encoding)
+- backend:
+  - `backend/app/services/pdf_service_playwright.py` revisado para remover strings com mojibake no HTML gerado.
+- frontend:
+  - `frontend/src/lib/pdf.ts` com textos institucionais normalizados em UTF-8 (cabecalho, partes, intro e assinatura);
+  - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx` com normalizacao de acentos no preview contratual;
+  - `frontend/src/app/(dashboard)/contratos/novo/page.tsx` com ajustes pontuais de acentuacao de labels/placeholders.
+- padronizacao aplicada:
+  - pipeline de novos modelos `.md` passa a usar texto canonico UTF-8 desde template/preview/PDF, sem carregar literal mojibake legado.
+- validacao tecnica:
+  - `python -m py_compile backend/app/services/pdf_service_playwright.py` => OK;
+  - `frontend`: `npm run type-check` => OK;
+  - `frontend`: `npm run lint -- --file src/lib/pdf.ts --file src/app/(dashboard)/contratos/[id]/page.tsx --file src/app/(dashboard)/contratos/novo/page.tsx` => OK (apenas warnings conhecidos nao bloqueantes).

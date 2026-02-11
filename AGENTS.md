@@ -93,6 +93,7 @@ Leia antes de trabalhar:
 4. **docs/CONTRATOS/CAMPOS_BACEN.md** - Especificação do contrato Bacen
 5. **docs/BUGSREPORT.md** - Bugs conhecidos e resolvidos
 6. **docs/SESSION.md** - Contexto atual da sessão
+7. **docs/CONTRATOS/PLAYBOOK_MODELOS_MD.md** - Processo oficial para subir modelos `.md` sem margem para erro
 
 ---
 

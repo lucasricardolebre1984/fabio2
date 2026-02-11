@@ -137,6 +137,14 @@ Atualizado em: 10/02/2026
 - status operacional:
   - pronto para homologacao do cliente no piloto;
   - proximo gate: replicar o mesmo padrao para os demais modelos padronizados enviados.
+
+## Estado Contratos (2026-02-11 - encoding UTF-8 estabilizado)
+- bug de acentuacao no fluxo de contrato baixado (`BUG-079`):
+  - preview de contrato;
+  - PDF frontend;
+  - PDF backend.
+- diretriz para os proximos modelos:
+  - ingestao de modelos `.md` com texto canonico UTF-8 e validacao de render final antes de liberar o modulo.
 - Briefing de campanha com contexto acumulado e destrave de CTA:
   - aceita entrada em texto livre;
   - quando faltar apenas CTA, nao repete o template completo em loop.
@@ -584,3 +592,11 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
 - status consolidado:
   - resolvidos: `60`;
   - pendentes em validacao: `4` (`BUG-015`, `BUG-016`, `BUG-061`, `BUG-062`).
+
+## Estado Contratos (2026-02-11 - governanca de novos modelos)
+- playbook oficial publicado para subida de modelos `.md`:
+  - `docs/CONTRATOS/PLAYBOOK_MODELOS_MD.md`
+- cobertura do playbook:
+  - template JSON, fallback backend, menu, criacao, preview, PDF frontend/backend, validacao tecnica/funcional e fechamento documental.
+- objetivo:
+  - permitir carga dos proximos 9-10 modelos com processo replicavel e sem margem de erro.

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -81,7 +81,7 @@ export default function VisualizarContratoPage() {
     try {
       const { generateContractPDF } = await import('@/lib/pdf')
       generateContractPDF(contrato)
-      toast.success('PDF aberto para visualizaÃ§Ã£o!')
+      toast.success('PDF aberto para visualização!')
     } catch (error) {
       toast.error('Erro ao gerar PDF')
     }
@@ -118,7 +118,7 @@ export default function VisualizarContratoPage() {
   if (!contrato) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-        <p>Contrato nÃ£o encontrado</p>
+        <p>Contrato não encontrado</p>
         <Button 
           variant="outline" 
           className="mt-4"
@@ -146,33 +146,33 @@ export default function VisualizarContratoPage() {
     return (
       <div className="bg-white p-10 min-h-[1120px] shadow-sm [font-family:'Times_New_Roman',Times,serif_!important]">
         
-        {/* CabeÃ§alho Institucional - Faixa Azul com Logo */}
+        {/* Cabeçalho Institucional - Faixa Azul com Logo */}
         <div className="bg-[#1e3a5f] text-white py-5 px-8 mb-8 -mx-10 -mt-10">
           <div className="flex items-center gap-4">
             {/* Logo Institucional */}
             <div className="flex-shrink-0">
               <img
                 src="/logo2.png"
-                alt="FC SoluÃ§Ãµes Financeiras"
+                alt="FC Soluções Financeiras"
                 className="h-[92px] w-auto object-contain"
               />
             </div>
             <div className="flex-1">
               <h1 className="text-[2rem] font-bold tracking-wide">
-                F C SoluÃ§Ãµes Financeiras
+                F C Soluções Financeiras
               </h1>
             </div>
           </div>
         </div>
 
-        {/* TÃ­tulo */}
+        {/* Título */}
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold uppercase tracking-wider text-gray-900 border-b-2 border-gray-800 pb-2 inline-block">
-            Contrato de PrestaÃ§Ã£o de ServiÃ§os
+            Contrato de Prestação de Serviços
           </h2>
           <p className="text-gray-600 mt-2 font-semibold">{contractSubtitle}</p>
           <div className="mt-5 flex justify-center gap-10 text-base">
-            <span><strong>NÂº:</strong> {contrato.numero}</span>
+            <span><strong>Nº:</strong> {contrato.numero}</span>
             <span><strong>Data:</strong> {contrato.data_assinatura || formatDate(contrato.created_at)}</span>
           </div>
         </div>
@@ -188,55 +188,55 @@ export default function VisualizarContratoPage() {
             {contrato.contratante_telefone && (
               <p><strong>Contato:</strong> {contrato.contratante_telefone}</p>
             )}
-            <p><strong>EndereÃ§o:</strong> {contrato.contratante_endereco}</p>
+            <p><strong>Endereço:</strong> {contrato.contratante_endereco}</p>
           </div>
 
           <div className="border-2 border-gray-800 p-4">
             <h3 className="font-bold text-gray-900 uppercase mb-3 border-b border-gray-400 pb-1">Contratada</h3>
-            <p><strong>RazÃ£o Social:</strong> FC SERVIÃ‡OS E SOLUÃ‡Ã•ES ADMINISTRATIVAS LTDA</p>
+            <p><strong>Razão Social:</strong> FC SERVIÇOS E SOLUÇÕES ADMINISTRATIVAS LTDA</p>
             <p><strong>CNPJ:</strong> 57.815.628/0001-62</p>
             <p><strong>E-mail:</strong> contato@fcsolucoesfinanceiras.com</p>
             <p><strong>Contato:</strong> (16) 99301-7396</p>
-            <p><strong>EndereÃ§o:</strong> Rua Maria das GraÃ§as de Negreiros Bonilha, nÂº 30, sala 3, Jardim Nova AlianÃ§a Sul, RibeirÃ£o Preto/SP, CEP 14022-100</p>
+            <p><strong>Endereço:</strong> Rua Maria das Graças de Negreiros Bonilha, nº 30, sala 3, Jardim Nova Aliança Sul, Ribeirão Preto/SP, CEP 14022-100</p>
           </div>
         </div>
 
-        {/* Texto introdutÃ³rio */}
+        {/* Texto introdutório */}
         <p className="text-base text-justify mb-7 leading-relaxed">
-          As partes acima identificadas tÃªm, entre si, justo e acertado o presente Contrato de PrestaÃ§Ã£o de ServiÃ§os, 
-          que se regerÃ¡ pelas clÃ¡usulas seguintes e pelas condiÃ§Ãµes descritas no presente.
+          As partes acima identificadas têm, entre si, justo e acertado o presente Contrato de Prestação de Serviços, 
+          que se regerá pelas cláusulas seguintes e pelas condições descritas no presente.
         </p>
 
-        {/* CLÃUSULAS */}
+        {/* CLÁUSULAS */}
         <div className="space-y-4 text-base text-justify leading-relaxed">
           {isCadin ? (
             <>
               <p>
-                <strong className="text-gray-900 uppercase">CLÃUSULA PRIMEIRA - DO OBJETO</strong><br />
-                <strong>1.1.</strong> O presente instrumento tem por objeto a prestaÃ§Ã£o de serviÃ§os de assessoria administrativa para a
-                regularizaÃ§Ã£o de pendÃªncias do(a) CONTRATANTE junto ao Cadastro Informativo de CrÃ©ditos nÃ£o Quitados do Setor PÃºblico
-                Federal (CADIN), visando Ã  adoÃ§Ã£o dos procedimentos necessÃ¡rios para obtenÃ§Ã£o da CertidÃ£o Negativa de DÃ©bitos (CND)
-                ou documento equivalente, referente Ã s dÃ­vidas federais constatadas atÃ© a data de assinatura deste contrato.
+                <strong className="text-gray-900 uppercase">CLÁUSULA PRIMEIRA - DO OBJETO</strong><br />
+                <strong>1.1.</strong> O presente instrumento tem por objeto a prestação de serviços de assessoria administrativa para a
+                regularização de pendências do(a) CONTRATANTE junto ao Cadastro Informativo de Créditos não Quitados do Setor Público
+                Federal (CADIN), visando à adoção dos procedimentos necessários para obtenção da Certidão Negativa de Débitos (CND)
+                ou documento equivalente, referente às dívidas federais constatadas até a data de assinatura deste contrato.
               </p>
               <p>
-                <strong>Â§1Âº.</strong> O serviÃ§o inclui anÃ¡lise dos dÃ©bitos, negociaÃ§Ã£o junto aos Ã³rgÃ£os credores para obtenÃ§Ã£o de descontos e
-                formalizaÃ§Ã£o de parcelamentos, conforme as condiÃ§Ãµes e programas de anistia disponibilizados pelo governo.
+                <strong>§1º.</strong> O serviço inclui análise dos débitos, negociação junto aos órgãos credores para obtenção de descontos e
+                formalização de parcelamentos, conforme as condições e programas de anistia disponibilizados pelo governo.
               </p>
               <p>
-                <strong>Â§2Âº.</strong> Fica expressamente claro que a CONTRATADA nÃ£o se responsabiliza pela quitaÃ§Ã£o das dÃ­vidas do(a)
-                CONTRATANTE, mas sim pela prestaÃ§Ã£o de serviÃ§os de assessoria para negociaÃ§Ã£o e regularizaÃ§Ã£o dos apontamentos no CADIN.
+                <strong>§2º.</strong> Fica expressamente claro que a CONTRATADA não se responsabiliza pela quitação das dívidas do(a)
+                CONTRATANTE, mas sim pela prestação de serviços de assessoria para negociação e regularização dos apontamentos no CADIN.
               </p>
               <p>
-                <strong>Â§3Âº.</strong> DÃ©bitos que surgirem ou forem inscritos no CADIN apÃ³s a data de assinatura deste contrato nÃ£o estarÃ£o
+                <strong>§3º.</strong> Débitos que surgirem ou forem inscritos no CADIN após a data de assinatura deste contrato não estarão
                 cobertos por este instrumento.
               </p>
               <p>
-                <strong>1.2.</strong> Os serviÃ§os contratados nÃ£o representam garantia de aprovaÃ§Ã£o de crÃ©dito para o(a) CONTRATANTE,
-                mas um meio para regularizaÃ§Ã£o da situaÃ§Ã£o fiscal perante os Ã³rgÃ£os federais.
+                <strong>1.2.</strong> Os serviços contratados não representam garantia de aprovação de crédito para o(a) CONTRATANTE,
+                mas um meio para regularização da situação fiscal perante os órgãos federais.
               </p>
               <p>
-                <strong className="text-gray-900 uppercase">CLÃUSULA SEGUNDA - DAS DESPESAS E HONORÃRIOS</strong><br />
-                <strong>2.1.</strong> Como contraprestaÃ§Ã£o pelos serviÃ§os descritos na ClÃ¡usula 1Âª, o(a) CONTRATANTE pagarÃ¡ Ã  CONTRATADA
+                <strong className="text-gray-900 uppercase">CLÁUSULA SEGUNDA - DAS DESPESAS E HONORÁRIOS</strong><br />
+                <strong>2.1.</strong> Como contraprestação pelos serviços descritos na Cláusula 1ª, o(a) CONTRATANTE pagará à CONTRATADA
                 o valor total de <strong>{formatCurrency(contrato.valor_total)}</strong> ({contrato.valor_total_extenso}), sendo entrada de{' '}
                 <strong>{formatCurrency(contrato.valor_entrada)}</strong> ({contrato.valor_entrada_extenso})
                 {contrato.qtd_parcelas > 0 ? (
@@ -246,64 +246,64 @@ export default function VisualizarContratoPage() {
                 )}
               </p>
               <p>
-                <strong>2.2.</strong> Em caso de atraso superior a 30 (trinta) dias no pagamento de qualquer parcela, o serviÃ§o serÃ¡
-                suspenso. Persistindo a inadimplÃªncia, o(a) CONTRATANTE perderÃ¡ o direito Ã  continuidade do serviÃ§o e aos valores jÃ¡ pagos,
-                e as demais parcelas em aberto poderÃ£o ser protestadas.
+                <strong>2.2.</strong> Em caso de atraso superior a 30 (trinta) dias no pagamento de qualquer parcela, o serviço será
+                suspenso. Persistindo a inadimplência, o(a) CONTRATANTE perderá o direito à continuidade do serviço e aos valores já pagos,
+                e as demais parcelas em aberto poderão ser protestadas.
               </p>
               <p>
-                <strong>2.3.</strong> No caso de solicitaÃ§Ã£o de cancelamento pelo(a) CONTRATANTE, serÃ¡ cobrada multa de 30% (trinta por cento)
+                <strong>2.3.</strong> No caso de solicitação de cancelamento pelo(a) CONTRATANTE, será cobrada multa de 30% (trinta por cento)
                 sobre o valor total das parcelas em aberto.
               </p>
               <p>
-                <strong>2.4.</strong> A execuÃ§Ã£o dos serviÃ§os terÃ¡ inÃ­cio imediato apÃ³s a assinatura deste contrato e confirmaÃ§Ã£o do pagamento
+                <strong>2.4.</strong> A execução dos serviços terá início imediato após a assinatura deste contrato e confirmação do pagamento
                 da primeira parcela ou do valor integral, conforme modalidade escolhida.
               </p>
               <p>
-                <strong>2.5.</strong> Havendo parcelamento, o nÃ£o pagamento de qualquer parcela acarretarÃ¡ acrÃ©scimo de juros de 2% (dois por cento)
-                ao mÃªs, multa de 10% (dez por cento) e correÃ§Ã£o monetÃ¡ria.
+                <strong>2.5.</strong> Havendo parcelamento, o não pagamento de qualquer parcela acarretará acréscimo de juros de 2% (dois por cento)
+                ao mês, multa de 10% (dez por cento) e correção monetária.
               </p>
               <p>
-                <strong>2.6.</strong> O nÃ£o pagamento de uma parcela acarreta vencimento antecipado das vincendas, podendo a CONTRATADA
-                promover cobranÃ§a e protesto dos tÃ­tulos em aberto perante o foro da comarca de RibeirÃ£o Preto/SP.
+                <strong>2.6.</strong> O não pagamento de uma parcela acarreta vencimento antecipado das vincendas, podendo a CONTRATADA
+                promover cobrança e protesto dos títulos em aberto perante o foro da comarca de Ribeirão Preto/SP.
               </p>
               <p>
-                <strong>2.7.</strong> A rescisÃ£o solicitada pelo(a) CONTRATANTE apÃ³s o inÃ­cio da prestaÃ§Ã£o dos serviÃ§os implica multa compensatÃ³ria
-                de 30% (trinta por cento) do valor acordado, sem direito a ressarcimento dos valores jÃ¡ pagos.
+                <strong>2.7.</strong> A rescisão solicitada pelo(a) CONTRATANTE após o início da prestação dos serviços implica multa compensatória
+                de 30% (trinta por cento) do valor acordado, sem direito a ressarcimento dos valores já pagos.
               </p>
               <p>
-                <strong className="text-gray-900 uppercase">CLÃUSULA TERCEIRA - DO PRAZO E GARANTIA</strong><br />
-                <strong>3.1.</strong> A CONTRATADA realizarÃ¡ os procedimentos no prazo de atÃ© 45 (quarenta e cinco) dias Ãºteis, contados da
-                confirmaÃ§Ã£o do pagamento e assinatura deste contrato, podendo ser prorrogado conforme complexidade dos dÃ©bitos ou prazos dos Ã³rgÃ£os.
+                <strong className="text-gray-900 uppercase">CLÁUSULA TERCEIRA - DO PRAZO E GARANTIA</strong><br />
+                <strong>3.1.</strong> A CONTRATADA realizará os procedimentos no prazo de até 45 (quarenta e cinco) dias úteis, contados da
+                confirmação do pagamento e assinatura deste contrato, podendo ser prorrogado conforme complexidade dos débitos ou prazos dos órgãos.
               </p>
               <p>
-                <strong>Â§1Âº - GARANTIA DE RESULTADO:</strong> caso o serviÃ§o nÃ£o seja executado no prazo estabelecido, a CONTRATADA garantirÃ¡
-                devoluÃ§Ã£o integral do valor pago em atÃ© 30 (trinta) dias Ãºteis apÃ³s o tÃ©rmino do prazo.
+                <strong>§1º - GARANTIA DE RESULTADO:</strong> caso o serviço não seja executado no prazo estabelecido, a CONTRATADA garantirá
+                devolução integral do valor pago em até 30 (trinta) dias úteis após o término do prazo.
               </p>
               <p>
-                <strong>3.2.</strong> A CONTRATADA oferece garantia de acompanhamento por 1 (um) ano, contado da data de efetiva regularizaÃ§Ã£o dos apontamentos.
-                Se os apontamentos das dÃ­vidas tratadas neste contrato retornarem ao CADIN nesse perÃ­odo, o processo serÃ¡ refeito sem custo adicional.
+                <strong>3.2.</strong> A CONTRATADA oferece garantia de acompanhamento por 1 (um) ano, contado da data de efetiva regularização dos apontamentos.
+                Se os apontamentos das dívidas tratadas neste contrato retornarem ao CADIN nesse período, o processo será refeito sem custo adicional.
               </p>
               <p>
-                <strong>Â§2Âº - ABRANGÃŠNCIA DA GARANTIA:</strong> a garantia aplica-se exclusivamente Ã s dÃ­vidas e restriÃ§Ãµes identificadas e tratadas
-                no Ã¢mbito deste contrato. DÃ­vidas ou restriÃ§Ãµes posteriores nÃ£o estÃ£o cobertas.
+                <strong>§2º - ABRANGÊNCIA DA GARANTIA:</strong> a garantia aplica-se exclusivamente às dívidas e restrições identificadas e tratadas
+                no âmbito deste contrato. Dívidas ou restrições posteriores não estão cobertas.
               </p>
               <p>
-                <strong className="text-gray-900 uppercase">CLÃUSULA QUARTA - DA PROTEÃ‡ÃƒO DE DADOS (LGPD)</strong><br />
-                <strong>4.1.</strong> Em conformidade com a Lei nÂº 13.709/2018 (LGPD), a CONTRATADA tratarÃ¡ os dados pessoais do(a) CONTRATANTE
-                com finalidade exclusiva de execuÃ§Ã£o contratual, nos termos do art. 7Âº, incisos II, V e X.
+                <strong className="text-gray-900 uppercase">CLÁUSULA QUARTA - DA PROTEÇÃO DE DADOS (LGPD)</strong><br />
+                <strong>4.1.</strong> Em conformidade com a Lei nº 13.709/2018 (LGPD), a CONTRATADA tratará os dados pessoais do(a) CONTRATANTE
+                com finalidade exclusiva de execução contratual, nos termos do art. 7º, incisos II, V e X.
               </p>
               <p>
-                <strong>Â§1Âº.</strong> A CONTRATADA adota medidas de seguranÃ§a para proteger os dados e os eliminarÃ¡ apÃ³s o tÃ©rmino do serviÃ§o,
-                ressalvadas as obrigaÃ§Ãµes legais de guarda.
+                <strong>§1º.</strong> A CONTRATADA adota medidas de segurança para proteger os dados e os eliminará após o término do serviço,
+                ressalvadas as obrigações legais de guarda.
               </p>
               <p>
-                <strong>Â§2Âº.</strong> O(A) CONTRATANTE pode exercer direitos de titular (acesso, correÃ§Ã£o, eliminaÃ§Ã£o etc.) pelo e-mail:
+                <strong>§2º.</strong> O(A) CONTRATANTE pode exercer direitos de titular (acesso, correção, eliminação etc.) pelo e-mail:
                 contato@fcsolucoesfinanceiras.com.
               </p>
               <p>
-                <strong className="text-gray-900 uppercase">CLÃUSULA QUINTA - DO FORO</strong><br />
-                <strong>5.1.</strong> Para dirimir controvÃ©rsias oriundas deste contrato, as partes elegem o foro da comarca de RibeirÃ£o Preto/SP,
-                ressalvada a faculdade do(a) CONTRATANTE de propor aÃ§Ã£o no foro de seu domicÃ­lio, conforme o CÃ³digo de Defesa do Consumidor.
+                <strong className="text-gray-900 uppercase">CLÁUSULA QUINTA - DO FORO</strong><br />
+                <strong>5.1.</strong> Para dirimir controvérsias oriundas deste contrato, as partes elegem o foro da comarca de Ribeirão Preto/SP,
+                ressalvada a faculdade do(a) CONTRATANTE de propor ação no foro de seu domicílio, conforme o Código de Defesa do Consumidor.
               </p>
               <p className="mt-6">
                 E, por estarem assim justas e contratadas, as partes assinam o presente instrumento em 2 (duas) vias de igual teor e forma,
@@ -405,47 +405,47 @@ export default function VisualizarContratoPage() {
           ) : (
             <>
           <p>
-            <strong className="text-gray-900 uppercase">CLÃUSULA PRIMEIRA - DO OBJETO</strong><br />
-            O presente contrato tem como objeto a prestaÃ§Ã£o de serviÃ§os de consultoria e intermediaÃ§Ã£o administrativa 
-            pela CONTRATADA em favor do(a) CONTRATANTE, visando a adoÃ§Ã£o de procedimentos administrativos para a 
-            regularizaÃ§Ã£o de apontamentos de prejuÃ­zo registrados no Sistema de InformaÃ§Ãµes de CrÃ©dito (SCR) do 
+            <strong className="text-gray-900 uppercase">CLÁUSULA PRIMEIRA - DO OBJETO</strong><br />
+            O presente contrato tem como objeto a prestação de serviços de consultoria e intermediação administrativa 
+            pela CONTRATADA em favor do(a) CONTRATANTE, visando a adoção de procedimentos administrativos para a 
+            regularização de apontamentos de prejuízo registrados no Sistema de Informações de Crédito (SCR) do 
             Banco Central do Brasil, vinculados ao CPF/CNPJ do(a) CONTRATANTE.
           </p>
           <p>
-            O serviÃ§o consiste na anÃ¡lise do caso, elaboraÃ§Ã£o de requerimentos e acompanhamento do processo 
-            administrativo junto Ã s instituiÃ§Ãµes financeiras credoras, buscando a baixa dos referidos apontamentos, 
-            nos termos da regulamentaÃ§Ã£o vigente.
+            O serviço consiste na análise do caso, elaboração de requerimentos e acompanhamento do processo 
+            administrativo junto às instituições financeiras credoras, buscando a baixa dos referidos apontamentos, 
+            nos termos da regulamentação vigente.
           </p>
           <p>
-            Fica claro entre as partes que este serviÃ§o nÃ£o se trata de quitaÃ§Ã£o ou pagamento de dÃ­vidas, 
-            mas sim de um procedimento administrativo para a regularizaÃ§Ã£o dos registros no SCR.
+            Fica claro entre as partes que este serviço não se trata de quitação ou pagamento de dívidas, 
+            mas sim de um procedimento administrativo para a regularização dos registros no SCR.
           </p>
 
           <p>
-            <strong className="text-gray-900 uppercase">CLÃUSULA SEGUNDA - DAS OBRIGAÃ‡Ã•ES DA CONTRATADA</strong><br />
+            <strong className="text-gray-900 uppercase">CLÁUSULA SEGUNDA - DAS OBRIGAÇÕES DA CONTRATADA</strong><br />
             A CONTRATADA se compromete a:
           </p>
           <ul className="list-disc pl-6 space-y-1">
-            <li>Realizar uma anÃ¡lise detalhada da situaÃ§Ã£o do(a) CONTRATANTE junto ao SCR.</li>
-            <li>Elaborar e protocolar os requerimentos administrativos necessÃ¡rios junto Ã s instituiÃ§Ãµes financeiras pertinentes.</li>
-            <li>Acompanhar o andamento dos procedimentos, empregando seus melhores esforÃ§os tÃ©cnicos para a obtenÃ§Ã£o do resultado almejado.</li>
+            <li>Realizar uma análise detalhada da situação do(a) CONTRATANTE junto ao SCR.</li>
+            <li>Elaborar e protocolar os requerimentos administrativos necessários junto às instituições financeiras pertinentes.</li>
+            <li>Acompanhar o andamento dos procedimentos, empregando seus melhores esforços técnicos para a obtenção do resultado almejado.</li>
             <li>Manter o(a) CONTRATANTE informado sobre as etapas e o andamento do processo.</li>
-            <li>Prestar o serviÃ§o dentro do mais alto padrÃ£o de Ã©tica e profissionalismo.</li>
+            <li>Prestar o serviço dentro do mais alto padrão de ética e profissionalismo.</li>
           </ul>
 
           <p>
-            <strong className="text-gray-900 uppercase">CLÃUSULA TERCEIRA - DAS OBRIGAÃ‡Ã•ES DO(A) CONTRATANTE</strong><br />
+            <strong className="text-gray-900 uppercase">CLÁUSULA TERCEIRA - DAS OBRIGAÇÕES DO(A) CONTRATANTE</strong><br />
             <strong>3.1.</strong> O(A) CONTRATANTE se compromete a:
           </p>
           <ul className="list-disc pl-6 space-y-1">
-            <li>Fornecer Ã  CONTRATADA todos os documentos e informaÃ§Ãµes solicitados, de forma completa e verdadeira, para a correta execuÃ§Ã£o dos serviÃ§os.</li>
-            <li>Efetuar o pagamento dos honorÃ¡rios nas datas e valores acordados neste instrumento.</li>
-            <li>NÃ£o tratar diretamente com as instituiÃ§Ãµes financeiras sobre o objeto deste contrato sem o prÃ©vio conhecimento e anuÃªncia da CONTRATADA.</li>
+            <li>Fornecer à CONTRATADA todos os documentos e informações solicitados, de forma completa e verdadeira, para a correta execução dos serviços.</li>
+            <li>Efetuar o pagamento dos honorários nas datas e valores acordados neste instrumento.</li>
+            <li>Não tratar diretamente com as instituições financeiras sobre o objeto deste contrato sem o prévio conhecimento e anuência da CONTRATADA.</li>
           </ul>
 
           <p>
-            <strong className="text-gray-900 uppercase">CLÃUSULA QUARTA - DO VALOR E DA FORMA DE PAGAMENTO</strong><br />
-            <strong>4.1.</strong> Pelos serviÃ§os prestados, o(a) CONTRATANTE pagarÃ¡ Ã  CONTRATADA o valor total de{' '}
+            <strong className="text-gray-900 uppercase">CLÁUSULA QUARTA - DO VALOR E DA FORMA DE PAGAMENTO</strong><br />
+            <strong>4.1.</strong> Pelos serviços prestados, o(a) CONTRATANTE pagará à CONTRATADA o valor total de{' '}
             <strong>{formatCurrency(contrato.valor_total)}</strong> ({contrato.valor_total_extenso}), a ser pago da seguinte forma:
           </p>
           <ul className="list-disc pl-6 space-y-1">
@@ -461,59 +461,59 @@ export default function VisualizarContratoPage() {
           </ul>
 
           <p>
-            <strong className="text-gray-900 uppercase">CLÃUSULA QUINTA - DO PRAZO DE EXECUÃ‡ÃƒO</strong><br />
-            O prazo estimado para a conclusÃ£o dos serviÃ§os Ã© de 45 (quarenta e cinco) a 60 (sessenta) dias Ãºteis, 
-            contados a partir da data de assinatura deste instrumento e da confirmaÃ§Ã£o do pagamento da entrada.
+            <strong className="text-gray-900 uppercase">CLÁUSULA QUINTA - DO PRAZO DE EXECUÇÃO</strong><br />
+            O prazo estimado para a conclusão dos serviços é de 45 (quarenta e cinco) a 60 (sessenta) dias úteis, 
+            contados a partir da data de assinatura deste instrumento e da confirmação do pagamento da entrada.
           </p>
 
           <p>
-            <strong className="text-gray-900 uppercase">CLÃUSULA SEXTA - DA GARANTIA DE RESULTADO E POLÃTICA DE REEMBOLSO</strong><br />
-            O serviÃ§o objeto deste contrato Ã© de resultado, vinculado Ã  efetiva baixa e atualizaÃ§Ã£o dos apontamentos 
-            de prejuÃ­zo no Sistema de InformaÃ§Ãµes de CrÃ©dito (SCR) do Banco Central, conforme o escopo definido na ClÃ¡usula Primeira.
+            <strong className="text-gray-900 uppercase">CLÁUSULA SEXTA - DA GARANTIA DE RESULTADO E POLÍTICA DE REEMBOLSO</strong><br />
+            O serviço objeto deste contrato é de resultado, vinculado à efetiva baixa e atualização dos apontamentos 
+            de prejuízo no Sistema de Informações de Crédito (SCR) do Banco Central, conforme o escopo definido na Cláusula Primeira.
           </p>
           <p>
-            Caso a CONTRATADA nÃ£o comprove a conclusÃ£o do serviÃ§o no prazo mÃ¡ximo de 60 (sessenta) dias Ãºteis, 
-            o presente contrato serÃ¡ considerado automaticamente rescindido por inadimplemento da CONTRATADA.
+            Caso a CONTRATADA não comprove a conclusão do serviço no prazo máximo de 60 (sessenta) dias úteis, 
+            o presente contrato será considerado automaticamente rescindido por inadimplemento da CONTRATADA.
           </p>
           <p>
-            Na hipÃ³tese de rescisÃ£o por descumprimento do prazo, a CONTRATADA deverÃ¡ realizar a devoluÃ§Ã£o integral 
-            dos valores jÃ¡ pagos pelo(a) CONTRATANTE, no prazo de atÃ© 30 (trinta) dias Ãºteis apÃ³s o tÃ©rmino do prazo contratual.
+            Na hipótese de rescisão por descumprimento do prazo, a CONTRATADA deverá realizar a devolução integral 
+            dos valores já pagos pelo(a) CONTRATANTE, no prazo de até 30 (trinta) dias úteis após o término do prazo contratual.
           </p>
 
           <p>
-            <strong className="text-gray-900 uppercase">CLÃUSULA SÃ‰TIMA - DO INADIMPLEMENTO DO(A) CONTRATANTE</strong><br />
-            Em caso de atraso no pagamento de qualquer parcela, o valor devido serÃ¡ acrescido de:
+            <strong className="text-gray-900 uppercase">CLÁUSULA SÉTIMA - DO INADIMPLEMENTO DO(A) CONTRATANTE</strong><br />
+            Em caso de atraso no pagamento de qualquer parcela, o valor devido será acrescido de:
           </p>
           <ul className="list-disc pl-6 space-y-1">
             <li>Multa de 10% (dez por cento) sobre o valor da parcela em atraso;</li>
-            <li>Juros de mora de 1% (um por cento) ao mÃªs, calculados pro rata die;</li>
-            <li>CorreÃ§Ã£o monetÃ¡ria pelo Ã­ndice IPCA/IBGE, ou outro que venha a substituÃ­-lo.</li>
+            <li>Juros de mora de 1% (um por cento) ao mês, calculados pro rata die;</li>
+            <li>Correção monetária pelo índice IPCA/IBGE, ou outro que venha a substituí-lo.</li>
           </ul>
           <p>
-            O atraso superior a 30 (trinta) dias no pagamento de qualquer parcela poderÃ¡ ensejar a suspensÃ£o dos 
-            serviÃ§os e, a critÃ©rio da CONTRATADA, a rescisÃ£o do presente contrato.
+            O atraso superior a 30 (trinta) dias no pagamento de qualquer parcela poderá ensejar a suspensão dos 
+            serviços e, a critério da CONTRATADA, a rescisão do presente contrato.
           </p>
 
           <p>
-            <strong className="text-gray-900 uppercase">CLÃUSULA OITAVA - DA ALOCAÃ‡ÃƒO DE RECURSOS E DA IRREVERSIBILIDADE DOS CUSTOS</strong><br />
-            O(A) CONTRATANTE declara estar ciente de que o processo de contrataÃ§Ã£o foi dividido em duas fases distintas: 
-            (I) a fase de anÃ¡lise e onboarding, de carÃ¡ter gratuito e sem compromisso; e (II) a fase de execuÃ§Ã£o do serviÃ§o.
+            <strong className="text-gray-900 uppercase">CLÁUSULA OITAVA - DA ALOCAÇÃO DE RECURSOS E DA IRREVERSIBILIDADE DOS CUSTOS</strong><br />
+            O(A) CONTRATANTE declara estar ciente de que o processo de contratação foi dividido em duas fases distintas: 
+            (I) a fase de análise e onboarding, de caráter gratuito e sem compromisso; e (II) a fase de execução do serviço.
           </p>
           <p>
             Ao assinar este contrato, o(a) CONTRATANTE autoriza e a CONTRATADA se compromete a alocar, de forma 
-            imediata e irreversÃ­vel, os recursos humanos e materiais necessÃ¡rios para o protocolo e acompanhamento 
+            imediata e irreversível, os recursos humanos e materiais necessários para o protocolo e acompanhamento 
             do procedimento administrativo.
           </p>
 
           <p>
-            <strong className="text-gray-900 uppercase">CLÃUSULA NONA - DA CONFIDENCIALIDADE</strong><br />
-            As partes se comprometem a manter em sigilo todas as informaÃ§Ãµes e documentos a que tiverem acesso em 
-            decorrÃªncia deste contrato, nÃ£o podendo divulgÃ¡-los a terceiros sem a prÃ©via autorizaÃ§Ã£o da outra parte.
+            <strong className="text-gray-900 uppercase">CLÁUSULA NONA - DA CONFIDENCIALIDADE</strong><br />
+            As partes se comprometem a manter em sigilo todas as informações e documentos a que tiverem acesso em 
+            decorrência deste contrato, não podendo divulgá-los a terceiros sem a prévia autorização da outra parte.
           </p>
 
           <p>
-            <strong className="text-gray-900 uppercase">CLÃUSULA DÃ‰CIMA - DO FORO</strong><br />
-            Para dirimir quaisquer controvÃ©rsias oriundas do CONTRATO, as partes elegem o foro da Comarca de SÃ£o Paulo/SP.
+            <strong className="text-gray-900 uppercase">CLÁUSULA DÉCIMA - DO FORO</strong><br />
+            Para dirimir quaisquer controvérsias oriundas do CONTRATO, as partes elegem o foro da Comarca de São Paulo/SP.
           </p>
 
           <p className="mt-6">
@@ -538,7 +538,7 @@ export default function VisualizarContratoPage() {
           </div>
           <div className="text-center">
             <div className="border-t-2 border-black pt-2 mt-16">
-              <p className="font-bold text-base">FC SERVIÃ‡OS E SOLUÃ‡Ã•ES ADMINISTRATIVAS LTDA</p>
+              <p className="font-bold text-base">FC SERVIÇOS E SOLUÇÕES ADMINISTRATIVAS LTDA</p>
               <p className="text-xs text-gray-600">CNPJ: 57.815.628/0001-62</p>
               <p className="text-xs text-gray-500 uppercase mt-1 font-semibold">CONTRATADA</p>
             </div>
@@ -562,9 +562,9 @@ export default function VisualizarContratoPage() {
           </div>
         </div>
 
-        {/* RodapÃ© */}
+        {/* Rodapé */}
         <div className="mt-8 pt-3 border-t border-gray-300 text-center text-xs text-gray-500">
-          <p>FC SoluÃ§Ãµes Financeiras - CNPJ: 57.815.628/0001-62</p>
+          <p>FC Soluções Financeiras - CNPJ: 57.815.628/0001-62</p>
           <p>Documento gerado em {formatDate(new Date().toISOString())}</p>
         </div>
       </div>
@@ -600,7 +600,7 @@ export default function VisualizarContratoPage() {
         </div>
       </div>
 
-      {/* AÃ§Ãµes */}
+      {/* Ações */}
       <div className="flex items-center gap-2 mb-6">
         <Button 
           variant="outline" 
@@ -639,7 +639,7 @@ export default function VisualizarContratoPage() {
       {/* Tabs */}
       <Tabs defaultValue="preview" className="flex-1">
         <TabsList>
-          <TabsTrigger value="preview">VisualizaÃ§Ã£o</TabsTrigger>
+          <TabsTrigger value="preview">Visualização</TabsTrigger>
           <TabsTrigger value="data">Dados</TabsTrigger>
         </TabsList>
         
@@ -657,7 +657,7 @@ export default function VisualizarContratoPage() {
               <h3 className="font-semibold mb-4">Dados do Contrato</h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="flex justify-between py-2 border-b">
-                  <span className="text-gray-500">NÃºmero:</span>
+                  <span className="text-gray-500">Número:</span>
                   <span className="font-medium">{contrato.numero}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b">

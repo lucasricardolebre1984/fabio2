@@ -138,6 +138,20 @@ Atualizado em: 10/02/2026
 - status:
   - piloto CNH pronto para validacao funcional do cliente;
   - apos validacao visual/operacional, liberar carga dos modelos restantes no mesmo padrao.
+
+## Atualizacao tecnica (2026-02-11 - normalizacao de acentuacao contratos)
+- contexto:
+  - apos homologacao funcional do piloto CNH, foi identificado bug visual de encoding no contrato (`mojibake`) em preview e PDF.
+- acao aplicada:
+  - normalizacao UTF-8 em:
+    - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`;
+    - `frontend/src/lib/pdf.ts`;
+    - `backend/app/services/pdf_service_playwright.py`;
+    - ajuste pontual em `frontend/src/app/(dashboard)/contratos/novo/page.tsx`.
+- resultado:
+  - cabecalho institucional, clausulas, campos das partes e assinatura voltaram a exibir acentos corretos.
+- padrao para proximos lotes:
+  - novos contratos em `.md` devem manter texto canonico UTF-8 desde template ate renderizacao final (preview e PDF), sem strings legadas com mojibake.
   - logo oficial aplicada na geracao PDF backend (Playwright).
 - Inclusao do novo contrato CADIN PF/PJ:
   - template `contratos/templates/cadin.json` criado com base em `contratos/cadinpfpjmodelo.docx`;
@@ -726,3 +740,12 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
 - status consolidado:
   - resolvidos: `BUG-072`, `BUG-076`, `BUG-077`;
   - em validacao final: `BUG-015`, `BUG-016`, `BUG-061`, `BUG-062`.
+
+## Atualizacao tecnica (2026-02-11 - playbook oficial de subida de modelos .md)
+- documentacao operacional criada para eliminar margem de erro de agentes na carga de novos contratos:
+  - `docs/CONTRATOS/PLAYBOOK_MODELOS_MD.md`
+- o playbook define:
+  - arquivos obrigatorios por etapa (template, fallback, menu, novo, preview, PDF frontend, PDF backend);
+  - gates de encoding UTF-8 (anti-mojibake);
+  - validacao tecnica e funcional obrigatoria;
+  - checklist final de entrega e fechamento documental.
