@@ -600,3 +600,38 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
   - template JSON, fallback backend, menu, criacao, preview, PDF frontend/backend, validacao tecnica/funcional e fechamento documental.
 - objetivo:
   - permitir carga dos proximos 9-10 modelos com processo replicavel e sem margem de erro.
+
+## Estado Contratos (2026-02-12 - lote completo de modelos `.md` integrado)
+- modelos ativos adicionados ao sistema:
+  - aumento_score, ccf, certificado_digital, diagnostico360, limpa_nome_express, limpa_nome_standard, rating_convencional, rating_express_pj, remocao_proposta, revisional.
+- fluxo ponta a ponta habilitado:
+  - menu `/contratos`;
+  - criacao `/contratos/novo?template=<id>`;
+  - preview `/contratos/[id]` com clausulas dinamicas;
+  - PDF frontend (`src/lib/pdf.ts`) e PDF backend (`pdf_service_playwright.py`) com clausulas dinamicas e substituicao de placeholders.
+- governanca:
+  - BUG institucional associado: `BUG-080` => **Resolvido**.
+- validacao:
+  - backend `py_compile` => OK;
+  - frontend `type-check` => OK;
+  - frontend `lint` direcionado => OK (warning residual de `<img>` nao bloqueante).
+
+## Estado Contratos (2026-02-12 - incidente de clausulas nao renderizadas)
+- sintoma em producao local:
+  - preview de contrato exibindo "Clausulas nao cadastradas" mesmo apos carga dos modelos `.md`.
+- causa raiz confirmada por diagnostico read-only:
+  - backend em container nao encontra `contratos/templates/*.json` no runtime atual;
+  - tabela `contrato_templates` local sem seed (`0 rows`);
+  - API cai em fallback vazio (`clausulas: null`) em `GET /api/v1/contratos/templates/{id}`.
+- governanca:
+  - incidente formalizado como `BUG-081` em `docs/BUGSREPORT.md`;
+  - correcao ainda nao aplicada neste bloco (somente diagnostico + plano).
+
+## Estado Git (2026-02-12 - copia de seguranca)
+- copia de seguranca confirmada no remoto:
+  - `HEAD` local e `origin/main` alinhados em `42cc294`.
+- estado de trabalho atual:
+  - worktree local com alteracoes pendentes (modificados + novos arquivos) ainda sem commit.
+- implicacao:
+  - rollback para checkpoint remoto e possivel a qualquer momento;
+  - alteracoes locais atuais exigem commit dedicado antes de novo push.

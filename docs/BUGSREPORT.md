@@ -1,7 +1,7 @@
 ﻿# BUGSREPORT - Registro de Bugs
 
 > **Projeto:** FC SoluÃ§Ãµes Financeiras SaaS  
-> **Ãšltima AtualizaÃ§Ã£o:** 2026-02-11
+> **Ãšltima AtualizaÃ§Ã£o:** 2026-02-12
 
 ---
 
@@ -73,6 +73,7 @@
 | BUG-075 | Alta | LP/HTML | Landing page externa exibindo trecho de JavaScript como texto por bloco duplicado apos fechamento estrutural do documento | Resolvido |
 | BUG-076 | Alta | VIVA/UI Conversacao | Modo de conversacao da VIVA ficou acoplado ao chat normal (topo da pagina) em vez de ativacao dedicada por botao lateral/submenu | Resolvido |
 | BUG-077 | Alta | VIVA/UI Conversacao | Conversa continua por voz + avatar central dedicado ainda nao atingiu experiencia institucional final | Resolvido |
+| BUG-081 | Alta | Contratos/Templates Runtime | Clausulas nao aparecem no preview/PDF porque backend no container nao encontra `contratos/templates/*.json` e responde fallback vazio | Ativo (diagnostico concluido) |
 
 ---
 
@@ -1180,3 +1181,69 @@
   - `python -m py_compile backend/app/services/pdf_service_playwright.py` => OK;
   - `frontend`: `npm run type-check` => OK;
   - `frontend`: `npm run lint -- --file src/lib/pdf.ts --file src/app/(dashboard)/contratos/[id]/page.tsx --file src/app/(dashboard)/contratos/novo/page.tsx` => OK (apenas warnings conhecidos nao bloqueantes).
+
+### BUG-080: Modelos restantes em `.md` nao habilitados ponta a ponta no sistema de contratos
+**Data:** 2026-02-12
+**Severidade:** Alta
+**Descricao:** os modelos enviados em `.md` (Aumento de Score, CCF, Certificado Digital, Diagnostico 360, Limpa Nome Express, Limpa Nome Standard, Rating Convencional, Rating Express PJ, Remocao de Proposta, Revisional) ainda nao estavam operacionais em menu, criacao, preview e PDF institucional.
+**Passos:** 1. abrir `/contratos` 2. tentar selecionar os modelos do novo lote 3. validar indisponibilidade de fluxo completo.
+**Esperado:** todos os modelos `.md` ativos no menu e funcionais de ponta a ponta com clausulas corretas e acentuacao valida.
+**Atual:** lote integrado com templates ativos no menu, criacao liberada e renderizacao dinamica de clausulas no preview/PDF.
+**Status:** Resolvido
+
+### Atualizacao 2026-02-12 (execucao BUG-080 - lote completo de modelos `.md`)
+- templates adicionados em `contratos/templates/`:
+  - `aumento_score.json`
+  - `ccf.json`
+  - `certificado_digital.json`
+  - `diagnostico360.json`
+  - `limpa_nome_express.json`
+  - `limpa_nome_standard.json`
+  - `rating_convencional.json`
+  - `rating_express_pj.json`
+  - `remocao_proposta.json`
+  - `revisional.json`
+- consolidacao de template institucional:
+  - `contratos/templates/cnh.json` atualizado com clausulas estruturadas e subtitulo;
+  - `contratos/templates/bacen.json` e `contratos/templates/cadin.json` com `subtitulo` canonico.
+- backend:
+  - `backend/app/services/contrato_service.py` atualizado com fallbacks para os 10 novos `template_id`;
+  - `backend/app/services/pdf_service_playwright.py` refeito para renderizar clausulas dinamicas dos templates JSON com substituicao de placeholders.
+- frontend:
+  - `frontend/src/app/(dashboard)/contratos/page.tsx` com os 10 novos modelos ativos no menu;
+  - `frontend/src/app/(dashboard)/contratos/novo/page.tsx` aceitando os novos `template_id` no fluxo de criacao;
+  - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx` refeito para preview dinamico por template (clausulas JSON + tokens);
+  - `frontend/src/lib/pdf.ts` refeito para PDF dinamico por template (clausulas JSON + tokens);
+  - `frontend/src/lib/api.ts` com `contratosApi.getTemplate`.
+- schemas:
+  - `backend/app/schemas/contrato.py` ajustado para retorno de template JSON sem exigir `created_at`.
+- validacao tecnica:
+  - `python -m py_compile backend/app/services/contrato_service.py backend/app/services/pdf_service_playwright.py backend/app/schemas/contrato.py` => OK;
+  - `frontend`: `npm run type-check` => OK;
+  - `frontend`: `npm run lint -- --file src/app/(dashboard)/contratos/page.tsx --file src/app/(dashboard)/contratos/novo/page.tsx --file src/app/(dashboard)/contratos/[id]/page.tsx --file src/lib/pdf.ts --file src/lib/api.ts` => OK (warning residual de `<img>` nao bloqueante).
+
+### BUG-081: Clausulas ausentes em runtime local apos carga dos modelos
+**Data:** 2026-02-12
+**Severidade:** Alta
+**Descricao:** apesar dos JSON de modelos estarem no workspace, a API de templates entrega fallback vazio (`campos=[]`, `secoes=[]`, `clausulas=null`) no runtime Docker local, causando preview/PDF com "Clausulas nao cadastradas".
+**Passos:** 1. abrir `/contratos/{id}` de contrato novo 2. visualizar texto "Clausulas nao cadastradas" 3. consultar `GET /api/v1/contratos/templates/{id}` e observar `clausulas: null`.
+**Esperado:** API entregar template completo com clausulas do JSON e renderizar todas as clausulas no preview/PDF.
+**Atual:** fallback institucional vazio sendo usado para todos os templates.
+**Status:** Ativo (diagnostico concluido)
+
+### Atualizacao 2026-02-12 (diagnostico read-only BUG-081)
+- evidencias coletadas:
+  - tabela `contrato_templates` no Postgres local: `0 rows` (sem seed em banco para substituir JSON);
+  - container `fabio2-backend` sem path de templates:
+    - `/app/contratos/templates` => ausente;
+    - `/app/backend/contratos/templates` => ausente;
+  - API retornando fallback vazio:
+    - `GET /api/v1/contratos/templates/bacen` => `nome: Contrato de Adesao ao Bacen`, `clausulas: null`;
+    - mesma resposta observada para os demais templates do lote.
+- causa raiz confirmada:
+  - loader atual em `backend/app/services/contrato_service.py` depende de paths que nao existem dentro do container em execucao;
+  - sem DB seed e sem arquivo encontrado, o sistema cai em `FALLBACK_TEMPLATES` (estrutura minima sem clausulas).
+- acao planejada (sem execucao nesta rodada):
+  1. corrigir montagem/path de `contratos/templates` no runtime backend;
+  2. unificar loader para contrato + PDF com busca robusta por ambiente;
+  3. manter retrocompatibilidade de clausulas (`conteudo` e `paragrafos`) para nao perder BACEN legado.

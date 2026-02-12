@@ -749,3 +749,59 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
   - gates de encoding UTF-8 (anti-mojibake);
   - validacao tecnica e funcional obrigatoria;
   - checklist final de entrega e fechamento documental.
+
+## Atualizacao Operacional (2026-02-12 - execucao lote completo dos modelos `.md`)
+- escopo executado:
+  - integracao dos 10 modelos restantes enviados em `.md` no fluxo oficial de contratos.
+- templates novos adicionados:
+  - `contratos/templates/aumento_score.json`
+  - `contratos/templates/ccf.json`
+  - `contratos/templates/certificado_digital.json`
+  - `contratos/templates/diagnostico360.json`
+  - `contratos/templates/limpa_nome_express.json`
+  - `contratos/templates/limpa_nome_standard.json`
+  - `contratos/templates/rating_convencional.json`
+  - `contratos/templates/rating_express_pj.json`
+  - `contratos/templates/remocao_proposta.json`
+  - `contratos/templates/revisional.json`
+- consolidacao de templates base:
+  - `contratos/templates/cnh.json` atualizado com clausulas estruturadas;
+  - `contratos/templates/bacen.json` e `contratos/templates/cadin.json` com `subtitulo` canonico.
+- backend:
+  - `backend/app/services/contrato_service.py` com fallbacks dos novos templates;
+  - `backend/app/services/pdf_service_playwright.py` convertido para renderizacao dinamica por template JSON;
+  - `backend/app/schemas/contrato.py` adaptado para resposta de template JSON sem `created_at` obrigatorio.
+- frontend:
+  - `frontend/src/app/(dashboard)/contratos/page.tsx` com 10 novos cards ativos;
+  - `frontend/src/app/(dashboard)/contratos/novo/page.tsx` aceitando todos os `template_id` do lote;
+  - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx` migrado para preview dinamico de clausulas;
+  - `frontend/src/lib/pdf.ts` migrado para PDF dinamico de clausulas;
+  - `frontend/src/lib/api.ts` com `contratosApi.getTemplate`.
+- validacao tecnica:
+  - `python -m py_compile backend/app/services/contrato_service.py backend/app/services/pdf_service_playwright.py backend/app/schemas/contrato.py` => OK;
+  - `frontend`: `npm run type-check` => OK;
+  - `frontend`: `npm run lint -- --file src/app/(dashboard)/contratos/page.tsx --file src/app/(dashboard)/contratos/novo/page.tsx --file src/app/(dashboard)/contratos/[id]/page.tsx --file src/lib/pdf.ts --file src/lib/api.ts` => OK (apenas warning nao bloqueante de `<img>` no preview).
+
+## Atualizacao Operacional (2026-02-12 - reabertura contratos sem clausulas)
+- contexto:
+  - apos validacao visual em `/contratos/{id}`, contratos novos exibiram "Clausulas nao cadastradas".
+- diagnostico read-only executado:
+  - API `GET /api/v1/contratos/templates/{id}` retornando fallback vazio (`clausulas: null`) para todos os IDs do lote;
+  - Postgres local (`contrato_templates`) sem registros (`0 rows`);
+  - container backend sem diretorio de templates no runtime:
+    - `/app/contratos/templates` ausente;
+    - `/app/backend/contratos/templates` ausente.
+- conclusao:
+  - os JSON existem no workspace host, mas nao estao acessiveis dentro do container backend atual, forçando fallback sem clausulas.
+- protocolo:
+  - bug reaberto/formalizado como `BUG-081` em `docs/BUGSREPORT.md`;
+  - correcao ficou planejada em 3 etapas (path runtime, loader unificado, retrocompatibilidade de clausulas), sem aplicacao de codigo nesta rodada.
+
+## Atualizacao Git (2026-02-12 - verificacao de copia de seguranca)
+- branch atual: `main`
+- remoto: `origin` -> `https://github.com/lucasricardolebre1984/fabio2.git`
+- checkpoint confirmado:
+  - `HEAD` local = `origin/main` no commit `42cc294` (`docs(contratos): formaliza playbook de modelos md e estabiliza acentuacao`).
+- observacao importante:
+  - existe copia de seguranca remota nesse commit;
+  - estado atual ainda possui alteracoes locais nao commitadas (worktree suja), incluindo templates e ajustes de contratos.
