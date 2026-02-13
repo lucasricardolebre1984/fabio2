@@ -1,8 +1,8 @@
 ﻿# ARQUITETURA - Visao Geral
 
 > **Projeto:** FC Solucoes Financeiras SaaS  
-> **Versao:** 1.1.0  
-> **Data:** 2026-02-10
+> **Versao:** 1.2.0  
+> **Data:** 2026-02-13
 
 ---
 
@@ -36,7 +36,7 @@ Regra de arquitetura:
 ## Prompt Mestre (fonte ativa)
 
 - Prompt mestre da VIVA interna: `backend/app/services/viva_concierge_service.py`.
-- Montagem das mensagens do chat: `backend/app/api/v1/viva.py` (`_build_viva_concierge_messages`).
+- Montagem das mensagens do chat: `backend/app/services/viva_chat_domain_service.py` (`_build_viva_concierge_messages`).
 - Frontend nao injeta mais prompt por arquivo no payload de chat.
 
 Observacao:
@@ -54,13 +54,15 @@ Fluxo atual do chat VIVA:
 5. modelo responde com base no contexto reconstruido.
 
 Arquivos-chave:
-- `backend/app/api/v1/viva.py` (sessao, snapshot, reconstrucao de contexto);
+- `backend/app/services/viva_chat_session_service.py` (sessao/snapshot/contexto);
+- `backend/app/services/viva_chat_orchestrator_service.py` (orquestracao principal);
 - `frontend/src/app/viva/page.tsx` (envio de mensagem e `session_id`).
 
 Status:
 - memoria de sessao e continuidade operacional ativas;
 - memoria media em Redis ativa por sessao;
-- memoria longa vetorial provisionada em pgvector (`viva_memory_vectors`), porem com indisponibilidade funcional na busca semantica nesta rodada.
+- memoria longa vetorial ativa em pgvector (`viva_memory_vectors`) com fallback local de embeddings quando OpenAI falhar por quota/rede;
+- para operacao institucional, RAG fica **indisponivel para homologacao semantica premium** enquanto depender de fallback local sem rodada de qualidade dedicada.
 
 Referencia institucional desta rodada:
 - `docs/ARCHITECTURE/VIVA_ORQUESTRADOR_SKILLS_BLUEPRINT.md`
@@ -120,7 +122,61 @@ Decisao vigente:
 Implementacao atual (DECISAO-031):
 - curta: snapshot de chat;
 - media: Redis por sessao;
-- longa: busca semantica vetorial com embeddings OpenAI.
+- longa: busca semantica vetorial com embeddings OpenAI + fallback local controlado.
+
+Critico para comercializacao:
+- status de qualidade semantica deve ser homologado antes de vender modulo de memoria como diferencial.
+- sem essa homologacao, modulo de memoria deve ser vendido como "contexto assistido" e nao como "RAG premium garantido".
+
+---
+
+## Orquestrador + Skills (arquitetura alvo comercial)
+
+Componente central:
+- `viva_orchestrator` como ponto unico de roteamento por intencao.
+
+Contrato minimo de skill:
+- `skill_id`
+- `trigger_intents`
+- `input_schema`
+- `output_schema`
+- `safety_rules`
+- `observability_keys`
+
+Skill obrigatoria de campanhas:
+- `generate_campanha` (baseada em `docs/PROMPTS/SKILLS/VIVA_SKILL_GHD_COPY_CAMPAIGN.md`).
+
+---
+
+## Divisao em Modulos de Produto (pre-config para novas vendas)
+
+1. `core_saas`: auth, clientes, contratos, agenda, permissao, billing.
+2. `modulo_viva`: chat interno, orquestrador, memoria curta/media/longa.
+3. `modulo_viviane`: atendimento externo WhatsApp e handoff operacional.
+4. `modulo_campanhas`: planner criativo + geracao de imagem + historico de criativos.
+5. `modulo_memoria`: base semantica, indexacao, metricas e governanca de retention.
+
+Regra de produto:
+- VIVA e Viviane permanecem separadas por dominio;
+- uma pode saber da outra via handoff estruturado, sem mistura de persona.
+
+---
+
+## Fala Continua e Avatar (estado atual)
+
+Estado implementado em `frontend/src/app/viva/page.tsx`:
+- escuta continua: `SpeechRecognition/webkitSpeechRecognition` do browser;
+- voz de resposta: `window.speechSynthesis`;
+- transcricao OpenAI (`/api/v1/viva/audio/transcribe`) apenas para audio anexado/manual.
+
+Risco:
+- qualidade de voz e estabilidade variam por SO/browser;
+- nao ha pipeline realtime dedicado de voz com identidade vocal institucional fixa.
+
+Pendencias abertas:
+- trocar avatar para o asset oficial enviado pelo cliente;
+- selecionar voz oficial e padronizar provider;
+- validar stack de fala ao vivo para reduzir dependencia da engine nativa do navegador.
 
 ---
 
@@ -146,4 +202,4 @@ Implementacao atual (DECISAO-031):
 
 ---
 
-*Documento atualizado em: 2026-02-10*
+*Documento atualizado em: 2026-02-13*

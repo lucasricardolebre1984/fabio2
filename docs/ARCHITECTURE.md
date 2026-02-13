@@ -1,8 +1,8 @@
 ﻿# ARQUITETURA - Resumo Executivo
 
 > **Projeto:** FC Soluções Financeiras SaaS  
-> **Versão:** 1.0.0  
-> **Data:** 2026-02-05
+> **Versão:** 1.1.0  
+> **Data:** 2026-02-13
 
 ---
 
@@ -40,7 +40,7 @@ Dados
 ## Fluxos-Chave
 
 - Contrato: template → formulário → cálculo automático → preview → PDF (browser print)
-- VIVA chat: mensagens internas no `/viva` com prompts laterais
+- VIVA chat: mensagens internas no `/viva` com orquestracao server-side e memoria por sessao
 - WhatsApp: webhook → processamento → resposta VIVA → painel de conversas
 
 ---
@@ -53,7 +53,7 @@ Dados
 
 ---
 
-*Documento atualizado em: 2026-02-05*
+*Documento atualizado em: 2026-02-13*
 
 ---
 
@@ -71,3 +71,27 @@ Essa camada define:
 - linguagem e postura comercial da Viviane;
 - portfolio e contexto institucional da Rezeta;
 - tabela base de oferta com margem operacional.
+
+---
+
+## Atualizacao 2026-02-13 - memoria, modulos e 3 gates
+
+Memoria oficial da VIVA:
+- curta: historico de sessao em Postgres;
+- media: Redis por sessao;
+- longa: pgvector com fallback local de embeddings em falha de quota OpenAI.
+
+Status institucional do RAG:
+- operacional para continuidade, mas indisponivel para homologacao semantica premium sem rodada formal de qualidade.
+
+Arquitetura de produto para comercializacao por modulos:
+1. `core_saas`
+2. `modulo_viva`
+3. `modulo_viviane`
+4. `modulo_campanhas`
+5. `modulo_memoria`
+
+Plano de fechamento em 3 gates:
+1. governanca + rollback institucional (concluido);
+2. consolidacao documental e contrato de orquestrador/skills (concluido nesta rodada);
+3. homologacao final de fala continua, avatar, voz e qualidade semantica do RAG (pendente).

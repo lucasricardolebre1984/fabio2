@@ -1,7 +1,7 @@
 # SESSION - contexto atual da sessao
 
-Sessao ativa: 10/02/2026
-Status: rodada GODMOD pre-clean iniciada (persona dual + limpeza estrutural + memoria/RAG)
+Sessao ativa: 13/02/2026
+Status: rodada de consolidacao documental e plano em 3 gates para modularizacao comercial
 Branch: main
 
 ## Resumo executivo
@@ -1269,3 +1269,31 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
   - `GET /api/v1/viva/memory/status` => `vector_enabled=true`, `redis_enabled=true`, `total_vectors=486`.
 - status:
   - BUG-091 fechado como resolvido com evidencias.
+
+## Atualizacao Operacional (2026-02-13 - plano institucional em 3 gates + modulo de voz)
+- rollback institucional desta rodada criado antes da edicao de docs:
+  - `docs/ROLLBACK/rollback-20260213-140923-pre-doc-gates-baseline.txt`
+  - `docs/ROLLBACK/rollback-20260213-140923-pre-doc-gates.patch`
+  - `docs/ROLLBACK/rollback-20260213-140923-pre-doc-gates-staged.patch`
+  - `docs/ROLLBACK/rollback-20260213-140923-pre-doc-gates-untracked.txt`
+- memoria e contexto (estado oficial):
+  - prompt principal unico da VIVA: `backend/app/services/viva_concierge_service.py`;
+  - montagem de contexto do chat: `backend/app/services/viva_chat_domain_service.py`;
+  - memoria curta: historico/snapshot de sessao em Postgres;
+  - memoria media: Redis por sessao;
+  - memoria longa: pgvector (`viva_memory_vectors`) com fallback local de embedding quando OpenAI falhar.
+- status institucional do RAG para a pauta atual:
+  - **indisponivel para homologacao semantica premium** enquanto operar sem saldo OpenAI e sem rodada formal de qualidade semantica;
+  - operacional tecnicamente para continuidade (fallback local), mas ainda pendente de validacao de qualidade em producao.
+- fala continua (diagnostico confirmado em codigo):
+  - reconhecimento de voz continuo hoje usa API nativa do navegador (`SpeechRecognition/webkitSpeechRecognition`);
+  - voz de resposta usa `window.speechSynthesis` (dependente das vozes instaladas no SO/browser);
+  - endpoint OpenAI de transcricao (`/api/v1/viva/audio/transcribe`, `gpt-4o-mini-transcribe`) e usado no fluxo de audio anexado/manual, nao no loop de conversa continua.
+- plano de execucao em 3 gates para fechamento desta fase:
+  - Gate 1 (concluido nesta rodada): baseline/rollback + congelamento de contexto institucional.
+  - Gate 2 (documentado e pendente de execucao tecnica): separar modulos comercializaveis (`core_saas`, `modulo_viva`, `modulo_viviane`, `modulo_campanhas`, `modulo_memoria`), mantendo um orquestrador unico de skills.
+  - Gate 3 (pendente): homologacao final de voz/avatar/realtime + certificacao de qualidade do RAG + pacote de onboarding para novas vendas.
+- pendencias abertas por solicitacao do cliente:
+  - trocar avatar da VIVA para o novo asset institucional enviado pelo cliente;
+  - definir voz oficial com qualidade superior para modo conversa continua;
+  - validar API/modelo de voz ao vivo dedicado (nao dependente apenas de APIs nativas do navegador).

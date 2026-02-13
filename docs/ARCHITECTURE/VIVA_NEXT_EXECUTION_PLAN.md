@@ -54,3 +54,31 @@ Concluir estabilizacao final da VIVA com foco em qualidade criativa de campanhas
 
 ## Mitigacao
 - Manter protocolo docs-first + rollback institucional antes de cada bloco.
+
+---
+
+## Atualizacao 2026-02-13 - Plano Fechado em 3 Gates
+
+### Gate 1 - Governanca e rollback (concluido)
+- snapshot pre-change criado em `docs/ROLLBACK/rollback-20260213-140923-pre-doc-gates-*`;
+- estado atual consolidado em `SESSION`, `STATUS`, `ARCHITECTURE` e `BUGSREPORT`.
+
+### Gate 2 - Modularizacao comercial (em andamento)
+- estruturar produto em modulos pre-configurados:
+  1. `core_saas`
+  2. `modulo_viva`
+  3. `modulo_viviane`
+  4. `modulo_campanhas`
+  5. `modulo_memoria`
+- manter um orquestrador unico com roteamento por skills (`generate_campanha` como skill obrigatoria).
+
+### Gate 3 - Homologacao final (pendente)
+- fala continua com stack de voz ao vivo padronizada;
+- troca do avatar oficial da VIVA;
+- definicao de voz institucional;
+- certificacao semantica do RAG para venda modular premium.
+
+Criterio de saida do Gate 3:
+- voz consistente em multiplos dispositivos;
+- avatar oficial ativo no frontend;
+- RAG com score/relevancia validados por conjunto de casos reais.

@@ -1,7 +1,7 @@
 ﻿# BUGSREPORT - Registro de Bugs
 
 > **Projeto:** FC SoluÃ§Ãµes Financeiras SaaS  
-> **Ãšltima AtualizaÃ§Ã£o:** 2026-02-13 (rodada VIVA RAG fallback local + validacao runtime)
+> **Ãšltima AtualizaÃ§Ã£o:** 2026-02-13 (rodada de governanca 3 gates + voz/avatar/RAG premium)
 
 ---
 
@@ -81,6 +81,9 @@
 | BUG-089 | Alta | VIVA/Campanhas | Em modo `FC/REZETA`, conversa comum podia ser sequestrada para fluxo de campanha por inferencia ampla de tema livre | Resolvido |
 | BUG-090 | Alta | VIVA/UI Chat | Recuperacao de chats antigos indisponivel no frontend (somente snapshot da sessao mais recente) | Resolvido |
 | BUG-091 | Alta | VIVA/RAG Runtime | RAG semantico indisponivel no runtime atual (reindex sem indexacao e search vazio), com dependencia de embeddings OpenAI sem saldo | Resolvido |
+| BUG-092 | Alta | VIVA/Fala Continua | Conversa por voz depende de APIs nativas do navegador (SpeechRecognition + speechSynthesis), com qualidade/estabilidade variavel e sem pipeline realtime institucional | Ativo |
+| BUG-093 | Media | VIVA/Avatar | Avatar do modo Conversa VIVA ainda usa fallback local antigo e nao o asset institucional novo enviado pelo cliente | Ativo |
+| BUG-094 | Alta | VIVA/RAG Qualidade | RAG roda com fallback local sem embeddings OpenAI, mas ainda sem homologacao semantica premium para operacao comercial | Ativo |
 
 ---
 
@@ -1759,3 +1762,40 @@
   - `GET /api/v1/viva/memory/status` apos rodada => `total_vectors=486`.
 - status:
   - `BUG-091` baixado para **Resolvido**.
+
+### BUG-092: Fala continua depende de motor nativo de navegador
+**Data:** 2026-02-13
+**Severidade:** Alta
+**Descricao:** o modo `Conversa VIVA` usa `SpeechRecognition/webkitSpeechRecognition` para escuta continua e `window.speechSynthesis` para fala da assistente. Isso gera variacao de qualidade e estabilidade por browser/SO, sem voz institucional fixa.
+**Passos:** 1. abrir `/viva` 2. ativar `Conversa VIVA` 3. testar em navegadores/dispositivos diferentes.
+**Esperado:** pipeline de voz ao vivo padronizado, com modelo/provedor controlado e qualidade previsivel.
+**Atual:** qualidade depende do browser e das vozes instaladas localmente.
+**Status:** Ativo
+
+### BUG-093: Avatar institucional da VIVA ainda nao aplicado
+**Data:** 2026-02-13
+**Severidade:** Media
+**Descricao:** o frontend usa fallback de avatars locais (`/viva-avatar.png`, `/viva-avatar-3d.png`, `/viva.png`) e ainda nao recebeu o novo avatar institucional aprovado pelo cliente.
+**Passos:** 1. abrir `/viva` no modo conversa 2. observar avatar renderizado.
+**Esperado:** avatar oficial novo padronizado e unico no fluxo principal.
+**Atual:** fallback antigo permanece ativo.
+**Status:** Ativo
+
+### BUG-094: RAG sem homologacao semantica premium para venda modular
+**Data:** 2026-02-13
+**Severidade:** Alta
+**Descricao:** apos fallback local de embeddings, o RAG voltou a funcionar tecnicamente, mas ainda nao ha homologacao formal de qualidade semantica para cenarios comerciais de alta exigencia.
+**Passos:** 1. executar lote de buscas semanticas de regressao 2. comparar relevancia entre fallback local e embeddings OpenAI 3. avaliar taxa de acerto por caso real.
+**Esperado:** qualidade semantica auditada com criterio minimo e aprovacao institucional para comercializacao.
+**Atual:** status tecnico funciona, mas certificacao de qualidade ainda pendente.
+**Status:** Ativo
+
+### Atualizacao 2026-02-13 (triagem de voz/avatar/RAG premium)
+- evidencia tecnica de implementacao atual:
+  - escuta continua via browser: `frontend/src/app/viva/page.tsx` (`SpeechRecognition/webkitSpeechRecognition`);
+  - fala da assistente via browser: `window.speechSynthesis`;
+  - transcricao OpenAI para audio anexado/manual: `POST /api/v1/viva/audio/transcribe` (`gpt-4o-mini-transcribe`).
+- impacto:
+  - experiencia de voz ainda nao padronizada para operacao institucional.
+- acao institucional:
+  - manter `BUG-092`, `BUG-093` e `BUG-094` ativos ate fechamento do Gate 3.

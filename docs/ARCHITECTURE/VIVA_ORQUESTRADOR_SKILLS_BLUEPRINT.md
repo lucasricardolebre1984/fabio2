@@ -32,13 +32,13 @@ Regra institucional:
 
 ### 1.3 Status real da memoria/RAG (runtime)
 Evidencia desta rodada:
-- `GET /api/v1/viva/memory/status` => `vector_enabled=true`, `redis_enabled=true`, `total_vectors=373`.
-- `POST /api/v1/viva/memory/reindex?limit=200` => `processed=200`, `indexed=0`.
-- `GET /api/v1/viva/memory/search?q=agenda&limit=3` => `items=[]`.
+- `GET /api/v1/viva/memory/status` => `vector_enabled=true`, `redis_enabled=true`, `total_vectors=486`.
+- `POST /api/v1/viva/memory/reindex?limit=120` => `processed=120`, `indexed=112`.
+- `GET /api/v1/viva/memory/search?q=agenda compromisso gabriela&limit=5` => `total=5`.
 
 Conclusao:
 - Memoria curta/media: operacional.
-- Memoria longa semantica (RAG): indisponivel funcionalmente no estado atual.
+- Memoria longa semantica (RAG): operacional tecnicamente com fallback local, porem sem homologacao semantica premium para comercializacao.
 
 ---
 
@@ -174,7 +174,7 @@ Criterio de aceite do RAG:
 ## 7) Checkpoint para pausa/retomada
 
 Persistido nesta rodada:
-- status tecnico real do RAG (indisponivel funcionalmente);
+- status tecnico real do RAG (operacional com fallback local e homologacao premium pendente);
 - blueprint alvo do orquestrador unico + personas separadas;
 - contrato da skill `generate_campanha`;
 - shortlist oficial de skills para uso no projeto.

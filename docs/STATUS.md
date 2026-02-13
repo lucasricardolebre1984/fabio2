@@ -1,8 +1,8 @@
 # STATUS do projeto - FC Solucoes Financeiras
 
-Data: 10/02/2026
-Sessao: rodada GODMOD de limpeza estrutural (persona dual + memoria + RAG) em execucao
-Status: V1.9 em transicao arquitetural controlada com rollback institucional pre-clean
+Data: 13/02/2026
+Sessao: rodada de consolidacao documental, governanca de memoria e planejamento em 3 gates
+Status: V2.0 em transicao para modularizacao comercial do SaaS
 
 ## Objetivo atual
 Consolidar operacao comercial da Viviane no WhatsApp com regras de negocio,
@@ -757,4 +757,41 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
   - `BUG-073` => **Resolvido**
   - `BUG-081` => **Resolvido**
   - `BUG-088` => **Resolvido**
-  - `BUG-062` permanece **Ativo** (monolito `viva.py`, refatoracao estrutural pendente).
+  - `BUG-062` estava **Ativo** neste checkpoint historico (hoje resolvido).
+
+## Estado VIVA/Memoria (2026-02-13 - baseline para modularizacao comercial)
+- status de arquitetura:
+  - `BUG-062` resolvido (router VIVA minimo e orquestracao em services dedicados).
+- prompt principal ativo:
+  - `backend/app/services/viva_concierge_service.py`.
+- orquestracao de chat:
+  - `backend/app/services/viva_chat_orchestrator_service.py`.
+- memoria oficial:
+  - curta (Postgres chat sessions);
+  - media (Redis por sessao);
+  - longa (pgvector com fallback local de embedding em falta de saldo OpenAI).
+- status institucional do RAG:
+  - funcional para continuidade, mas **indisponivel para homologacao semantica premium** ate nova prova de qualidade com embeddings OpenAI.
+
+## Estado Fala Continua (2026-02-13)
+- modulo ainda nao atende padrao institucional final:
+  - captura de voz continua depende de `SpeechRecognition/webkitSpeechRecognition` do navegador;
+  - voz de resposta depende de `window.speechSynthesis` local (qualidade variavel por dispositivo).
+- endpoint OpenAI de audio atual:
+  - `POST /api/v1/viva/audio/transcribe` com `gpt-4o-mini-transcribe` para audio anexado/manual.
+- pendencias de UX:
+  - troca do avatar para novo asset oficial;
+  - definicao de voz oficial de melhor qualidade;
+  - avaliacao de pipeline de voz ao vivo dedicado para reduzir dependencia do browser.
+
+## Plano Oficial em 3 Gates (fechamento da pauta)
+1. Gate 1 - Governanca e seguranca (concluido)
+   - rollback pre-doc registrado em `docs/ROLLBACK/rollback-20260213-140923-pre-doc-gates-*`;
+   - contexto consolidado em `SESSION`, `STATUS`, `ARCHITECTURE` e `BUGSREPORT`.
+2. Gate 2 - Modularizacao para venda por pacotes (em andamento)
+   - separar SaaS em modulos: `core_saas`, `modulo_viva`, `modulo_viviane`, `modulo_campanhas`, `modulo_memoria`;
+   - manter orquestrador unico com roteamento por skills (incluindo `generate_campanha`).
+3. Gate 3 - Homologacao final de IA conversacional (a concluir)
+   - voz/avatars institucionais;
+   - validacao de modelo/API de fala ao vivo;
+   - certificacao de qualidade do RAG para operacao comercial sem perda de contexto.
