@@ -1108,3 +1108,20 @@ Foi identificado drift entre documentacao operacional e runtime atual (credencia
 
 ### Data
 2026-02-13
+
+## DECISAO-033: hardening do parser de handoff para regex unicode estavel
+
+### Contexto
+Durante a rodada de validacao dos bugs ativos de VIVA, o fluxo `agenda + aviso no WhatsApp` apresentou erro interno `bad character range €-Ã` na extracao de nome de cliente, causado por faixa de regex corrompida no router.
+
+### Decisao
+- Ajustar `_extract_cliente_nome` em `backend/app/api/v1/viva.py` para:
+  - usar faixa unicode explicita com escapes (`\\u00C0-\\u00FF`) em vez de caracteres mojibake;
+  - reconhecer tokens de corte com variacoes acentuadas (`amanhã`, `às`) de forma segura.
+
+### Impacto
+- Elimina erro 500 intermitente no fluxo de handoff via chat.
+- Mantem operacao `Fabio -> VIVA -> Viviane` com rastreabilidade de tarefa.
+
+### Data
+2026-02-13

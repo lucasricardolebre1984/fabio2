@@ -937,3 +937,23 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
   - `docs/DEPLOY_UBUNTU_DOCKER.md` atualizado para `OPENAI_API_KEY`.
 - governanca:
   - `BUG-086` e `BUG-087` formalizados e baixados como **Resolvidos** em `docs/BUGSREPORT.md`.
+
+## Atualizacao Operacional (2026-02-13 - rodada de bugs ativos VIVA/Contratos)
+- rollback pre-fix registrado em:
+  - `docs/ROLLBACK/rollback-20260213-061013-pre-bug-active-round-baseline.txt`
+  - `docs/ROLLBACK/rollback-20260213-061013-pre-bug-active-round.patch`
+  - `docs/ROLLBACK/rollback-20260213-061013-pre-bug-active-round-staged.patch`
+  - `docs/ROLLBACK/rollback-20260213-061013-pre-bug-active-round-untracked.txt`
+- correcao aplicada:
+  - `backend/app/api/v1/viva.py`:
+    - `_extract_cliente_nome` ajustado para regex unicode estavel (`\\u00C0-\\u00FF`), eliminando erro `bad character range`.
+- validacao de runtime (auth + chat + handoff + contratos):
+  - `POST /api/v1/viva/chat` com frase natural de agendamento (`BUG-073`) => criou compromisso com confirmacao;
+  - `POST /api/v1/viva/chat` com entrada parcial de agenda (`BUG-063`) => follow-up contextual sem template fixo;
+  - `POST /api/v1/viva/chat` com agenda+WhatsApp (`BUG-064`) => criou handoff com ID;
+  - `POST /api/v1/viva/handoff/process-due` => processou tarefa vencida com status `sent`;
+  - varredura dos 15 templates em `GET /api/v1/contratos/templates/{id}` com clausulas > 0 (`BUG-081`);
+  - `GET /api/v1/contratos/{id}/pdf` => `200 application/pdf`.
+- governanca:
+  - `BUG-063`, `BUG-064`, `BUG-073`, `BUG-081` e `BUG-088` baixados para **Resolvido**.
+  - `BUG-062` mantido **Ativo** por escopo estrutural (monolito `viva.py`).

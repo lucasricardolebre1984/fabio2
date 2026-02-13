@@ -1227,10 +1227,18 @@ def _extract_phone_candidate(texto: str) -> Optional[str]:
 
 
 def _extract_cliente_nome(texto: str) -> Optional[str]:
-    match = re.search(r"cliente\s+([A-Za-zÃ€-Ã¿0-9 ]{2,80})", texto or "", flags=re.IGNORECASE)
+    match = re.search(
+        r"cliente\s+([A-Za-z\u00C0-\u00FF0-9 ]{2,80})",
+        texto or "",
+        flags=re.IGNORECASE,
+    )
     if not match:
         return None
-    raw = re.split(r"\b(amanha|hoje|as|Ã s|no|na|dia|whatsapp)\b", match.group(1), flags=re.IGNORECASE)[0]
+    raw = re.split(
+        r"\b(amanha|amanhã|hoje|as|às|no|na|dia|whatsapp)\b",
+        match.group(1),
+        flags=re.IGNORECASE,
+    )[0]
     cleaned = " ".join(raw.split()).strip(" -,:;")
     return cleaned if len(cleaned) >= 2 else None
 

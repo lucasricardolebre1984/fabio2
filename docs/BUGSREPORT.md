@@ -682,7 +682,7 @@
 **Passos:** 1. enviar pedido de agenda com variacao natural 2. observar resposta exigindo template textual.
 **Esperado:** follow-up contextual curto e inteligente, sem exigir frase identica.
 **Atual:** fallback com frase fixa e orientacao rigida.
-**Status:** Ativo
+**Status:** Resolvido
 
 ### BUG-064: Falta de handoff completo VIVA -> Viviane por agenda
 **Data:** 2026-02-10
@@ -691,7 +691,7 @@
 **Passos:** 1. pedir para VIVA agendar e avisar cliente 2. validar disparo automatico no horario.
 **Esperado:** orquestracao fluida `Fabio -> VIVA -> Viviane -> Fabio` com rastreabilidade.
 **Atual:** fluxo parcial, sem motor de handoff operacional fechado.
-**Status:** Ativo
+**Status:** Resolvido
 
 ### BUG-065: Falha de serializacao `meta_json` na listagem de handoff
 **Data:** 2026-02-10
@@ -911,7 +911,7 @@
 **Passos:** 1. abrir `/viva` 2. enviar mensagem de criacao usando verbo de acao ("agende ... amanha as 10") 3. observar resposta da VIVA.
 **Esperado:** criar compromisso para amanha as 10 e confirmar criacao (com ID/retorno de agenda).
 **Atual:** VIVA responde com listagem vazia de amanha e nao executa criacao.
-**Status:** Ativo
+**Status:** Resolvido
 
 ### Atualizacao 2026-02-11 (registro institucional de encerramento do dia)
 - Solicitacao do usuario: apenas documentar o incidente e encerrar a rodada para retomada amanha.
@@ -1233,7 +1233,7 @@
 **Passos:** 1. abrir `/contratos/{id}` de contrato novo 2. visualizar texto "Clausulas nao cadastradas" 3. consultar `GET /api/v1/contratos/templates/{id}` e observar `clausulas: null`.
 **Esperado:** API entregar template completo com clausulas do JSON e renderizar todas as clausulas no preview/PDF.
 **Atual:** fallback institucional vazio sendo usado para todos os templates.
-**Status:** Em validacao (runtime corrigido)
+**Status:** Resolvido
 
 ### Atualizacao 2026-02-12 (diagnostico read-only BUG-081)
 - evidencias coletadas:
@@ -1435,3 +1435,32 @@
   - `docs/MANUAL_DO_CLIENTE.md` atualizado com status real de audio no `/viva` e escopo atual de contratos;
   - `docs/API.md` atualizado com endpoints complementares ativos e status atual da VIVA em OpenAI;
   - `docs/DEPLOY_UBUNTU_DOCKER.md` alinhado para `OPENAI_API_KEY` (sem dependencia operacional de ZAI).
+
+### BUG-088: Regex de extração de cliente no handoff gera erro `bad character range`
+**Data:** 2026-02-13
+**Severidade:** Alta
+**Descricao:** no fluxo de agenda + handoff via `/api/v1/viva/chat`, a extração de nome do cliente usa regex com faixa de caracteres corrompida (`Ãƒâ‚¬-ÃƒÂ¿`), podendo disparar erro interno `bad character range €-Ã`.
+**Passos:** 1. enviar pedido no chat com "agende ... e avise no whatsapp ..." 2. observar retorno `500` com erro de regex.
+**Esperado:** fluxo de handoff processar sem erro de regex e retornar resposta de agendamento/handoff.
+**Atual:** erro interno de regex interrompe o fluxo em alguns inputs.
+**Status:** Resolvido
+
+### Atualizacao 2026-02-13 (execucao BUG-063 + BUG-064 + BUG-073 + BUG-081 + BUG-088)
+- `BUG-063` (rigidez de agenda) validado com fallback contextual:
+  - entrada parcial: `agende uma reuniao com o cliente Joao para a agenda`;
+  - resposta: follow-up curto contextual, sem template fixo prescritivo;
+  - validacao: nao houve retorno do formato legado `agendar TITULO | DD/MM/AAAA HH:MM`.
+- `BUG-064` (handoff completo) validado ponta a ponta:
+  - chat: `agende retorno ... e avise no whatsapp ...` criou compromisso e retornou `Handoff ... (ID: ...)`;
+  - endpoint: `POST /api/v1/viva/handoff/process-due` processou tarefa vencida com resultado `sent`;
+  - rastreabilidade: tarefa consultada em `GET /api/v1/viva/handoff` com status final atualizado.
+- `BUG-073` (agendamento natural) validado:
+  - frase de incidente: `agende o Andre amanha as 10 para mim. Mande para a agenda.`;
+  - resultado: compromisso criado com confirmacao objetiva no chat.
+- `BUG-081` (clausulas runtime) validado como resolvido:
+  - 15 templates operacionais conferidos via `GET /api/v1/contratos/templates/{id}` com `clausulas > 0`;
+  - geracao de contrato + PDF backend validada (`GET /api/v1/contratos/{id}/pdf` => `200 application/pdf`).
+- `BUG-088` (regex corrompida no handoff) corrigido em:
+  - `backend/app/api/v1/viva.py` (`_extract_cliente_nome`);
+  - ajuste para regex unicode estavel com escapes `\\u00C0-\\u00FF` e tokens de corte com `amanhã/às`;
+  - validacao: fluxo de chat com handoff voltou a responder sem `500` por regex.

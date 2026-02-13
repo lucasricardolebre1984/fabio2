@@ -742,3 +742,19 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
 - governanca:
   - `BUG-086` (drift de documentacao) => **Resolvido**;
   - `BUG-087` (segredos em compose legado) => **Resolvido**.
+
+## Estado VIVA/Contratos (2026-02-13 - fechamento de bugs ativos prioritarios)
+- backend:
+  - corrigido parser de nome de cliente no handoff em `backend/app/api/v1/viva.py` para eliminar erro de regex (`bad character range`) em mensagens de agenda + WhatsApp.
+- validacao funcional executada (runtime local):
+  - `BUG-073`: frase natural de agendamento criou compromisso com confirmacao;
+  - `BUG-063`: fallback de agenda permaneceu contextual, sem template textual rigido;
+  - `BUG-064`: fluxo `agenda + handoff` validado com criacao/listagem/processamento de tarefa;
+  - `BUG-081`: todos os 15 templates operacionais retornando clausulas, com PDF backend `200 application/pdf`.
+- governanca:
+  - `BUG-063` => **Resolvido**
+  - `BUG-064` => **Resolvido**
+  - `BUG-073` => **Resolvido**
+  - `BUG-081` => **Resolvido**
+  - `BUG-088` => **Resolvido**
+  - `BUG-062` permanece **Ativo** (monolito `viva.py`, refatoracao estrutural pendente).
