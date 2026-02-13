@@ -1252,3 +1252,20 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
     - `rollback-20260213-073005-pre-viva-chat-session-service-extract*`
 - status esperado apos esta rodada:
   - repositorio limpo (`git status` sem pendencias) para pausa e retomada com contexto maximo.
+
+## Atualizacao Operacional (2026-02-13 - fix BUG-091 RAG com fallback local)
+- objetivo:
+  - restaurar funcionalidade de memoria longa sem depender exclusivamente de saldo OpenAI para embeddings.
+- implementacao:
+  - `backend/app/services/openai_service.py`:
+    - fallback local deterministico de embeddings em `embed_text` para falhas/quota/rede;
+  - `backend/app/services/viva_memory_service.py`:
+    - coercao de dimensao de embedding para `1536` antes de insert/search em pgvector;
+  - `backend/app/config.py`:
+    - `OPENAI_EMBEDDING_FALLBACK_LOCAL=true` por padrao.
+- validacao runtime:
+  - `POST /api/v1/viva/memory/reindex?limit=120` => `processed=120`, `indexed=112`;
+  - `GET /api/v1/viva/memory/search?q=agenda compromisso gabriela&limit=5` => `total=5`;
+  - `GET /api/v1/viva/memory/status` => `vector_enabled=true`, `redis_enabled=true`, `total_vectors=486`.
+- status:
+  - BUG-091 fechado como resolvido com evidencias.

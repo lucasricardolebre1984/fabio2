@@ -1,7 +1,7 @@
 ﻿# BUGSREPORT - Registro de Bugs
 
 > **Projeto:** FC SoluÃ§Ãµes Financeiras SaaS  
-> **Ãšltima AtualizaÃ§Ã£o:** 2026-02-13 (rodada VIVA skills/orquestrador + status RAG)
+> **Ãšltima AtualizaÃ§Ã£o:** 2026-02-13 (rodada VIVA RAG fallback local + validacao runtime)
 
 ---
 
@@ -80,7 +80,7 @@
 | BUG-085 | Media | Contratos/Templates Base | Templates legados `bacen`, `cadin` e `cnh` permaneceram fora do metodo padrao novo (estrutura heterogenea e placeholders inconsistentes) | Resolvido |
 | BUG-089 | Alta | VIVA/Campanhas | Em modo `FC/REZETA`, conversa comum podia ser sequestrada para fluxo de campanha por inferencia ampla de tema livre | Resolvido |
 | BUG-090 | Alta | VIVA/UI Chat | Recuperacao de chats antigos indisponivel no frontend (somente snapshot da sessao mais recente) | Resolvido |
-| BUG-091 | Alta | VIVA/RAG Runtime | RAG semantico indisponivel no runtime atual (reindex sem indexacao e search vazio), com dependencia de embeddings OpenAI sem saldo | Ativo |
+| BUG-091 | Alta | VIVA/RAG Runtime | RAG semantico indisponivel no runtime atual (reindex sem indexacao e search vazio), com dependencia de embeddings OpenAI sem saldo | Resolvido |
 
 ---
 
@@ -1743,3 +1743,19 @@
   - memoria longa semantica (RAG) fica indisponivel funcionalmente.
 - acao institucional aberta:
   - manter `BUG-091` ativo ate restaurar indexacao vetorial e busca semantica com prova de vida.
+
+### Atualizacao 2026-02-13 (BUG-091 - fix fallback local de embeddings + prova de vida)
+- correcao aplicada:
+  - `backend/app/services/openai_service.py`:
+    - `embed_text` recebeu fallback local deterministico por hashing quando API de embeddings falha (inclui cenario de sem saldo/quota);
+    - tratamento de excecao de rede/parse com degradacao segura para fallback.
+  - `backend/app/services/viva_memory_service.py`:
+    - normalizacao de dimensao do vetor para `1536` (truncate/pad) antes de inserir/buscar no pgvector.
+  - `backend/app/config.py`:
+    - nova flag `OPENAI_EMBEDDING_FALLBACK_LOCAL` (padrao `true`).
+- validacao runtime autenticada:
+  - `POST /api/v1/viva/memory/reindex?limit=120` => `processed=120`, `indexed=112`;
+  - `GET /api/v1/viva/memory/search?q=agenda compromisso gabriela&limit=5` => `total=5` (hits retornados com score);
+  - `GET /api/v1/viva/memory/status` apos rodada => `total_vectors=486`.
+- status:
+  - `BUG-091` baixado para **Resolvido**.

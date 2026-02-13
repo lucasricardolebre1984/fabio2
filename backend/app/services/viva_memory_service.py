@@ -59,6 +59,20 @@ class VivaMemoryService:
     def _vector_literal(embedding: List[float]) -> str:
         return "[" + ",".join(f"{float(item):.10f}" for item in embedding) + "]"
 
+    def _coerce_embedding_dim(self, embedding: Optional[List[float]]) -> Optional[List[float]]:
+        if not embedding:
+            return None
+        vector = [float(item) for item in embedding if item is not None]
+        if not vector:
+            return None
+
+        target = int(self.embedding_dim)
+        if len(vector) > target:
+            return vector[:target]
+        if len(vector) < target:
+            return vector + [0.0] * (target - len(vector))
+        return vector
+
     async def ensure_storage(self, db: AsyncSession) -> Dict[str, bool]:
         if self._storage_checked and self.vector_enabled:
             redis_ok = bool(await self._get_redis())
@@ -190,7 +204,7 @@ class VivaMemoryService:
         if len(clean) < 12:
             return False
 
-        embedding = await openai_service.embed_text(clean)
+        embedding = self._coerce_embedding_dim(await openai_service.embed_text(clean))
         if not embedding:
             return False
 
@@ -262,7 +276,7 @@ class VivaMemoryService:
         if not clean_query:
             return []
 
-        embedding = await openai_service.embed_text(clean_query)
+        embedding = self._coerce_embedding_dim(await openai_service.embed_text(clean_query))
         if not embedding:
             return []
 

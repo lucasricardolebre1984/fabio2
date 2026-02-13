@@ -99,6 +99,7 @@ class Settings(BaseSettings):
     OPENAI_IMAGE_MODEL: str = "gpt-image-1"
     OPENAI_VISION_MODEL: str = "gpt-4o-mini"
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
+    OPENAI_EMBEDDING_FALLBACK_LOCAL: bool = True
     OPENAI_TIMEOUT_SECONDS: int = 60
 
     # VIVA provider strategy (institucional): openai

@@ -1,6 +1,9 @@
 """
 OpenAI service for VIVA chat and audio transcription.
 """
+import hashlib
+import math
+import re
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -19,6 +22,8 @@ class OpenAIService:
         self.model_image = settings.OPENAI_IMAGE_MODEL
         self.model_vision = settings.OPENAI_VISION_MODEL
         self.model_embedding = settings.OPENAI_EMBEDDING_MODEL
+        self.embedding_fallback_local = bool(settings.OPENAI_EMBEDDING_FALLBACK_LOCAL)
+        self.embedding_fallback_dim = 1536
         self.timeout = float(settings.OPENAI_TIMEOUT_SECONDS)
 
     def _headers(self) -> Dict[str, str]:
@@ -304,44 +309,83 @@ class OpenAIService:
         return f"Erro OpenAI vision ({response.status_code}): {response.text[:300]}"
 
     async def embed_text(self, text: str) -> Optional[List[float]]:
-        if not self.api_key:
-            return None
-
         clean = str(text or "").strip()
         if not clean:
             return None
+
+        if not self.api_key:
+            return self._fallback_embed_text(clean) if self.embedding_fallback_local else None
 
         payload: Dict[str, Any] = {
             "model": self.model_embedding,
             "input": clean,
         }
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(
-                f"{self.base_url}/embeddings",
-                headers=self._headers(),
-                json=payload,
-            )
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(
+                    f"{self.base_url}/embeddings",
+                    headers=self._headers(),
+                    json=payload,
+                )
+        except Exception:
+            return self._fallback_embed_text(clean) if self.embedding_fallback_local else None
 
         if response.status_code != 200:
-            return None
+            return self._fallback_embed_text(clean) if self.embedding_fallback_local else None
 
-        data = response.json()
+        try:
+            data = response.json()
+        except Exception:
+            return self._fallback_embed_text(clean) if self.embedding_fallback_local else None
         items = data.get("data")
         if not isinstance(items, list) or not items:
-            return None
+            return self._fallback_embed_text(clean) if self.embedding_fallback_local else None
 
         first = items[0] if isinstance(items[0], dict) else {}
         embedding = first.get("embedding")
         if not isinstance(embedding, list):
-            return None
+            return self._fallback_embed_text(clean) if self.embedding_fallback_local else None
 
         vector: List[float] = []
         for item in embedding:
             try:
                 vector.append(float(item))
             except Exception:
-                return None
+                return self._fallback_embed_text(clean) if self.embedding_fallback_local else None
         return vector
+
+    def _fallback_embed_text(self, text: str) -> Optional[List[float]]:
+        """Deterministic local hash embedding to keep RAG functional without API quota."""
+        clean = str(text or "").strip().lower()
+        if not clean:
+            return None
+
+        dim = self.embedding_fallback_dim
+        vector = [0.0] * dim
+
+        tokens = re.findall(r"[a-z0-9]+", clean)
+        if not tokens:
+            tokens = [clean]
+
+        for token in tokens:
+            digest = hashlib.sha256(token.encode("utf-8")).digest()
+            idx = int.from_bytes(digest[:4], "big") % dim
+            sign = -1.0 if (digest[4] & 1) else 1.0
+            weight = 1.0 + (float(digest[5]) / 255.0) * 0.5
+            vector[idx] += sign * weight
+
+        # Add a small whole-text anchor to reduce collisions for short phrases.
+        full_digest = hashlib.sha256(clean.encode("utf-8")).digest()
+        for offset in range(0, 16, 4):
+            idx = int.from_bytes(full_digest[offset:offset + 4], "big") % dim
+            sign = -1.0 if (full_digest[(offset + 4) % len(full_digest)] & 1) else 1.0
+            vector[idx] += sign * 0.35
+
+        norm = math.sqrt(sum(value * value for value in vector))
+        if norm <= 1e-12:
+            return None
+
+        return [value / norm for value in vector]
 
     def get_status(self) -> Dict[str, Any]:
         return {
