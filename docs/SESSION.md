@@ -1386,3 +1386,18 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
   - `BUG-092` baixado para resolvido (validacao de front confirmada pelo cliente);
   - `BUG-094` movido para em validacao;
   - `BUG-061`, `BUG-015`, `BUG-016` mantidos em validacao com nova rodada de robustez aplicada.
+
+## Atualizacao Operacional (2026-02-13 - UX de fala curta + voz institucional)
+- rollback desta micro-rodada:
+  - `docs/ROLLBACK/rollback-20260213-180837-pre-concise-voice-lock-baseline.txt`
+  - `docs/ROLLBACK/rollback-20260213-180837-pre-concise-voice-lock.patch`
+  - `docs/ROLLBACK/rollback-20260213-180837-pre-concise-voice-lock-staged.patch`
+  - `docs/ROLLBACK/rollback-20260213-180837-pre-concise-voice-lock-untracked.txt`
+- resposta textual da VIVA simplificada para reduzir "falacao":
+  - `backend/app/services/viva_concierge_service.py` reforca regra de resposta curta (ate 2 frases por padrao);
+  - `backend/app/services/viva_chat_orchestrator_service.py` reduziu `max_tokens` e temperatura para respostas mais diretas;
+  - `backend/app/services/viva_chat_domain_service.py` usa janela menor de historico para reduzir prolixidade residual.
+- voz:
+  - `frontend/src/app/viva/page.tsx` passou a detectar status de TTS institucional;
+  - quando MiniMax estiver configurado, nao faz fallback para voz nativa do navegador (Google) em falha de sintese;
+  - exibe mensagem de erro curta para ajuste do provider.

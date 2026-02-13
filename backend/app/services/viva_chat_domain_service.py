@@ -153,7 +153,7 @@ def _build_viva_concierge_messages(
                 ),
             }
         )
-    for msg in contexto[-60:]:
+    for msg in contexto[-25:]:
         tipo = str(msg.get("tipo") or "")
         conteudo = str(msg.get("conteudo") or "").strip()
         if not conteudo:

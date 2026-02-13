@@ -1789,6 +1789,15 @@
 - status:
   - `BUG-092` movido para **Resolvido** (validacao funcional em front realizada pelo cliente).
 
+### Atualizacao 2026-02-13 (BUG-092 - ajuste fino: evitar voz de navegador quando MiniMax estiver ativo)
+- ajuste aplicado apos feedback do cliente ("voz ainda Google"):
+  - `frontend/src/app/viva/page.tsx`:
+    - passa a consultar `GET /api/v1/viva/status` para detectar `tts.configured`;
+    - quando MiniMax estiver configurado e a sintese falhar, nao cai para `speechSynthesis`;
+    - exibe erro operacional curto para correcao do provider, evitando troca silenciosa para voz nativa do navegador.
+- resultado esperado:
+  - manter consistencia da voz institucional quando provider externo estiver habilitado.
+
 ### BUG-093: Avatar institucional da VIVA ainda nao aplicado
 **Data:** 2026-02-13
 **Severidade:** Media

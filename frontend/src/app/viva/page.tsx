@@ -289,6 +289,7 @@ export default function VivaChatPage() {
   const [menuAberto, setMenuAberto] = useState(true)
   const [modoConversacaoAtivo, setModoConversacaoAtivo] = useState(false)
   const [vozVivaAtiva, setVozVivaAtiva] = useState(true)
+  const [ttsProviderConfigured, setTtsProviderConfigured] = useState(false)
   const [escutaContinuaAtiva, setEscutaContinuaAtiva] = useState(false)
   const [transcricaoParcial, setTranscricaoParcial] = useState('')
   const [avatarFallback, setAvatarFallback] = useState(false)
@@ -798,6 +799,27 @@ export default function VivaChatPage() {
   }, [loadSessions])
 
   useEffect(() => {
+    let mounted = true
+    const loadTtsStatus = async () => {
+      try {
+        const response = await api.get('/viva/status')
+        const configured = Boolean(response?.data?.tts?.configured)
+        if (mounted) {
+          setTtsProviderConfigured(configured)
+        }
+      } catch {
+        if (mounted) {
+          setTtsProviderConfigured(false)
+        }
+      }
+    }
+    void loadTtsStatus()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  useEffect(() => {
     requestAnimationFrame(() => scrollToBottom())
   }, [mensagens, loading, scrollToBottom])
 
@@ -939,8 +961,10 @@ export default function VivaChatPage() {
       beginSpeech()
       stopAssistantPlayback()
       let spoke = await speakWithMinimax()
-      if (!spoke) {
+      if (!spoke && !ttsProviderConfigured) {
         await speakWithBrowserFallback()
+      } else if (!spoke && ttsProviderConfigured) {
+        setErroAudio('Voz institucional indisponivel no momento. Verifique MiniMax no backend.')
       }
       if (cancelled) return
       finishSpeech()
@@ -953,7 +977,7 @@ export default function VivaChatPage() {
       cancelled = true
       stopAssistantPlayback()
     }
-  }, [mensagens, modoConversacaoAtivo, vozVivaAtiva, startContinuousConversation, stopContinuousConversation, stopAssistantPlayback])
+  }, [mensagens, modoConversacaoAtivo, vozVivaAtiva, startContinuousConversation, stopContinuousConversation, stopAssistantPlayback, ttsProviderConfigured])
 
   const handleSend = useCallback(async (options?: SendOptions) => {
     const anexosAtuais = options?.anexosOverride ?? anexos
@@ -1515,10 +1539,8 @@ export default function VivaChatPage() {
       scrollToBottom(true)
     }
 
-    if (!novoEstado && typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel()
-    }
     if (!novoEstado) {
+      stopAssistantPlayback()
       stopContinuousConversation()
     } else {
       conversationShouldListenRef.current = true

@@ -19,7 +19,6 @@ from app.services.viva_chat_domain_service import (
     _build_viva_concierge_messages,
     _collect_campaign_fields_from_context,
     _extract_cast_preference,
-    _ensure_fabio_greeting,
     _extract_campaign_brief_fields,
     _generate_campaign_copy,
     _has_campaign_signal,
@@ -594,15 +593,14 @@ class VivaChatOrchestratorService:
                     )
                     resposta = await viva_model_service.chat(
                         messages=messages,
-                        temperature=0.58,
-                        max_tokens=700,
+                        temperature=0.45,
+                        max_tokens=220,
                     )
                     if not resposta or resposta.strip().lower().startswith(("erro", "error")):
                         messages_local = viva_local_service.build_messages(request.mensagem, contexto_efetivo)
                         resposta = await viva_local_service.chat(messages_local, modo)
 
                 resposta = _sanitize_fake_asset_delivery_reply(resposta, modo)
-                resposta = _ensure_fabio_greeting(request.mensagem, resposta)
                 return await finalize(resposta=resposta)
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
