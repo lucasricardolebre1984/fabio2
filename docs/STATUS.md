@@ -719,3 +719,13 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
   - frontend `lint` direcionado => OK (warning nao bloqueante existente sobre `<img>`).
 - status:
   - `BUG-084` => **Resolvido**.
+
+## Estado Contratos (2026-02-13 - BUG-085 executado)
+- escopo:
+  - padronizacao dos templates base `bacen`, `cadin` e `cnh` para o mesmo metodo dos modelos novos.
+- resultado:
+  - estrutura dos 3 templates unificada no padrao atual;
+  - placeholders institucionais alinhados para preview/PDF;
+  - suporte a token CNH (`[NÚMERO CNH]` / `[NUMERO CNH]`) adicionado em frontend e backend.
+- status:
+  - `BUG-085` => **Resolvido**.

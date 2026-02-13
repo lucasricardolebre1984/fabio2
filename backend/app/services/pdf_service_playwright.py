@@ -115,6 +115,9 @@ class PDFService:
         return text.strip()
 
     def _replace_tokens(self, value: str, contrato: Contrato) -> str:
+        dados_extras = contrato.dados_extras if isinstance(contrato.dados_extras, dict) else {}
+        cnh_numero = str(dados_extras.get("cnh_numero") or "-")
+
         mapped = {
             "[NOME COMPLETO DO CLIENTE]": str(contrato.contratante_nome or ""),
             "[NÚMERO DO DOCUMENTO]": self._format_document(contrato.contratante_documento),
@@ -123,6 +126,8 @@ class PDFService:
             "[TELEFONE DO CLIENTE]": str(contrato.contratante_telefone or "-"),
             "[ENDEREÇO COMPLETO DO CLIENTE]": str(contrato.contratante_endereco or ""),
             "[ENDERECO COMPLETO DO CLIENTE]": str(contrato.contratante_endereco or ""),
+            "[NÚMERO CNH]": cnh_numero,
+            "[NUMERO CNH]": cnh_numero,
             "[VALOR]": self._format_currency(contrato.valor_total),
             "[VALOR EXTENSO]": str(contrato.valor_total_extenso or ""),
             "[VALOR ENTRADA]": self._format_currency(contrato.valor_entrada),

@@ -132,6 +132,8 @@ function formatPrazoExtensoDisplay(value: unknown, extenso: unknown): string {
 }
 
 function replaceTemplateTokens(value: string, contractData: any): string {
+  const cnhNumero = String(contractData?.dados_extras?.cnh_numero || '-')
+
   const mapped: Record<string, string> = {
     '[NOME COMPLETO DO CLIENTE]': String(contractData?.contratante_nome || ''),
     '[NÚMERO DO DOCUMENTO]': formatDocument(contractData?.contratante_documento),
@@ -140,6 +142,8 @@ function replaceTemplateTokens(value: string, contractData: any): string {
     '[TELEFONE DO CLIENTE]': String(contractData?.contratante_telefone || '-'),
     '[ENDEREÇO COMPLETO DO CLIENTE]': String(contractData?.contratante_endereco || ''),
     '[ENDERECO COMPLETO DO CLIENTE]': String(contractData?.contratante_endereco || ''),
+    '[NÚMERO CNH]': cnhNumero,
+    '[NUMERO CNH]': cnhNumero,
     '[VALOR]': formatCurrency(contractData?.valor_total),
     '[VALOR EXTENSO]': String(contractData?.valor_total_extenso || ''),
     '[VALOR ENTRADA]': formatCurrency(contractData?.valor_entrada),

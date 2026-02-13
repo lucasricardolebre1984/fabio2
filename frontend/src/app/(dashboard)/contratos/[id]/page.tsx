@@ -263,6 +263,13 @@ export default function VisualizarContratoPage() {
   const clauses = Array.isArray(templateData?.clausulas) ? templateData!.clausulas : []
 
   const replaceTemplateTokens = (value: string) => {
+    const cnhNumero =
+      contrato.dados_extras &&
+      typeof contrato.dados_extras === 'object' &&
+      'cnh_numero' in contrato.dados_extras
+        ? String(contrato.dados_extras.cnh_numero || '-')
+        : '-'
+
     const mapped: Record<string, string> = {
       '[NOME COMPLETO DO CLIENTE]': contrato.contratante_nome,
       '[NÚMERO DO DOCUMENTO]': formatCPF(contrato.contratante_documento),
@@ -271,6 +278,8 @@ export default function VisualizarContratoPage() {
       '[TELEFONE DO CLIENTE]': contrato.contratante_telefone || '-',
       '[ENDEREÇO COMPLETO DO CLIENTE]': contrato.contratante_endereco,
       '[ENDERECO COMPLETO DO CLIENTE]': contrato.contratante_endereco,
+      '[NÚMERO CNH]': cnhNumero,
+      '[NUMERO CNH]': cnhNumero,
       '[VALOR]': formatCurrency(contrato.valor_total),
       '[VALOR EXTENSO]': contrato.valor_total_extenso,
       '[VALOR ENTRADA]': formatCurrency(contrato.valor_entrada),

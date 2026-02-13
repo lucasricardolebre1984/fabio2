@@ -77,6 +77,7 @@
 | BUG-082 | Alta | Contratos/Modelos MD | Modelos `rating_full_pj` e `jusbrasil` enviados em `.md` nao estao operacionais ponta a ponta (template/menu/criacao), impedindo uso funcional completo | Resolvido |
 | BUG-083 | Media | Contratos/Encoding | Clausulas exibem simbolos residuais (`�`) em alguns titulos/textos no preview/PDF por decodificacao incompleta de mojibake CP1252/UTF-8 | Resolvido |
 | BUG-084 | Alta | Contratos/Parcelamento UX+Regra | Formulario exige prazos manuais e nao atende venda a vista/1x fluida; precisa trabalhar com qtd de parcelas (1..12), entrada opcional e calculo automatico institucional | Resolvido |
+| BUG-085 | Media | Contratos/Templates Base | Templates legados `bacen`, `cadin` e `cnh` permaneceram fora do metodo padrao novo (estrutura heterogenea e placeholders inconsistentes) | Resolvido |
 
 ---
 
@@ -1380,3 +1381,27 @@
   - backend: `python -m py_compile backend/app/schemas/contrato.py backend/app/services/contrato_service.py backend/app/services/pdf_service_playwright.py` => OK;
   - frontend: `npm run type-check` => OK;
   - frontend: `npm run lint -- --file src/app/(dashboard)/contratos/novo/page.tsx --file src/app/(dashboard)/contratos/[id]/page.tsx --file src/lib/pdf.ts` => OK (warning nao bloqueante existente de `<img>` em preview).
+
+### BUG-085: Templates base (BACEN/CADIN/CNH) fora do metodo padrao novo
+**Data:** 2026-02-13
+**Severidade:** Media
+**Descricao:** os 3 templates base iniciais (`bacen`, `cadin`, `cnh`) estavam com estrutura diferente dos modelos recentes, mantendo formato legado, texto/encoding inconsistente e placeholders nao totalmente padronizados.
+**Passos:** 1. comparar `contratos/templates/bacen.json`, `contratos/templates/cadin.json`, `contratos/templates/cnh.json` com os modelos novos 2. validar divergencias de estrutura e placeholders.
+**Esperado:** os 3 templates base seguindo o mesmo metodo atual dos demais (estrutura unificada e placeholders institucionais).
+**Atual:** os 3 templates foram padronizados e alinhados ao metodo novo.
+**Status:** Resolvido
+
+### Atualizacao 2026-02-13 (execucao BUG-085 - padronizacao dos 3 templates base)
+- templates regravados no metodo padrao novo:
+  - `contratos/templates/bacen.json`
+  - `contratos/templates/cadin.json`
+  - `contratos/templates/cnh.json`
+- padrao aplicado:
+  - estrutura JSON unificada (metadados + campos + secoes + clausulas com `conteudo`);
+  - placeholders institucionais padronizados para render dinamica no preview/PDF;
+  - compatibilidade com fluxo atual de parcelamento automatico.
+- ajuste complementar de placeholders CNH:
+  - adicionado suporte para `[NÚMERO CNH]` e `[NUMERO CNH]` em:
+    - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`
+    - `frontend/src/lib/pdf.ts`
+    - `backend/app/services/pdf_service_playwright.py`

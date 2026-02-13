@@ -908,3 +908,15 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
   - `python -m py_compile backend/app/schemas/contrato.py backend/app/services/contrato_service.py backend/app/services/pdf_service_playwright.py` => OK;
   - `frontend`: `npm run type-check` => OK;
   - `frontend`: `npm run lint -- --file src/app/(dashboard)/contratos/novo/page.tsx --file src/app/(dashboard)/contratos/[id]/page.tsx --file src/lib/pdf.ts` => OK (warning conhecido de `<img>` nao bloqueante).
+
+## Atualizacao Operacional (2026-02-13 - execucao BUG-085 templates base)
+- contexto:
+  - os 3 templates base (`bacen`, `cadin`, `cnh`) ainda estavam em formato legado e fora do metodo padronizado adotado nos modelos novos.
+- execucao:
+  - `contratos/templates/bacen.json`, `contratos/templates/cadin.json` e `contratos/templates/cnh.json` regravados no padrao atual (estrutura e placeholders unificados).
+  - suporte de placeholder CNH incluido em toda a cadeia de renderizacao:
+    - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`
+    - `frontend/src/lib/pdf.ts`
+    - `backend/app/services/pdf_service_playwright.py`
+- resultado:
+  - os 3 modelos ficaram alinhados ao mesmo metodo operacional dos demais contratos.
