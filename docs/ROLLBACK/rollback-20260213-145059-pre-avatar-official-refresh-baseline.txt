@@ -1,0 +1,9 @@
+23d9fd8
+ M docs/BUGSREPORT.md
+ M docs/SESSION.md
+ M docs/STATUS.md
+ M frontend/src/app/viva/page.tsx
+ M frontend/src/styles/globals.css
+?? docs/ROLLBACK/rollback-20260213-145059-pre-avatar-official-refresh-baseline.txt
+?? frontend/public/viva-avatar-official.jpg
+?? frontend/public/viva-avatar-official.png

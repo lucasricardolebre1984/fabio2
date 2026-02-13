@@ -812,3 +812,13 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
   - `viva_chat_orchestrator_service` passou a anexar `skill_id` e metadados de roteamento nas respostas persistidas.
 - ganho:
   - trilha auditavel de decisao do agente (qual skill foi escolhida e por qual motivo).
+
+## Execucao Tecnica (2026-02-13 - avatar oficial aplicado)
+- avatar VIVA:
+  - novo arquivo oficial em `frontend/public/viva-avatar-official.jpg`;
+  - prioridade de carregamento no chat atualizada em `frontend/src/app/viva/page.tsx`.
+- UX visual:
+  - palco de conversa da VIVA ajustado para estilo 2D premium em `frontend/src/styles/globals.css`;
+  - avatar exibido com `object-contain` para manter corpo completo no enquadramento.
+- governanca de bug:
+  - `BUG-093` movido para **Em validacao**.

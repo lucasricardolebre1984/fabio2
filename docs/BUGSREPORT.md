@@ -82,7 +82,7 @@
 | BUG-090 | Alta | VIVA/UI Chat | Recuperacao de chats antigos indisponivel no frontend (somente snapshot da sessao mais recente) | Resolvido |
 | BUG-091 | Alta | VIVA/RAG Runtime | RAG semantico indisponivel no runtime atual (reindex sem indexacao e search vazio), com dependencia de embeddings OpenAI sem saldo | Resolvido |
 | BUG-092 | Alta | VIVA/Fala Continua | Conversa por voz depende de APIs nativas do navegador (SpeechRecognition + speechSynthesis), com qualidade/estabilidade variavel e sem pipeline realtime institucional | Ativo |
-| BUG-093 | Media | VIVA/Avatar | Avatar do modo Conversa VIVA ainda usa fallback local antigo e nao o asset institucional novo enviado pelo cliente | Ativo |
+| BUG-093 | Media | VIVA/Avatar | Avatar do modo Conversa VIVA ainda usa fallback local antigo e nao o asset institucional novo enviado pelo cliente | Em validacao (rodada avatar oficial aplicada) |
 | BUG-094 | Alta | VIVA/RAG Qualidade | RAG roda com fallback local sem embeddings OpenAI, mas ainda sem homologacao semantica premium para operacao comercial | Ativo |
 
 ---
@@ -1778,8 +1778,8 @@
 **Descricao:** o frontend usa fallback de avatars locais (`/viva-avatar.png`, `/viva-avatar-3d.png`, `/viva.png`) e ainda nao recebeu o novo avatar institucional aprovado pelo cliente.
 **Passos:** 1. abrir `/viva` no modo conversa 2. observar avatar renderizado.
 **Esperado:** avatar oficial novo padronizado e unico no fluxo principal.
-**Atual:** fallback antigo permanece ativo.
-**Status:** Ativo
+**Atual:** avatar oficial novo aplicado no frontend e fallback legado mantido apenas como contingencia.
+**Status:** Em validacao
 
 ### BUG-094: RAG sem homologacao semantica premium para venda modular
 **Data:** 2026-02-13
@@ -1798,4 +1798,17 @@
 - impacto:
   - experiencia de voz ainda nao padronizada para operacao institucional.
 - acao institucional:
-  - manter `BUG-092`, `BUG-093` e `BUG-094` ativos ate fechamento do Gate 3.
+  - manter `BUG-092` e `BUG-094` ativos ate fechamento do Gate 3;
+  - `BUG-093` segue em validacao visual final no navegador.
+
+### Atualizacao 2026-02-13 (BUG-093 - avatar oficial aplicado)
+- frontend atualizado:
+  - novo asset oficial: `frontend/public/viva-avatar-official.jpg`;
+  - prioridade de carregamento em `VIVA_AVATAR_SOURCES` no chat (`frontend/src/app/viva/page.tsx`);
+  - render ajustado para preservar enquadramento completo (`object-contain`) no modo conversa.
+- visual/UX:
+  - palco da VIVA redesenhado para estilo 2D premium em `frontend/src/styles/globals.css`;
+  - efeitos mantidos sutis (scan/rings/glow), sem dependencia de avatar 3D.
+- validacao tecnica:
+  - `frontend npm run type-check` => OK;
+  - `frontend npm run lint -- --file src/app/viva/page.tsx` => OK (warnings nao bloqueantes de `<img>`).

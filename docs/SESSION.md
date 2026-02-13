@@ -1319,3 +1319,14 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
   - preparar a arquitetura de orquestrador unico + auto skills com rastreabilidade auditavel por conversa.
 - impacto funcional:
   - sem quebra de comportamento existente; mudanca focada em observabilidade e governanca de roteamento.
+
+## Atualizacao Operacional (2026-02-13 - avatar oficial da VIVA)
+- frontend:
+  - asset novo aplicado em `frontend/public/viva-avatar-official.jpg`;
+  - `frontend/src/app/viva/page.tsx` atualizado para priorizar o avatar oficial e manter fallback legado;
+  - render do avatar ajustado para enquadramento completo (`object-contain`) no modo conversa.
+- visual:
+  - `frontend/src/styles/globals.css` redesenhado para palco 2D premium (sem proposta de avatar 3D), mantendo efeitos leves de presenca.
+- validacao:
+  - `frontend npm run type-check` => OK;
+  - `frontend npm run lint -- --file src/app/viva/page.tsx` => OK (warnings nao bloqueantes de `<img>`).

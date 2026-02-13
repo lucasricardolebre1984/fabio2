@@ -184,7 +184,7 @@ const BRAND_THEMES = {
   }
 } as const
 
-const VIVA_AVATAR_SOURCES = ['/viva-avatar.png', '/viva-avatar-3d.png', '/viva.png']
+const VIVA_AVATAR_SOURCES = ['/viva-avatar-official.jpg', '/viva-avatar-official.png', '/viva-avatar.png', '/viva-avatar-3d.png', '/viva.png']
 
 const createWelcomeMessage = (): Mensagem => ({
   id: 'welcome',
@@ -1331,7 +1331,7 @@ export default function VivaChatPage() {
                 ref={holoStageRef}
                 className={`holo-stage ${assistenteFalando ? 'is-active' : ''}`}
                 role="img"
-                aria-label="Avatar holografico da VIVA"
+                aria-label="Avatar oficial da VIVA"
                 onPointerMove={handleHoloPointerMove}
                 onPointerLeave={resetHoloTilt}
               >
@@ -1350,7 +1350,7 @@ export default function VivaChatPage() {
                     <img
                       src={VIVA_AVATAR_SOURCES[avatarSourceIndex]}
                       alt="VIVA"
-                      className="h-full w-full rounded-full object-cover"
+                      className="h-full w-full rounded-[20px] object-contain object-center"
                       onError={() => {
                         if (avatarSourceIndex < VIVA_AVATAR_SOURCES.length - 1) {
                           setAvatarSourceIndex((prev) => prev + 1)
