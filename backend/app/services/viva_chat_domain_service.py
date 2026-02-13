@@ -367,6 +367,10 @@ def _extract_cast_preference(texto: str) -> Optional[str]:
     if not normalized:
         return None
 
+    if "apenas mulher" in normalized or "somente mulher" in normalized or "so mulher" in normalized:
+        return "feminino"
+    if "apenas homem" in normalized or "somente homem" in normalized or "so homem" in normalized:
+        return "masculino"
     if "duas mulheres" in normalized or "dupla feminina" in normalized:
         return "dupla_feminina"
     if "casal" in normalized or "homem e mulher" in normalized:
@@ -1264,6 +1268,48 @@ def _build_branded_background_prompt(modo: str, campaign_copy: Dict[str, Any], v
         f"Variacao de enquadramento: {visual_variant}. "
         f"Humor visual: {mood_variant}. "
         f"Codigo de variacao: {variation_id}"
+    )
+
+
+def _build_branded_background_prompt_compact(modo: str, campaign_copy: Dict[str, Any], variation_id: str) -> str:
+    tema = _sanitize_prompt(str(campaign_copy.get("tema") or ""), 100)
+    oferta = _sanitize_prompt(str(campaign_copy.get("oferta") or ""), 100)
+    publico = _sanitize_prompt(str(campaign_copy.get("publico") or ""), 100)
+    scene = _sanitize_prompt(str(campaign_copy.get("scene") or ""), 180)
+    formato = _normalize_formato_value(str(campaign_copy.get("formato") or "4:5"))
+    cast_preference = _sanitize_prompt(str(campaign_copy.get("cast_user_preference") or "").strip(), 80).lower()
+
+    cast_profile = campaign_copy.get("cast_profile") if isinstance(campaign_copy.get("cast_profile"), dict) else {}
+    cast_profile_prompt = _sanitize_prompt(str(cast_profile.get("prompt") or "").strip(), 180)
+    scene_profile = campaign_copy.get("scene_profile") if isinstance(campaign_copy.get("scene_profile"), dict) else {}
+    scene_profile_prompt = _sanitize_prompt(str(scene_profile.get("prompt") or "").strip(), 180)
+
+    if cast_preference in {"feminino", "dupla_feminina"}:
+        cast_guardrail = "Personagem principal obrigatoriamente mulher; nao usar homem como protagonista."
+    elif cast_preference == "masculino":
+        cast_guardrail = "Personagem principal obrigatoriamente homem."
+    elif cast_preference == "casal":
+        cast_guardrail = "Composicao obrigatoria com homem e mulher em destaque conjunto."
+    elif cast_preference == "grupo":
+        cast_guardrail = "Composicao obrigatoria de grupo diverso em colaboracao."
+    else:
+        cast_guardrail = "Elenco humano brasileiro diverso e autentico, sem estereotipo de banco de imagem."
+
+    brand_block = (
+        "Paleta FC (azul e branco: #071c4a, #00a3ff, #010a1c, #f9feff)."
+        if modo == "FC"
+        else "Paleta Rezeta (verde e azul: #3DAA7F, #1E3A5F, #2A8B68, #FFFFFF)."
+    )
+    return (
+        "Fotografia publicitaria realista no Brasil, sem texto e sem logotipo. "
+        f"Formato {formato}. {brand_block} "
+        f"Tema: {tema or 'reorganizacao financeira humana'}. Oferta: {oferta or 'consultoria financeira'}. "
+        f"Publico: {publico or 'publico geral'}. "
+        f"Cena obrigatoria: {scene or scene_profile_prompt or 'atendimento financeiro humanizado em contexto real'}. "
+        f"Elenco obrigatorio: {cast_profile_prompt or 'pessoa brasileira em contexto financeiro real'}. "
+        f"{cast_guardrail} "
+        "Nao repetir personagem padrao masculino de escritorio; variar rosto, cabelo, idade e enquadramento. "
+        f"Variacao: {variation_id}."
     )
 
 

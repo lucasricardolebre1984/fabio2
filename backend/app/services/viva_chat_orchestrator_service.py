@@ -14,6 +14,7 @@ from app.services.viva_chat_domain_service import (
     BACKGROUND_ONLY_SUFFIX,
     _apply_campaign_defaults,
     _build_branded_background_prompt,
+    _build_branded_background_prompt_compact,
     _build_campaign_quick_plan,
     _build_viva_concierge_messages,
     _collect_campaign_fields_from_context,
@@ -70,6 +71,8 @@ from app.services.viva_chat_runtime_helpers_service import (
 from app.services.viva_shared_service import (
     _clear_campaign_history,
     _derive_campaign_title,
+    _get_recent_campaign_cast_ids,
+    _get_recent_campaign_scene_ids,
     _normalize_key,
     _normalize_mode,
     _save_campaign_record,
@@ -448,8 +451,18 @@ class VivaChatOrchestratorService:
                     variation_id = uuid4().hex[:10]
 
                     if effective_mode in ("FC", "REZETA"):
-                        recent_cast_ids: List[str] = []
-                        recent_scene_ids: List[str] = []
+                        recent_cast_ids = await _get_recent_campaign_cast_ids(
+                            db=db,
+                            user_id=current_user.id,
+                            modo=effective_mode,
+                            limit=12,
+                        )
+                        recent_scene_ids = await _get_recent_campaign_scene_ids(
+                            db=db,
+                            user_id=current_user.id,
+                            modo=effective_mode,
+                            limit=12,
+                        )
                         campaign_copy = await _generate_campaign_copy(
                             campaign_prompt_source,
                             None,
@@ -489,8 +502,15 @@ class VivaChatOrchestratorService:
                     if not resultado.get("success"):
                         erro = resultado.get("error")
                         if _is_stackoverflow_error(erro):
-                            fallback_prompt = _build_fallback_image_prompt(hint, request.mensagem)
-                            fallback_prompt = f"{fallback_prompt}\n{BACKGROUND_ONLY_SUFFIX}"
+                            if effective_mode in ("FC", "REZETA") and campaign_copy:
+                                fallback_prompt = _build_branded_background_prompt_compact(
+                                    effective_mode,
+                                    campaign_copy,
+                                    variation_id=f"{variation_id}-compact",
+                                )
+                            else:
+                                fallback_prompt = _build_fallback_image_prompt(hint, request.mensagem)
+                                fallback_prompt = f"{fallback_prompt}\n{BACKGROUND_ONLY_SUFFIX}"
                             resultado = await openai_service.generate_image(
                                 prompt=fallback_prompt,
                                 size=image_size,

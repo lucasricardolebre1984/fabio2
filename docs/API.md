@@ -834,7 +834,7 @@ As rotas abaixo já estão ativas no backend e complementam os blocos acima:
 
 ### GET /viva/memory/status
 - Requer Bearer.
-- Exibe status da memória híbrida (curta/média/longa).
+- Exibe status da memória híbrida (curta/média/longa), incluindo `embedding_runtime` com tier semântico atual (`premium_openai` ou `fallback_local`).
 
 ### GET /viva/memory/search
 - Requer Bearer.

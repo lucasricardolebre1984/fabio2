@@ -1367,3 +1367,22 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
 - validacao tecnica:
   - `frontend npm run type-check` => OK;
   - `frontend npm run lint -- --file src/app/viva/page.tsx` => OK (warnings nao bloqueantes de `<img>`).
+
+## Atualizacao Operacional (2026-02-13 - RAG quality + campanhas anti-repeticao)
+- rollback de seguranca desta etapa:
+  - `docs/ROLLBACK/rollback-20260213-163920-pre-rag-campaign-quality-pass-baseline.txt`
+  - `docs/ROLLBACK/rollback-20260213-163920-pre-rag-campaign-quality-pass.patch`
+  - `docs/ROLLBACK/rollback-20260213-163920-pre-rag-campaign-quality-pass-staged.patch`
+  - `docs/ROLLBACK/rollback-20260213-163920-pre-rag-campaign-quality-pass-untracked.txt`
+- RAG premium (qualidade semantica):
+  - `backend/app/services/viva_memory_service.py` atualizado com busca hibrida (vetor + lexical + recencia) e rerank de candidatos;
+  - `backend/app/services/openai_service.py` ganhou telemetria de embedding runtime (`provider_last`, `semantic_tier`, `premium_active`);
+  - `memory/status` passa a reportar runtime semantico para auditoria.
+- campanhas/imagem:
+  - `backend/app/services/viva_chat_orchestrator_service.py` agora usa historico real de cast/cena para reduzir repeticao visual;
+  - fallback por overflow usa prompt compacto de marca/cena/elenco (sem perder o pedido do usuario);
+  - `backend/app/services/viva_chat_domain_service.py` reforcou preferencia explicita de personagem (`apenas mulher`, `somente homem`, etc.) com guarda obrigatoria no prompt compacto.
+- status de bugs nesta rodada:
+  - `BUG-092` baixado para resolvido (validacao de front confirmada pelo cliente);
+  - `BUG-094` movido para em validacao;
+  - `BUG-061`, `BUG-015`, `BUG-016` mantidos em validacao com nova rodada de robustez aplicada.

@@ -6,7 +6,7 @@ Hybrid memory service for VIVA:
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 import json
@@ -29,6 +29,11 @@ class VivaMemoryService:
         self.medium_max_items = 40
         self.vector_enabled = False
         self._storage_checked = False
+        self._stopwords = {
+            "de", "da", "do", "das", "dos", "e", "em", "no", "na", "nos", "nas", "um", "uma",
+            "para", "com", "que", "por", "se", "ao", "aos", "as", "o", "os", "eu", "voce",
+            "viva", "amanha", "hoje", "ontem",
+        }
 
     async def _get_redis(self) -> Optional[redis_asyncio.Redis]:
         if self._redis is not None:
@@ -54,6 +59,49 @@ class VivaMemoryService:
     def _clean_text(value: str) -> str:
         collapsed = " ".join(str(value or "").replace("\r", " ").replace("\n", " ").split())
         return collapsed.strip()
+
+    def _tokenize(self, text_value: str) -> List[str]:
+        clean = self._clean_text(text_value).lower()
+        if not clean:
+            return []
+        tokens = re.findall(r"[a-z0-9]{2,}", clean)
+        filtered: List[str] = []
+        for token in tokens:
+            if token in self._stopwords:
+                continue
+            if len(token) < 3 and not token.isdigit():
+                continue
+            filtered.append(token)
+        return filtered[:24]
+
+    def _lexical_overlap_score(self, query_tokens: List[str], content: str) -> float:
+        if not query_tokens:
+            return 0.0
+        content_tokens = set(self._tokenize(content))
+        if not content_tokens:
+            return 0.0
+        overlap = sum(1 for token in query_tokens if token in content_tokens)
+        return float(overlap) / float(max(1, len(set(query_tokens))))
+
+    @staticmethod
+    def _recency_score(created_at: Any) -> float:
+        if not isinstance(created_at, datetime):
+            return 0.0
+        dt = created_at if created_at.tzinfo else created_at.replace(tzinfo=timezone.utc)
+        age_seconds = max(0.0, (datetime.now(timezone.utc) - dt).total_seconds())
+        age_hours = age_seconds / 3600.0
+        # Decaimento suave: ainda valoriza contexto dos ultimos dias sem apagar historico.
+        return 1.0 / (1.0 + age_hours / 72.0)
+
+    @staticmethod
+    def _created_at_rank(created_at: Any) -> float:
+        if not isinstance(created_at, datetime):
+            return 0.0
+        dt = created_at if created_at.tzinfo else created_at.replace(tzinfo=timezone.utc)
+        try:
+            return float(dt.timestamp())
+        except Exception:
+            return 0.0
 
     @staticmethod
     def _vector_literal(embedding: List[float]) -> str:
@@ -269,15 +317,8 @@ class VivaMemoryService:
         limit: int = 6,
     ) -> List[Dict[str, Any]]:
         await self.ensure_storage(db)
-        if not self.vector_enabled:
-            return []
-
         clean_query = self._clean_text(query)
         if not clean_query:
-            return []
-
-        embedding = self._coerce_embedding_dim(await openai_service.embed_text(clean_query))
-        if not embedding:
             return []
 
         safe_limit = max(1, min(limit, 20))
@@ -285,46 +326,135 @@ class VivaMemoryService:
         where = "WHERE user_id = :user_id"
         params: Dict[str, Any] = {
             "user_id": str(user_id),
-            "query_embedding": self._vector_literal(embedding),
-            "limit": safe_limit,
         }
         if normalized_mode:
             where += " AND modo = :modo"
             params["modo"] = normalized_mode
-        rows: List[Any] = []
-        try:
-            async with db.begin_nested():
-                result = await db.execute(
-                    text(
-                        f"""
-                        SELECT id, tipo, modo, conteudo, created_at,
-                               1 - (embedding <=> CAST(:query_embedding AS vector)) AS score
-                        FROM viva_memory_vectors
-                        {where}
-                        ORDER BY embedding <=> CAST(:query_embedding AS vector)
-                        LIMIT :limit
-                        """
-                    ),
-                    params,
-                )
-                rows = result.fetchall()
-        except Exception:
+
+        query_tokens = self._tokenize(clean_query)
+        vector_rows: List[Any] = []
+        keyword_rows: List[Any] = []
+
+        if self.vector_enabled:
+            embedding = self._coerce_embedding_dim(await openai_service.embed_text(clean_query))
+            if embedding:
+                vector_params = {
+                    **params,
+                    "query_embedding": self._vector_literal(embedding),
+                    "vector_limit": max(24, min(120, safe_limit * 8)),
+                }
+                try:
+                    async with db.begin_nested():
+                        result = await db.execute(
+                            text(
+                                f"""
+                                SELECT id, tipo, modo, conteudo, created_at,
+                                       1 - (embedding <=> CAST(:query_embedding AS vector)) AS score
+                                FROM viva_memory_vectors
+                                {where}
+                                ORDER BY embedding <=> CAST(:query_embedding AS vector)
+                                LIMIT :vector_limit
+                                """
+                            ),
+                            vector_params,
+                        )
+                        vector_rows = result.fetchall()
+                except Exception:
+                    vector_rows = []
+
+        if query_tokens:
+            keyword_params: Dict[str, Any] = {
+                **params,
+                "keyword_limit": max(20, min(120, safe_limit * 8)),
+            }
+            clauses: List[str] = []
+            for idx, token in enumerate(query_tokens[:6]):
+                key = f"kw_{idx}"
+                keyword_params[key] = f"%{token}%"
+                clauses.append(f"conteudo ILIKE :{key}")
+            if clauses:
+                keyword_where = f"{where} AND ({' OR '.join(clauses)})"
+                try:
+                    async with db.begin_nested():
+                        result = await db.execute(
+                            text(
+                                f"""
+                                SELECT id, tipo, modo, conteudo, created_at,
+                                       0.0 AS score
+                                FROM viva_memory_vectors
+                                {keyword_where}
+                                ORDER BY created_at DESC
+                                LIMIT :keyword_limit
+                                """
+                            ),
+                            keyword_params,
+                        )
+                        keyword_rows = result.fetchall()
+                except Exception:
+                    keyword_rows = []
+
+        if not vector_rows and not keyword_rows:
             return []
 
-        items: List[Dict[str, Any]] = []
-        for row in rows:
-            score = float(row.score or 0.0)
-            items.append(
+        candidates: Dict[str, Dict[str, Any]] = {}
+        for row in vector_rows:
+            key = str(row.id)
+            candidates[key] = {
+                "id": row.id,
+                "tipo": row.tipo,
+                "modo": row.modo,
+                "conteudo": row.conteudo,
+                "created_at": row.created_at,
+                "vector_score": float(row.score or 0.0),
+            }
+
+        for row in keyword_rows:
+            key = str(row.id)
+            existing = candidates.get(key)
+            if existing:
+                continue
+            candidates[key] = {
+                "id": row.id,
+                "tipo": row.tipo,
+                "modo": row.modo,
+                "conteudo": row.conteudo,
+                "created_at": row.created_at,
+                "vector_score": 0.0,
+            }
+
+        has_vector_signal = bool(vector_rows)
+        rescored: List[Dict[str, Any]] = []
+        for item in candidates.values():
+            lexical_score = self._lexical_overlap_score(query_tokens, str(item.get("conteudo") or ""))
+            recency_score = self._recency_score(item.get("created_at"))
+            vector_score = float(item.get("vector_score") or 0.0)
+            if has_vector_signal:
+                final_score = (vector_score * 0.72) + (lexical_score * 0.22) + (recency_score * 0.06)
+            else:
+                final_score = (lexical_score * 0.85) + (recency_score * 0.15)
+            rescored.append(
                 {
-                    "id": row.id,
-                    "tipo": row.tipo,
-                    "modo": row.modo,
-                    "conteudo": row.conteudo,
-                    "score": score,
-                    "created_at": row.created_at,
+                    "id": item["id"],
+                    "tipo": item["tipo"],
+                    "modo": item["modo"],
+                    "conteudo": item["conteudo"],
+                    "created_at": item["created_at"],
+                    "score": float(final_score),
+                    "vector_score": float(vector_score),
+                    "lexical_score": float(lexical_score),
+                    "recency_score": float(recency_score),
                 }
             )
-        return items
+
+        rescored.sort(
+            key=lambda item: (
+                float(item.get("score") or 0.0),
+                float(item.get("vector_score") or 0.0),
+                self._created_at_rank(item.get("created_at")),
+            ),
+            reverse=True,
+        )
+        return rescored[:safe_limit]
 
     async def build_chat_memory_context(
         self,
@@ -443,6 +573,7 @@ class VivaMemoryService:
             "total_vectors": total_vectors,
             "medium_items": medium_items,
             "embedding_model": settings.OPENAI_EMBEDDING_MODEL,
+            "embedding_runtime": openai_service.get_embedding_runtime_status(),
         }
 
 

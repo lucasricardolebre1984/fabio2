@@ -13,8 +13,8 @@
 | BUG-012 | MÃ©dia | VIVA | BotÃ£o de Ã¡udio no chat nÃ£o funciona | Resolvido |
 | BUG-013 | MÃ©dia | VIVA | Erro `StackOverflowError` ao gerar imagem com prompt extra longo (REZETA/FC) | Resolvido |
 | BUG-014 | MÃ©dia | VIVA | Upload de imagem falha quando a imagem Ã© PNG (MIME assumido como JPEG) | Resolvido |
-| BUG-015 | Alta | VIVA | Fundo da imagem nÃ£o respeita paleta/brief do prompt (resultado genÃ©rico) | Em validaÃ§Ã£o (rodada 5 - tema livre) |
-| BUG-016 | MÃ©dia | VIVA | Arte final perde partes do texto (overlay truncado) | Em validaÃ§Ã£o (rodada 3 - wrap/ellipsis) |
+| BUG-015 | Alta | VIVA | Fundo da imagem nÃ£o respeita paleta/brief do prompt (resultado genÃ©rico) | Em validacao (rodada 8 - fallback compacto com ancora de tema/personagem) |
+| BUG-016 | MÃ©dia | VIVA | Arte final perde partes do texto (overlay truncado) | Em validacao (rodada 4 - copy sanitizada + limite estruturado) |
 | BUG-017 | Alta | WhatsApp Chat API | Endpoints `/api/v1/whatsapp-chat/*` retornam 500 por incompatibilidade de modelagem (`SQLEnum`) com schema real (`VARCHAR`) | Resolvido |
 | BUG-018 | Alta | WhatsApp Evolution | Backend consulta instÃ¢ncia/chave divergentes do runtime (instÃ¢ncia ativa `Teste`), causando falso desconectado (`Status 404`) | Resolvido |
 | BUG-019 | MÃ©dia | Frontend WhatsApp | `/whatsapp/conversas` usa token incorreto (`localStorage.token`) e base URL hardcoded em `localhost:8000` | Resolvido |
@@ -56,7 +56,7 @@
 | BUG-058 | Alta | VIVA/RAG | Ausencia de camada vetorial moderna (RAG) para memoria/conhecimento evolutivo de longo prazo no piloto | Resolvido |
 | BUG-059 | Alta | Frontend/NextDev | `next dev` pode quebrar com `MODULE_NOT_FOUND` apontando para rota removida (`/api/viva/prompts/[promptId]/route`) por cache `.next` stale | Resolvido |
 | BUG-060 | Alta | Frontend/Auth+Docs | Login no front exibe erro generico para qualquer falha e README publica senha de teste divergente do runtime local | Resolvido |
-| BUG-061 | Alta | VIVA/Campanhas | Geracao de imagem pode ignorar tema do brief (ex.: Carnaval sem dividas) e cair em cena corporativa generica (senhor de terno em escritorio) | Em validacao (rodada 7 - reset de padrao + sujeito explicito + fluxo livre sem briefing rigido) |
+| BUG-061 | Alta | VIVA/Campanhas | Geracao de imagem pode ignorar tema do brief (ex.: Carnaval sem dividas) e cair em cena corporativa generica (senhor de terno em escritorio) | Em validacao (rodada 8 - anti-repeticao real + preferencia de elenco obrigatoria) |
 | BUG-062 | Alta | VIVA/Arquitetura | Router VIVA ainda concentra muita responsabilidade de dominio (chat+agenda+campanhas+midia) e exige fatiamento progressivo para manutencao segura | Resolvido |
 | BUG-063 | Alta | VIVA/Agenda UX | Fallback rigido de agenda exige formato textual prescritivo, reduz fluidez conversacional e gera efeito de "bot travado" | Resolvido |
 | BUG-064 | Alta | VIVA->Viviane Orquestracao | Nao existe handoff operacional completo para aviso programado no WhatsApp (agenda da VIVA disparando persona Viviane no horario) | Resolvido |
@@ -81,9 +81,9 @@
 | BUG-089 | Alta | VIVA/Campanhas | Em modo `FC/REZETA`, conversa comum podia ser sequestrada para fluxo de campanha por inferencia ampla de tema livre | Resolvido |
 | BUG-090 | Alta | VIVA/UI Chat | Recuperacao de chats antigos indisponivel no frontend (somente snapshot da sessao mais recente) | Resolvido |
 | BUG-091 | Alta | VIVA/RAG Runtime | RAG semantico indisponivel no runtime atual (reindex sem indexacao e search vazio), com dependencia de embeddings OpenAI sem saldo | Resolvido |
-| BUG-092 | Alta | VIVA/Fala Continua | Conversa por voz dependia de APIs nativas do navegador (SpeechRecognition + speechSynthesis), com qualidade/estabilidade variavel e sem pipeline realtime institucional | Em validacao (rodada server STT + MiniMax TTS) |
+| BUG-092 | Alta | VIVA/Fala Continua | Conversa por voz dependia de APIs nativas do navegador (SpeechRecognition + speechSynthesis), com qualidade/estabilidade variavel e sem pipeline realtime institucional | Resolvido |
 | BUG-093 | Media | VIVA/Avatar | Avatar do modo Conversa VIVA ainda usa fallback local antigo e nao o asset institucional novo enviado pelo cliente | Resolvido |
-| BUG-094 | Alta | VIVA/RAG Qualidade | RAG roda com fallback local sem embeddings OpenAI, mas ainda sem homologacao semantica premium para operacao comercial | Ativo |
+| BUG-094 | Alta | VIVA/RAG Qualidade | RAG roda com fallback local sem embeddings OpenAI, mas ainda sem homologacao semantica premium para operacao comercial | Em validacao (rodada hybrid rerank + telemetria de tier semantico) |
 | BUG-095 | Alta | Agenda/Google Calendar | Agenda interna do SaaS sem sincronizacao oficial com Google Calendar para operacao compartilhada VIVA/Viviane | Em validacao (rodada bridge OAuth + sync auto) |
 
 ---
@@ -1770,8 +1770,8 @@
 **Descricao:** o modo `Conversa VIVA` usa `SpeechRecognition/webkitSpeechRecognition` para escuta continua e `window.speechSynthesis` para fala da assistente. Isso gera variacao de qualidade e estabilidade por browser/SO, sem voz institucional fixa.
 **Passos:** 1. abrir `/viva` 2. ativar `Conversa VIVA` 3. testar em navegadores/dispositivos diferentes.
 **Esperado:** pipeline de voz ao vivo padronizado, com modelo/provedor controlado e qualidade previsivel.
-**Atual:** qualidade depende do browser e das vozes instaladas localmente.
-**Status:** Ativo
+**Atual:** escuta continua prioriza pipeline server-side (captura + transcricao backend), com fallback de navegador apenas contingencial.
+**Status:** Resolvido
 
 ### Atualizacao 2026-02-13 (BUG-092 - server STT + MiniMax TTS no modo conversa)
 - frontend (`frontend/src/app/viva/page.tsx`):
@@ -1787,7 +1787,7 @@
   - `frontend npm run type-check` => OK;
   - `frontend npm run lint -- --file src/app/viva/page.tsx` => OK (warnings nao bloqueantes de `<img>`).
 - status:
-  - `BUG-092` movido para **Em validacao**, pendente prova final de voz em runtime com credenciais MiniMax ativas.
+  - `BUG-092` movido para **Resolvido** (validacao funcional em front realizada pelo cliente).
 
 ### BUG-093: Avatar institucional da VIVA ainda nao aplicado
 **Data:** 2026-02-13
@@ -1796,7 +1796,7 @@
 **Passos:** 1. abrir `/viva` no modo conversa 2. observar avatar renderizado.
 **Esperado:** avatar oficial novo padronizado e unico no fluxo principal.
 **Atual:** avatar oficial novo aplicado no frontend e fallback legado mantido apenas como contingencia.
-**Status:** Em validacao
+**Status:** Resolvido
 
 ### BUG-094: RAG sem homologacao semantica premium para venda modular
 **Data:** 2026-02-13
@@ -1804,19 +1804,20 @@
 **Descricao:** apos fallback local de embeddings, o RAG voltou a funcionar tecnicamente, mas ainda nao ha homologacao formal de qualidade semantica para cenarios comerciais de alta exigencia.
 **Passos:** 1. executar lote de buscas semanticas de regressao 2. comparar relevancia entre fallback local e embeddings OpenAI 3. avaliar taxa de acerto por caso real.
 **Esperado:** qualidade semantica auditada com criterio minimo e aprovacao institucional para comercializacao.
-**Atual:** status tecnico funciona, mas certificacao de qualidade ainda pendente.
-**Status:** Ativo
+**Atual:** busca semantica com rerank hibrido (vetor + lexical + recencia) e telemetria de tier semantico ativa; homologacao final segue em validacao.
+**Status:** Em validacao
 
 ### Atualizacao 2026-02-13 (triagem de voz/avatar/RAG premium)
 - evidencia tecnica de implementacao atual:
-  - escuta continua via browser: `frontend/src/app/viva/page.tsx` (`SpeechRecognition/webkitSpeechRecognition`);
-  - fala da assistente via browser: `window.speechSynthesis`;
-  - transcricao OpenAI para audio anexado/manual: `POST /api/v1/viva/audio/transcribe` (`gpt-4o-mini-transcribe`).
+  - escuta continua com caminho principal server-side (`MediaRecorder` + `/viva/audio/transcribe`) e fallback browser;
+  - fala da assistente priorizando MiniMax (`/viva/audio/speak`) com fallback browser;
+  - RAG com memoria longa vetorial + rerank hibrido (vetor/lexical/recencia).
 - impacto:
-  - experiencia de voz ainda nao padronizada para operacao institucional.
+  - voz padronizada no fluxo principal; homologacao final focada em qualidade semantica premium (RAG).
 - acao institucional:
-  - manter `BUG-092` e `BUG-094` ativos ate fechamento do Gate 3;
-  - `BUG-093` segue em validacao visual final no navegador.
+  - `BUG-092` baixado para resolvido;
+  - `BUG-093` baixado para resolvido;
+  - `BUG-094` segue em validacao ate rodada final de homologacao comercial.
 
 ### Atualizacao 2026-02-13 (BUG-093 - avatar oficial aplicado)
 - frontend atualizado:
@@ -1844,6 +1845,33 @@
   - `agendar reuniao amanha 10:30 ...` => query `false`, create payload valido.
 - status:
   - `BUG-073` em **Em validacao** aguardando prova final no chat com backend ativo.
+
+### Atualizacao 2026-02-13 (BUG-094 - qualidade semantica com rerank hibrido)
+- backend:
+  - `backend/app/services/viva_memory_service.py`:
+    - busca longa passou a combinar candidatos vetoriais com candidatos lexicais;
+    - rerank final por peso hibrido (`vector_score`, `lexical_score`, `recency_score`);
+    - retorno de score mais estavel para reduzir perda de contexto util em fallback local.
+  - `backend/app/services/openai_service.py`:
+    - telemetria de runtime de embedding (`provider_last`, `semantic_tier`, `premium_active`).
+  - `memory/status` agora expõe `embedding_runtime` para auditoria operacional.
+- impacto:
+  - quando embeddings OpenAI nao estiverem disponiveis, o RAG preserva relevancia usando reforco lexical/recencia em cima do vetor fallback.
+- status:
+  - `BUG-094` movido para **Em validacao** aguardando rodada final de homologacao comercial.
+
+### Atualizacao 2026-02-13 (BUG-061/015 - variacao real de campanhas e obediencia de personagem)
+- backend:
+  - `backend/app/services/viva_chat_orchestrator_service.py`:
+    - agora carrega historico real recente de `cast_profile` e `scene_profile` por usuario/modo para evitar repeticao de personagem/cenario;
+    - fallback de geracao por overflow passou a usar prompt compacto de marca/cena/elenco em vez de prompt generico.
+  - `backend/app/services/viva_chat_domain_service.py`:
+    - deteccao de preferencia de elenco reforcada (`apenas mulher`, `somente homem`, `duas mulheres`, etc.);
+    - novo `_build_branded_background_prompt_compact` com guarda de personagem obrigatorio (ex.: mulher protagonista quando solicitado).
+- impacto:
+  - reduz recorrencia de personagem masculino padrao e melhora aderencia ao pedido explicito do usuario.
+- status:
+  - `BUG-061` e `BUG-015` mantidos em **Em validacao** aguardando prova visual final no fluxo com geracao real.
 
 ### BUG-095: Agenda interna sem sincronizacao com Google Calendar
 **Data:** 2026-02-13

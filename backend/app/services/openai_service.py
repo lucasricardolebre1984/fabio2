@@ -25,6 +25,7 @@ class OpenAIService:
         self.embedding_fallback_local = bool(settings.OPENAI_EMBEDDING_FALLBACK_LOCAL)
         self.embedding_fallback_dim = 1536
         self.timeout = float(settings.OPENAI_TIMEOUT_SECONDS)
+        self._last_embedding_provider = "none"
 
     def _headers(self) -> Dict[str, str]:
         return {
@@ -314,7 +315,11 @@ class OpenAIService:
             return None
 
         if not self.api_key:
-            return self._fallback_embed_text(clean) if self.embedding_fallback_local else None
+            if self.embedding_fallback_local:
+                self._last_embedding_provider = "local_fallback"
+                return self._fallback_embed_text(clean)
+            self._last_embedding_provider = "disabled"
+            return None
 
         payload: Dict[str, Any] = {
             "model": self.model_embedding,
@@ -328,30 +333,55 @@ class OpenAIService:
                     json=payload,
                 )
         except Exception:
-            return self._fallback_embed_text(clean) if self.embedding_fallback_local else None
+            if self.embedding_fallback_local:
+                self._last_embedding_provider = "local_fallback"
+                return self._fallback_embed_text(clean)
+            self._last_embedding_provider = "error"
+            return None
 
         if response.status_code != 200:
-            return self._fallback_embed_text(clean) if self.embedding_fallback_local else None
+            if self.embedding_fallback_local:
+                self._last_embedding_provider = "local_fallback"
+                return self._fallback_embed_text(clean)
+            self._last_embedding_provider = f"error_{response.status_code}"
+            return None
 
         try:
             data = response.json()
         except Exception:
-            return self._fallback_embed_text(clean) if self.embedding_fallback_local else None
+            if self.embedding_fallback_local:
+                self._last_embedding_provider = "local_fallback"
+                return self._fallback_embed_text(clean)
+            self._last_embedding_provider = "error_json"
+            return None
         items = data.get("data")
         if not isinstance(items, list) or not items:
-            return self._fallback_embed_text(clean) if self.embedding_fallback_local else None
+            if self.embedding_fallback_local:
+                self._last_embedding_provider = "local_fallback"
+                return self._fallback_embed_text(clean)
+            self._last_embedding_provider = "error_payload"
+            return None
 
         first = items[0] if isinstance(items[0], dict) else {}
         embedding = first.get("embedding")
         if not isinstance(embedding, list):
-            return self._fallback_embed_text(clean) if self.embedding_fallback_local else None
+            if self.embedding_fallback_local:
+                self._last_embedding_provider = "local_fallback"
+                return self._fallback_embed_text(clean)
+            self._last_embedding_provider = "error_embedding_shape"
+            return None
 
         vector: List[float] = []
         for item in embedding:
             try:
                 vector.append(float(item))
             except Exception:
-                return self._fallback_embed_text(clean) if self.embedding_fallback_local else None
+                if self.embedding_fallback_local:
+                    self._last_embedding_provider = "local_fallback"
+                    return self._fallback_embed_text(clean)
+                self._last_embedding_provider = "error_embedding_value"
+                return None
+        self._last_embedding_provider = "openai"
         return vector
 
     def _fallback_embed_text(self, text: str) -> Optional[List[float]]:
@@ -397,6 +427,18 @@ class OpenAIService:
                 "vision": self.model_vision,
                 "embedding": self.model_embedding,
             },
+        }
+
+    def get_embedding_runtime_status(self) -> Dict[str, Any]:
+        provider = str(self._last_embedding_provider or "none")
+        premium_active = provider == "openai"
+        return {
+            "configured": bool(self.api_key),
+            "model": self.model_embedding,
+            "fallback_enabled": self.embedding_fallback_local,
+            "provider_last": provider,
+            "semantic_tier": "premium_openai" if premium_active else "fallback_local",
+            "premium_active": premium_active,
         }
 
 
