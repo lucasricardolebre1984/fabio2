@@ -217,3 +217,7 @@ class VideoGenerationRequest(BaseModel):
     duration: int = 5
     quality: str = "quality"
     with_audio: bool = True
+
+
+class TextToSpeechRequest(BaseModel):
+    text: str

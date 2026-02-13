@@ -3,6 +3,7 @@
 Extrai a orquestracao pesada do endpoint /chat para reduzir acoplamento em rota.
 """
 
+import logging
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
@@ -35,6 +36,7 @@ from app.services.viva_chat_domain_service import (
 from app.api.v1.viva_schemas import ChatResponse, MediaItem
 from app.schemas.agenda import EventoCreate
 from app.services.agenda_service import AgendaService
+from app.services.google_calendar_service import google_calendar_service
 from app.services.openai_service import openai_service
 from app.services.viva_agenda_nlu_service import viva_agenda_nlu_service
 from app.services.viva_chat_session_service import (
@@ -73,6 +75,8 @@ from app.services.viva_shared_service import (
     _save_campaign_record,
 )
 from app.services.viva_skill_router_service import viva_skill_router_service
+
+logger = logging.getLogger(__name__)
 
 
 class VivaChatOrchestratorService:
@@ -159,6 +163,21 @@ class VivaChatOrchestratorService:
                 )
 
                 service = AgendaService(db)
+
+                async def _sync_google_event_safe(evento: Any) -> None:
+                    try:
+                        await google_calendar_service.sync_agenda_event(
+                            db=db,
+                            user_id=current_user.id,
+                            evento=evento,
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            "viva_chat_google_sync_failed evento=%s erro=%s",
+                            str(getattr(evento, "id", "")),
+                            str(exc)[:180],
+                        )
+
                 agenda_query_intent = viva_agenda_nlu_service.is_agenda_query_intent(request.mensagem, contexto_efetivo)
                 agenda_command = viva_agenda_nlu_service.parse_agenda_command(request.mensagem)
                 agenda_natural_command = viva_agenda_nlu_service.parse_agenda_natural_create(request.mensagem)
@@ -205,6 +224,7 @@ class VivaChatOrchestratorService:
                         ),
                         current_user.id,
                     )
+                    await _sync_google_event_safe(evento)
                     if handoff_intent:
                         numero = _extract_phone_candidate(request.mensagem)
                         cliente_nome = _extract_cliente_nome(request.mensagem)
@@ -298,6 +318,7 @@ class VivaChatOrchestratorService:
                     evento = await service.concluir(target_event_id, user_id=current_user.id)
                     if not evento:
                         return await finalize(resposta="Nao encontrei esse compromisso para concluir na sua agenda.")
+                    await _sync_google_event_safe(evento)
                     return await finalize(
                         resposta=(
                             "Compromisso concluido com sucesso: "

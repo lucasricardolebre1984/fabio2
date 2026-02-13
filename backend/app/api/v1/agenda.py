@@ -1,5 +1,6 @@
 """Agenda routes."""
 from datetime import datetime
+import logging
 from typing import Optional
 from uuid import UUID
 
@@ -17,8 +18,32 @@ from app.schemas.agenda import (
     EventoListResponse
 )
 from app.services.agenda_service import AgendaService
+from app.services.google_calendar_service import google_calendar_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+async def _sync_google_safe(db: AsyncSession, current_user_id: UUID, evento: Agenda) -> None:
+    try:
+        await google_calendar_service.sync_agenda_event(
+            db,
+            user_id=current_user_id,
+            evento=evento,
+        )
+    except Exception as exc:
+        logger.warning("agenda_google_sync_failed evento=%s erro=%s", str(evento.id), str(exc)[:180])
+
+
+async def _delete_google_sync_safe(db: AsyncSession, current_user_id: UUID, evento_id: UUID) -> None:
+    try:
+        await google_calendar_service.delete_synced_agenda_event(
+            db,
+            user_id=current_user_id,
+            agenda_event_id=evento_id,
+        )
+    except Exception as exc:
+        logger.warning("agenda_google_delete_sync_failed evento=%s erro=%s", str(evento_id), str(exc)[:180])
 
 
 @router.post("", response_model=EventoResponse, status_code=status.HTTP_201_CREATED)
@@ -29,7 +54,9 @@ async def create_evento(
 ):
     """Create a new event."""
     service = AgendaService(db)
-    return await service.create(data, current_user.id)
+    evento = await service.create(data, current_user.id)
+    await _sync_google_safe(db, current_user.id, evento)
+    return evento
 
 
 @router.get("", response_model=EventoListResponse)
@@ -102,6 +129,7 @@ async def update_evento(
             detail="Evento não encontrado"
         )
     
+    await _sync_google_safe(db, current_user.id, evento)
     return evento
 
 
@@ -121,6 +149,7 @@ async def concluir_evento(
             detail="Evento não encontrado"
         )
     
+    await _sync_google_safe(db, current_user.id, evento)
     return evento
 
 
@@ -131,6 +160,7 @@ async def delete_evento(
     current_user: User = Depends(require_operador)
 ):
     """Delete event."""
+    await _delete_google_sync_safe(db, current_user.id, evento_id)
     service = AgendaService(db)
     deleted = await service.delete(evento_id, user_id=current_user.id)
     

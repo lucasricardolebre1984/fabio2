@@ -289,6 +289,7 @@ export default function VivaChatPage() {
   const audioChunksRef = useRef<BlobPart[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const audioInputRef = useRef<HTMLInputElement>(null)
+  const playbackAudioRef = useRef<HTMLAudioElement | null>(null)
   const lastSpokenMessageIdRef = useRef<string | null>(null)
   const speechRecognitionRef = useRef<any>(null)
   const conversationShouldListenRef = useRef(false)
@@ -480,6 +481,18 @@ export default function VivaChatPage() {
     }
   }, [])
 
+  const stopAssistantPlayback = useCallback(() => {
+    const currentAudio = playbackAudioRef.current
+    if (currentAudio) {
+      currentAudio.pause()
+      currentAudio.src = ''
+      playbackAudioRef.current = null
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel()
+    }
+  }, [])
+
   useEffect(() => {
     let active = true
 
@@ -573,15 +586,12 @@ export default function VivaChatPage() {
         mediaRecorderRef.current.stop()
       }
       mediaStreamRef.current?.getTracks().forEach(track => track.stop())
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel()
-      }
+      stopAssistantPlayback()
     }
-  }, [stopContinuousConversation])
+  }, [stopAssistantPlayback, stopContinuousConversation])
 
   useEffect(() => {
     if (!modoConversacaoAtivo || !vozVivaAtiva) return
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
 
     const ultimaMensagemIA = [...mensagens].reverse().find(msg => msg.tipo === 'ia')
     if (!ultimaMensagemIA) return
@@ -590,20 +600,17 @@ export default function VivaChatPage() {
     const texto = String(ultimaMensagemIA.conteudo || '').replace(/\*\*/g, '').trim()
     if (!texto) return
 
-    const utterance = new SpeechSynthesisUtterance(texto)
-    utterance.lang = 'pt-BR'
-    utterance.rate = 1
-    utterance.pitch = 1.03
+    let cancelled = false
 
-    const voices = window.speechSynthesis.getVoices()
-    const preferredVoice =
-      voices.find(voice => /pt-BR/i.test(voice.lang) && /(female|maria|luciana|francisca|helena)/i.test(voice.name)) ||
-      voices.find(voice => /pt-BR/i.test(voice.lang))
-    if (preferredVoice) {
-      utterance.voice = preferredVoice
+    const finishSpeech = () => {
+      assistantSpeakingRef.current = false
+      if (modoConversacaoRef.current) {
+        conversationShouldListenRef.current = true
+        startContinuousConversation()
+      }
     }
 
-    utterance.onstart = () => {
+    const beginSpeech = () => {
       assistantSpeakingRef.current = true
       if (modoConversacaoRef.current) {
         conversationShouldListenRef.current = true
@@ -611,26 +618,84 @@ export default function VivaChatPage() {
       }
     }
 
-    utterance.onend = () => {
-      assistantSpeakingRef.current = false
-      if (modoConversacaoRef.current) {
-        conversationShouldListenRef.current = true
-        startContinuousConversation()
+    const speakWithBrowserFallback = async () => {
+      if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+        return
+      }
+
+      await new Promise<void>((resolve) => {
+        const utterance = new SpeechSynthesisUtterance(texto)
+        utterance.lang = 'pt-BR'
+        utterance.rate = 1
+        utterance.pitch = 1.03
+
+        const voices = window.speechSynthesis.getVoices()
+        const preferredVoice =
+          voices.find(voice => /pt-BR/i.test(voice.lang) && /(female|maria|luciana|francisca|helena)/i.test(voice.name)) ||
+          voices.find(voice => /pt-BR/i.test(voice.lang))
+        if (preferredVoice) {
+          utterance.voice = preferredVoice
+        }
+
+        utterance.onend = () => resolve()
+        utterance.onerror = () => resolve()
+        window.speechSynthesis.cancel()
+        window.speechSynthesis.speak(utterance)
+      })
+    }
+
+    const speakWithMinimax = async (): Promise<boolean> => {
+      try {
+        const response = await api.post('/viva/audio/speak', { text: texto }, { responseType: 'blob' })
+        const mediaType = String(response.headers?.['content-type'] || 'audio/mpeg')
+        const blob = new Blob([response.data], { type: mediaType })
+        if (!blob.size) return false
+
+        const url = URL.createObjectURL(blob)
+        const audio = new Audio(url)
+        playbackAudioRef.current = audio
+
+        await new Promise<void>((resolve) => {
+          audio.onended = () => {
+            URL.revokeObjectURL(url)
+            resolve()
+          }
+          audio.onerror = () => {
+            URL.revokeObjectURL(url)
+            resolve()
+          }
+          void audio.play().catch(() => {
+            URL.revokeObjectURL(url)
+            resolve()
+          })
+        })
+
+        playbackAudioRef.current = null
+        return true
+      } catch {
+        return false
       }
     }
 
-    utterance.onerror = () => {
-      assistantSpeakingRef.current = false
-      if (modoConversacaoRef.current) {
-        conversationShouldListenRef.current = true
-        startContinuousConversation()
+    const run = async () => {
+      beginSpeech()
+      stopAssistantPlayback()
+      let spoke = await speakWithMinimax()
+      if (!spoke) {
+        await speakWithBrowserFallback()
       }
+      if (cancelled) return
+      finishSpeech()
+      lastSpokenMessageIdRef.current = ultimaMensagemIA.id
     }
 
-    window.speechSynthesis.cancel()
-    window.speechSynthesis.speak(utterance)
-    lastSpokenMessageIdRef.current = ultimaMensagemIA.id
-  }, [mensagens, modoConversacaoAtivo, vozVivaAtiva, startContinuousConversation, stopContinuousConversation])
+    void run()
+
+    return () => {
+      cancelled = true
+      stopAssistantPlayback()
+    }
+  }, [mensagens, modoConversacaoAtivo, vozVivaAtiva, startContinuousConversation, stopContinuousConversation, stopAssistantPlayback])
 
   const handleSend = useCallback(async (options?: SendOptions) => {
     const anexosAtuais = options?.anexosOverride ?? anexos
@@ -1384,9 +1449,7 @@ export default function VivaChatPage() {
                     onClick={() => {
                       const novoEstado = !vozVivaAtiva
                       setVozVivaAtiva(novoEstado)
-                      if (!novoEstado && typeof window !== 'undefined' && 'speechSynthesis' in window) {
-                        window.speechSynthesis.cancel()
-                      }
+                      if (!novoEstado) stopAssistantPlayback()
                     }}
                   >
                     {vozVivaAtiva ? <Volume2 className="mr-2 h-4 w-4" /> : <VolumeX className="mr-2 h-4 w-4" />}

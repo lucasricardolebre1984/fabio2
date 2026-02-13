@@ -1,11 +1,13 @@
 import base64
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import Response
 
 from app.api.deps import get_current_user
-from app.api.v1.viva_schemas import ImageAnalysisRequest, ImageGenerationRequest, VideoGenerationRequest
+from app.api.v1.viva_schemas import ImageAnalysisRequest, ImageGenerationRequest, VideoGenerationRequest, TextToSpeechRequest
 from app.config import settings
 from app.models.user import User
+from app.services.minimax_tts_service import minimax_tts_service
 from app.services.openai_service import openai_service
 from app.services.viva_local_service import viva_local_service
 from app.services.viva_model_service import viva_model_service
@@ -80,6 +82,18 @@ async def transcribe_audio(
         raise HTTPException(status_code=500, detail=f"Erro: {str(exc)}")
 
 
+@router.post("/audio/speak")
+async def speak_text(
+    payload: TextToSpeechRequest,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        audio_bytes, media_type = await minimax_tts_service.synthesize(payload.text)
+        return Response(content=audio_bytes, media_type=media_type)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Erro TTS: {str(exc)}")
+
+
 @router.post("/image/generate")
 async def generate_image(
     request: ImageGenerationRequest,
@@ -126,5 +140,5 @@ async def viva_status(
     current_user: User = Depends(get_current_user),
 ):
     if settings.OPENAI_API_KEY:
-        return viva_model_service.get_status()
-    return viva_local_service.get_status()
+        return {**viva_model_service.get_status(), "tts": minimax_tts_service.get_status()}
+    return {**viva_local_service.get_status(), "tts": minimax_tts_service.get_status()}

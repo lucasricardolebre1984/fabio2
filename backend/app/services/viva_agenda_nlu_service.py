@@ -17,6 +17,62 @@ def _normalize_key(texto: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", without_accents.lower()).strip()
 
 
+def _has_phrase(normalized: str, phrase: str) -> bool:
+    haystack = f" {normalized.strip()} "
+    needle = f" {phrase.strip()} "
+    return needle in haystack
+
+
+def _has_any_phrase(normalized: str, phrases: Tuple[str, ...]) -> bool:
+    return any(_has_phrase(normalized, phrase) for phrase in phrases)
+
+
+def _has_create_imperative(normalized: str) -> bool:
+    imperative_phrases = (
+        "agendar",
+        "agende",
+        "marcar",
+        "marque",
+        "criar compromisso",
+        "crie compromisso",
+        "novo compromisso",
+        "adicionar compromisso",
+        "adicione compromisso",
+    )
+    if _has_any_phrase(normalized, imperative_phrases):
+        return True
+    # compatibilidade com formato antigo iniciado por "agenda ..."
+    return normalized.startswith("agenda ")
+
+
+def _has_query_existence_intent(normalized: str) -> bool:
+    existence_phrases = (
+        "eu marquei",
+        "se eu marquei",
+        "ja marquei",
+        "tem algum",
+        "tem alguma",
+        "ha algum",
+        "ha alguma",
+        "existe algum",
+        "existe alguma",
+        "me confirma",
+        "me confirme",
+        "confirma se",
+        "confirme se",
+        "verifica se",
+        "verifique se",
+    )
+    if _has_any_phrase(normalized, existence_phrases):
+        return True
+
+    agenda_tokens = ("agenda", "agendamento", "agendamentos", "compromisso", "compromissos", "obrigacao", "obrigacoes")
+    query_tokens = ("tenho", "tem", "ha", "havera", "existe", "quais", "listar", "lista", "mostrar", "mostra", "consultar")
+    has_agenda_token = any(_has_phrase(normalized, token) for token in agenda_tokens)
+    has_query_token = any(_has_phrase(normalized, token) for token in query_tokens)
+    return has_agenda_token and has_query_token
+
+
 def _parse_datetime_input(raw: str) -> Optional[datetime]:
     value = " ".join((raw or "").replace(",", " ").split())
     formats = (
@@ -150,22 +206,15 @@ def _has_recent_agenda_prompt(contexto: List[Dict[str, Any]]) -> bool:
 def is_agenda_query_intent(message: str, contexto: List[Dict[str, Any]]) -> bool:
     normalized = _normalize_key(message)
 
-    create_terms = (
-        "agendar",
-        "agende",
-        "marcar",
-        "marque",
-        "criar compromisso",
-        "crie compromisso",
-        "novo compromisso",
-        "adicionar compromisso",
-        "adicione compromisso",
-    )
     conclude_terms = ("concluir", "confirmar compromisso", "finalizar compromisso")
 
     if any(term in normalized for term in conclude_terms):
         return False
-    if any(term in normalized for term in create_terms):
+    # Consulta de existencia tem prioridade sobre criacao para evitar falso positivo:
+    # "eu marquei algo amanha?" nao deve cair no fluxo de criar compromisso.
+    if _has_query_existence_intent(normalized):
+        return True
+    if _has_create_imperative(normalized):
         return False
 
     query_terms = (
@@ -253,21 +302,10 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
         return None
 
     normalized = _normalize_key(raw)
-    if not any(
-        term in normalized
-        for term in (
-            "agenda",
-            "agendar",
-            "agende",
-            "marcar",
-            "marque",
-            "novo compromisso",
-            "criar compromisso",
-            "crie compromisso",
-            "adicionar compromisso",
-            "adicione compromisso",
-        )
-    ):
+    if _has_query_existence_intent(normalized):
+        return None
+
+    if not _has_create_imperative(normalized):
         return None
 
     if "|" in raw:

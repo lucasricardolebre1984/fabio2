@@ -106,6 +106,33 @@ class Settings(BaseSettings):
     VIVA_PROVIDER: str = "openai"
 
     # ==================================================================
+    # Google Calendar (agenda bridge)
+    # ==================================================================
+    FRONTEND_BASE_URL: str = "http://localhost:3000"
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/google-calendar/callback"
+    GOOGLE_CALENDAR_DEFAULT_ID: str = "primary"
+    GOOGLE_CALENDAR_SCOPE: str = "https://www.googleapis.com/auth/calendar"
+    GOOGLE_CALENDAR_SYNC_ENABLED: bool = True
+
+    # ==================================================================
+    # MiniMax TTS (voz VIVA)
+    # ==================================================================
+    MINIMAX_API_KEY: Optional[str] = None
+    MINIMAX_GROUP_ID: Optional[str] = None
+    MINIMAX_BASE_URL: str = "https://api.minimax.io"
+    MINIMAX_TTS_MODEL: str = "speech-2.8-hd"
+    MINIMAX_TTS_VOICE_ID: str = "Portuguese_LovelyLady"
+    MINIMAX_TTS_SPEED: float = 1.0
+    MINIMAX_TTS_PITCH: float = 2.0
+    MINIMAX_TTS_VOLUME: float = 3.64
+    MINIMAX_TTS_FORMAT: str = "mp3"
+    MINIMAX_TTS_SAMPLE_RATE: int = 32000
+    MINIMAX_TTS_BITRATE: int = 128000
+    MINIMAX_TTS_CHANNEL: int = 1
+
+    # ==================================================================
     # Legacy vars (ignored in runtime logic; kept for backward compatibility)
     # ==================================================================
     ZAI_API_KEY: Optional[str] = None

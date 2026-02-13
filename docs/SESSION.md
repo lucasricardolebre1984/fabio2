@@ -1330,3 +1330,20 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
 - validacao:
   - `frontend npm run type-check` => OK;
   - `frontend npm run lint -- --file src/app/viva/page.tsx` => OK (warnings nao bloqueantes de `<img>`).
+
+## Atualizacao Operacional (2026-02-13 - agenda SaaS com ponte Google Calendar)
+- backend:
+  - novo bridge OAuth/Sync em `backend/app/services/google_calendar_service.py` e rotas `backend/app/api/v1/google_calendar.py`;
+  - `backend/app/api/v1/agenda.py` sincroniza automaticamente create/update/concluir/delete para Google (modo safe);
+  - `backend/app/services/viva_chat_orchestrator_service.py` agora tambem sincroniza quando compromisso nasce ou e concluido via chat da VIVA.
+- frontend:
+  - `frontend/src/app/(dashboard)/agenda/page.tsx` com status de conexao Google, botoes conectar/desconectar e sync manual por evento;
+  - callback OAuth com retorno de status em `/agenda?google_calendar=connected|error`.
+- credenciais e checklist de fechamento:
+  - recebido: `GOOGLE_CLIENT_ID`;
+  - pendente para fechar producao: `GOOGLE_CLIENT_SECRET` e liberar callback no Google Cloud:
+    - `http://localhost:8000/api/v1/google-calendar/callback`.
+- validacao tecnica:
+  - `python -m py_compile` dos modulos novos/alterados => OK;
+  - `frontend npm run type-check` => OK;
+  - `frontend npm run lint -- --file src/app/(dashboard)/agenda/page.tsx --file src/lib/api.ts --file src/app/viva/page.tsx` => OK (warnings nao bloqueantes de `<img>` no `viva/page.tsx`).

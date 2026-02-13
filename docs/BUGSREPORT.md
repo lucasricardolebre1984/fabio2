@@ -68,7 +68,7 @@
 | BUG-070 | Alta | VIVA/Audio UX | Audio era transcrito no front, mas sem texto digitado a transcricao nao era enviada para `/viva/chat`, entao VIVA nao respondia ao conteudo falado | Resolvido |
 | BUG-071 | Media | VIVA/Audio UX | Gravacao de audio ainda ficava anexada aguardando Enter, em vez de fluxo direto institucional (parar > transcrever > enviar) | Resolvido |
 | BUG-072 | Media | VIVA/UI+Audio UX | Atualizacao holografica ficou pouco perceptivel (avatar dentro da area rolavel) e audio gravado durante resposta podia voltar para anexo manual | Resolvido |
-| BUG-073 | Alta | VIVA/Agenda NLU | Comando de agendamento em linguagem natural foi interpretado como consulta de agenda (nao criou compromisso) | Resolvido |
+| BUG-073 | Alta | VIVA/Agenda NLU | Consulta de agenda em linguagem natural podia cair indevidamente no fluxo de criacao (loop de "me diga quando") | Em validacao (rodada query-existence fix) |
 | BUG-074 | Media | VIVA/UI Holograma | Bloco de estilo do holograma ficava acoplado ao JSX da pagina e o cerebro 3D nao era interativo para iniciar conversa | Resolvido |
 | BUG-075 | Alta | LP/HTML | Landing page externa exibindo trecho de JavaScript como texto por bloco duplicado apos fechamento estrutural do documento | Resolvido |
 | BUG-076 | Alta | VIVA/UI Conversacao | Modo de conversacao da VIVA ficou acoplado ao chat normal (topo da pagina) em vez de ativacao dedicada por botao lateral/submenu | Resolvido |
@@ -84,6 +84,7 @@
 | BUG-092 | Alta | VIVA/Fala Continua | Conversa por voz depende de APIs nativas do navegador (SpeechRecognition + speechSynthesis), com qualidade/estabilidade variavel e sem pipeline realtime institucional | Ativo |
 | BUG-093 | Media | VIVA/Avatar | Avatar do modo Conversa VIVA ainda usa fallback local antigo e nao o asset institucional novo enviado pelo cliente | Em validacao (rodada avatar oficial aplicada) |
 | BUG-094 | Alta | VIVA/RAG Qualidade | RAG roda com fallback local sem embeddings OpenAI, mas ainda sem homologacao semantica premium para operacao comercial | Ativo |
+| BUG-095 | Alta | Agenda/Google Calendar | Agenda interna do SaaS sem sincronizacao oficial com Google Calendar para operacao compartilhada VIVA/Viviane | Em validacao (rodada bridge OAuth + sync auto) |
 
 ---
 
@@ -1812,3 +1813,52 @@
 - validacao tecnica:
   - `frontend npm run type-check` => OK;
   - `frontend npm run lint -- --file src/app/viva/page.tsx` => OK (warnings nao bloqueantes de `<img>`).
+
+### Atualizacao 2026-02-13 (BUG-073 - reaberto por query de agenda e correção NLU)
+- regressao reportada em chat real:
+  - pergunta de consulta (`eu marquei algo amanha?`) caia no fluxo de criacao com resposta repetitiva "me diga quando deve acontecer...".
+- correcao aplicada:
+  - `backend/app/services/viva_agenda_nlu_service.py`:
+    - nova priorizacao de intencao de existencia/consulta (`eu marquei`, `tem algum`, `confirma se`, `verifica se`);
+    - parser de criacao natural passou a ignorar frases de consulta (nao entra em erro de data/hora para pergunta de status);
+    - matching de criacao ficou restrito a imperativos reais (`agendar`, `agende`, `marcar`, `marque`, etc.).
+- validacao local de NLU:
+  - `e confirma se eu marquei algum cliente para amanha` => query `true`, create `None`;
+  - `tem algum agendamento amanha?` => query `true`, create `None`;
+  - `agendar reuniao amanha 10:30 ...` => query `false`, create payload valido.
+- status:
+  - `BUG-073` em **Em validacao** aguardando prova final no chat com backend ativo.
+
+### BUG-095: Agenda interna sem sincronizacao com Google Calendar
+**Data:** 2026-02-13
+**Severidade:** Alta
+**Descricao:** agenda interna do SaaS nao estava conectada oficialmente ao Google Calendar, impedindo operacao compartilhada e edicao unificada por rotina de calendario externa.
+**Passos:** 1. criar/editar compromissos no SaaS 2. verificar no Google Calendar 3. confirmar ausencia de sincronizacao oficial.
+**Esperado:** criar/editar/concluir/excluir no SaaS refletindo no Google Calendar conectado por usuario.
+**Atual:** bridge de sincronizacao implementada e em validacao final.
+**Status:** Em validacao
+
+### Atualizacao 2026-02-13 (BUG-095 - bridge Google Calendar implementada)
+- backend:
+  - novo servico `backend/app/services/google_calendar_service.py` com:
+    - OAuth (`connect-url`, `callback`, refresh token);
+    - tabelas de conexao e links de evento;
+    - sync create/update/delete de eventos da agenda.
+  - nova API:
+    - `GET /api/v1/google-calendar/connect-url`
+    - `GET /api/v1/google-calendar/callback`
+    - `GET /api/v1/google-calendar/status`
+    - `POST /api/v1/google-calendar/disconnect`
+    - `POST /api/v1/google-calendar/sync/agenda/{evento_id}`
+  - agenda interna agora dispara sync automaticamente em criar/editar/concluir/excluir (modo safe, sem bloquear operacao local em falha externa).
+  - fluxo de chat da VIVA (`backend/app/services/viva_chat_orchestrator_service.py`) tambem passou a sincronizar no Google apos criar/concluir compromisso, evitando divergencia entre chat e tela de agenda.
+- frontend:
+  - `frontend/src/app/(dashboard)/agenda/page.tsx` com bloco de integracao Google Calendar:
+    - status da conexao,
+    - acao de conectar/desconectar,
+    - sincronizacao manual por evento.
+  - callback OAuth agora retorna mensagens de erro seguras/encodadas para exibir feedback no frontend.
+- configuracao:
+  - variaveis novas em `backend/app/config.py`:
+    - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`,
+    - `GOOGLE_CALENDAR_DEFAULT_ID`, `GOOGLE_CALENDAR_SCOPE`, `GOOGLE_CALENDAR_SYNC_ENABLED`.

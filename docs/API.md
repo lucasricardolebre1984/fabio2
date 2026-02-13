@@ -852,9 +852,33 @@ As rotas abaixo já estão ativas no backend e complementam os blocos acima:
 - Requer Bearer.
 - Retorna estado dos gates institucionais e readiness dos modulos comercializaveis (`core_saas`, `modulo_viva`, `modulo_viviane`, `modulo_campanhas`, `modulo_memoria`).
 
+### POST /viva/audio/speak
+- Requer Bearer.
+- Gera audio TTS da resposta da VIVA via provider externo (MiniMax), com fallback no frontend para voz local do navegador.
+
 ### POST /viva/handoff/schedule
 - Requer Bearer.
 - Agenda handoff operacional VIVA -> Viviane.
+
+### GET /google-calendar/connect-url
+- Requer Bearer.
+- Retorna URL OAuth para conectar a agenda interna ao Google Calendar do usuario.
+
+### GET /google-calendar/callback
+- Publico (callback OAuth).
+- Conclui autorizacao Google e redireciona para `/agenda` no frontend.
+
+### GET /google-calendar/status
+- Requer Bearer.
+- Exibe status da conexao Google Calendar do usuario logado.
+
+### POST /google-calendar/disconnect
+- Requer Bearer.
+- Remove conexao Google Calendar e links de sincronizacao do usuario.
+
+### POST /google-calendar/sync/agenda/{evento_id}
+- Requer Bearer.
+- Sincroniza manualmente um evento da agenda interna para o Google Calendar.
 
 ### GET /viva/handoff
 - Requer Bearer.
