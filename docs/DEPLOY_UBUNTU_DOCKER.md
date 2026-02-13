@@ -24,7 +24,7 @@ Existem múltiplos arquivos no repositório. Para produção, use:
 - **Canônico:** `docker-compose.prod.yml`  
 - **Local:** `docker-compose.local.yml`  
 - **Desenvolvimento:** `docker-compose.yml`  
-- **Legado:** `docker-compose-prod.yml` (contém segredos e IPs fixos, não usar em produção)
+- **Legado:** `docker-compose-prod.yml` (mantido apenas para referência; preferir `docker-compose.prod.yml`)
 
 **Observação:** a consolidação definitiva dos arquivos será feita na Etapa 3.
 
@@ -51,7 +51,7 @@ Obrigatórias
 - `SECRET_KEY`
 - `NEXT_PUBLIC_API_URL`
 - `EVOLUTION_API_KEY`
-- `ZAI_API_KEY`
+- `OPENAI_API_KEY`
 
 Recomendadas
 - `CORS_ORIGINS` (domínio e variações)
@@ -64,7 +64,7 @@ DB_NAME=fabio2
 SECRET_KEY=troque_esta_chave
 NEXT_PUBLIC_API_URL=https://fabio.automaniaai.com.br/api/v1
 EVOLUTION_API_KEY=troque_esta_chave
-ZAI_API_KEY=troque_esta_chave
+OPENAI_API_KEY=troque_esta_chave
 CORS_ORIGINS=https://fabio.automaniaai.com.br
 ```
 

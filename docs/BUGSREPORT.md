@@ -1405,3 +1405,33 @@
     - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`
     - `frontend/src/lib/pdf.ts`
     - `backend/app/services/pdf_service_playwright.py`
+
+### BUG-086: Drift institucional de documentacao (auth, modelos e manual)
+**Data:** 2026-02-13
+**Severidade:** Alta
+**Descricao:** documentos operacionais estavam divergindo do runtime atual (senha dev inconsistente entre guias, manual indicando audio pendente no chat interno e README ainda apontando apenas BACEN).
+**Passos:** 1. comparar `README.md`, `SETUP.md`, `teste-local.md` e `docs/MANUAL_DO_CLIENTE.md` 2. validar comportamento real no sistema local.
+**Esperado:** documentacao institucional coerente com o estado real de operacao.
+**Atual:** divergencias corrigidas na mesma entrega.
+**Status:** Resolvido
+
+### BUG-087: Exposicao de segredos em compose legado de producao
+**Data:** 2026-02-13
+**Severidade:** Alta
+**Descricao:** `docker-compose-prod.yml` continha senha de banco, chave de API e `SECRET_KEY` em texto puro versionado.
+**Passos:** 1. abrir `docker-compose-prod.yml` 2. verificar variaveis hardcoded em `backend`, `postgres` e `evolution-api`.
+**Esperado:** sem segredos hardcoded no repositório; uso de variaveis de ambiente com defaults neutros.
+**Atual:** credenciais removidas do arquivo e substituidas por placeholders de ambiente.
+**Status:** Resolvido
+
+### Atualizacao 2026-02-13 (execucao BUG-086 + BUG-087)
+- seguranca:
+  - `docker-compose-prod.yml` sanitizado:
+    - removidos segredos hardcoded (`DATABASE_URL`, `SECRET_KEY`, `EVOLUTION_API_KEY`, `POSTGRES_PASSWORD`);
+    - adicionados placeholders via variaveis de ambiente.
+- documentacao:
+  - `README.md` atualizado com modelos operacionais ativos e data da rodada;
+  - `SETUP.md` e `teste-local.md` alinhados para senha dev local `1234`;
+  - `docs/MANUAL_DO_CLIENTE.md` atualizado com status real de audio no `/viva` e escopo atual de contratos;
+  - `docs/API.md` atualizado com endpoints complementares ativos e status atual da VIVA em OpenAI;
+  - `docs/DEPLOY_UBUNTU_DOCKER.md` alinhado para `OPENAI_API_KEY` (sem dependencia operacional de ZAI).

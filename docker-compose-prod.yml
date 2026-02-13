@@ -22,7 +22,7 @@ services:
     container_name: fabio2-frontend
     restart: unless-stopped
     environment:
-      - NEXT_PUBLIC_API_URL=http://56.124.101.16:8000/api/v1
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
       - API_URL=http://backend:8000/api/v1
     networks:
       - fabio2-network
@@ -36,12 +36,12 @@ services:
     container_name: fabio2-backend
     restart: unless-stopped
     environment:
-      - DATABASE_URL=postgresql+asyncpg://fabio2_prod:Fabio2@Secure2026!@postgres:5432/fabio2_prod
+      - DATABASE_URL=postgresql+asyncpg://${DB_USER:-fabio2_prod}:${DB_PASSWORD:-change_me}@postgres:5432/${DB_NAME:-fabio2_prod}
       - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=Fabio2SecureKey2026Prod32CharsSecure
-      - CORS_ORIGINS=http://56.124.101.16,https://fabio.automaniaai.com.br
+      - SECRET_KEY=${SECRET_KEY:-change_me_min_32_chars}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost}
       - EVOLUTION_API_URL=http://evolution-api:8080
-      - EVOLUTION_API_KEY=Fabio2Evolution2026SecureKey
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-change_me}
       - STORAGE_MODE=local
       - STORAGE_LOCAL_PATH=/app/storage
     volumes:
@@ -60,7 +60,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: fabio2_prod
-      POSTGRES_PASSWORD: Fabio2@Secure2026!
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change_me}
       POSTGRES_DB: fabio2_prod
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -91,7 +91,7 @@ services:
     environment:
       - DATABASE_ENABLED=true
       - DATABASE_PROVIDER=postgresql
-      - DATABASE_CONNECTION_URI=postgresql://fabio2_prod:Fabio2@Secure2026!@postgres:5432/evolution
+      - DATABASE_CONNECTION_URI=postgresql://${DB_USER:-fabio2_prod}:${DB_PASSWORD:-change_me}@postgres:5432/evolution
       - DATABASE_SAVE_DATA_INSTANCE=true
       - DATABASE_SAVE_DATA_NEW_MESSAGE=true
       - DATABASE_SAVE_MESSAGE_UPDATE=true

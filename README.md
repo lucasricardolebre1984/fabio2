@@ -2,7 +2,7 @@
 
 > **Status:** 🧪 EM TESTES LOCAIS - Aguardando aprovação para deploy AWS  
 > **Versão:** 1.0.0  
-> **Última Atualização:** 2026-02-07  
+> **Última Atualização:** 2026-02-13  
 
 ---
 
@@ -11,15 +11,15 @@
 SaaS completo para **FC Soluções Financeiras** gerenciar contratos de forma institucional.
 
 ### Funcionalidades
-- ✅ **Contratos:** Templates pré-definidos (Bacen) com preenchimento dinâmico
+- ✅ **Contratos:** Templates pré-definidos com preenchimento dinâmico e renderização institucional (preview + PDF)
 - ✅ **Clientes:** Cadastro automático por contrato + cadastro manual + sincronização de órfãos
 - ✅ **Agenda:** Gestão mínima funcional (criar, listar, concluir e excluir)
 - ✅ **WhatsApp:** Integração Evolution API + webhook VIVA ativo
 - ✅ **VIVA Interna:** comando de agenda via chat (`agendar TITULO | DD/MM/AAAA HH:MM | descricao opcional`)
 
 ### Modelos de Contrato
-- ✅ **Bacen** (Remoção SCR) - Pronto para uso
-- ⏳ **Outros modelos** - Aguardando (amanhã)
+- ✅ **15 modelos operacionais ativos** no menu `/contratos` (Bacen, CADIN, CNH, Aumento de Score, Diagnóstico 360, Limpa Nome Standard/Express, Rating Convencional/Express PJ/Full PJ, CCF, Certificado Digital, Remoção de Proposta, Revisional, Jusbrasil/Escavador)
+- ✅ **Playbook oficial de entrada de novos modelos `.md`** em `docs/CONTRATOS/PLAYBOOK_MODELOS_MD.md`
 
 ---
 
@@ -142,7 +142,7 @@ fabio2/
 │   └── Dockerfile
 ├── contratos/
 │   └── templates/
-│       └── bacen.json   # Template Bacen
+│       └── *.json       # Templates operacionais de contratos
 ├── docs/                # Documentação GODMOD
 └── docker-compose.yml   # Config produção
 ```

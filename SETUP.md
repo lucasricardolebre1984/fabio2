@@ -1,6 +1,6 @@
 # 🚀 Setup Local - Windows (CORRIGIDO)
 
-> **Última atualização:** 2026-02-03  
+> **Última atualização:** 2026-02-13  
 > **Status:** Funcional com workarounds documentados  
 
 ---
@@ -121,7 +121,8 @@ Acesse: http://localhost:3000
 ### Opção A: Via Swagger UI (Recomendado)
 
 1. Acesse http://localhost:8000/docs
-2. Encontre endpoint POST `/api/v1/auth/register` (se existir) ou crie direto no banco
+2. Faça login via `POST /api/v1/auth/login` com um usuário já existente.
+3. Se não houver usuário, use a Opção B (script SQL/Python) para criar localmente.
 
 ### Opção B: Via Script Python (Com BUG-001)
 
@@ -132,8 +133,10 @@ Crie arquivo `criar_usuario_simples.py`:
 import asyncio
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import text
+from app.core.security import get_password_hash
 
 DATABASE_URL = "postgresql+asyncpg://fabio2_user:fabio2_pass@localhost:5432/fabio2"
+PASSWORD_HASH = get_password_hash("1234")
 
 async def criar():
     engine = create_async_engine(DATABASE_URL)
@@ -144,16 +147,16 @@ async def criar():
             VALUES (
                 gen_random_uuid(),
                 'fabio@fcsolucoes.com',
-                '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewKyNiAYMyzJ/I3K',
+                :password_hash,
                 'Fabio',
                 'admin',
                 true,
                 NOW()
             )
-        """))
+        """), {"password_hash": PASSWORD_HASH})
     print("Usuário criado!")
     print("Email: fabio@fcsolucoes.com")
-    print("Senha: 12345678")
+    print("Senha: 1234")
 
 asyncio.run(criar())
 ```
@@ -168,7 +171,7 @@ python criar_usuario_simples.py
 ## ✅ LOGIN
 
 - **Email:** `fabio@fcsolucoes.com`
-- **Senha:** `12345678` (ou a definida no script)
+- **Senha:** `1234` (dev local com `security_stub.py`)
 
 ---
 
@@ -219,4 +222,4 @@ c:\projetos\fabio2
 
 ---
 
-*Atualizado em: 2026-02-03*
+*Atualizado em: 2026-02-13*

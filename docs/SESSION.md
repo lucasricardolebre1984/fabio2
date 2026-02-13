@@ -920,3 +920,20 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
     - `backend/app/services/pdf_service_playwright.py`
 - resultado:
   - os 3 modelos ficaram alinhados ao mesmo metodo operacional dos demais contratos.
+
+## Atualizacao Operacional (2026-02-13 - saneamento institucional docs + seguranca)
+- rollback pre-change registrado em:
+  - `docs/ROLLBACK/rollback-20260213-055551-pre-doc-sync-baseline.txt`
+  - `docs/ROLLBACK/rollback-20260213-055551-pre-doc-sync.patch`
+  - `docs/ROLLBACK/rollback-20260213-055551-pre-doc-sync-staged.patch`
+  - `docs/ROLLBACK/rollback-20260213-055551-pre-doc-sync-untracked.txt`
+- seguranca:
+  - `docker-compose-prod.yml` higienizado para eliminar segredos hardcoded, usando apenas variaveis de ambiente no compose legado.
+- alinhamento documental:
+  - `README.md` ajustado para refletir os modelos de contrato ativos;
+  - `SETUP.md` e `teste-local.md` ajustados para credencial dev local `1234`;
+  - `docs/MANUAL_DO_CLIENTE.md` corrigido para estado real do audio no `/viva`;
+  - `docs/API.md` ampliado com endpoints complementares ativos no backend;
+  - `docs/DEPLOY_UBUNTU_DOCKER.md` atualizado para `OPENAI_API_KEY`.
+- governanca:
+  - `BUG-086` e `BUG-087` formalizados e baixados como **Resolvidos** em `docs/BUGSREPORT.md`.

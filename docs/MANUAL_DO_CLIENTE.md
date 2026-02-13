@@ -1,7 +1,7 @@
 ﻿# 📘 MANUAL DO CLIENTE - FC Soluções Financeiras SaaS
 
-> **Versão:** 1.2  
-> **Última atualização:** 2026-02-08  
+> **Versão:** 1.3  
+> **Última atualização:** 2026-02-13  
 > **Sistema:** FC Soluções Financeiras - Gestão de Contratos  
 > **Público-alvo:** Fábio (Administrador) e Operadores
 
@@ -32,9 +32,9 @@ Funcionalidades
 - Chat com respostas automáticas
 - Menu de prompts laterais
 - Análise de imagens
-- Audio:
-  - WhatsApp (webhook): transcricao ativa
-  - Chat interno `/viva`: botao presente, operacao pendente
+- Áudio:
+  - WhatsApp (webhook): transcrição ativa
+  - Chat interno `/viva`: gravação/transcrição ativas, com envio ao chat no fluxo principal
 
 Prompts laterais
 - Landing Pages
@@ -48,7 +48,7 @@ Prompts laterais
 
 Criar contrato
 1. Acesse `Contratos` no menu
-2. Escolha o template (Bacen disponível)
+2. Escolha o template (15 modelos operacionais ativos no menu)
 3. Preencha dados do cliente e valores
 4. Salve o contrato
 
@@ -120,8 +120,8 @@ PDF não aparece
 
 Áudio no VIVA não funciona
 - Status conhecido:
-  - WhatsApp: audio com transcricao funciona
-  - Chat interno `/viva`: botao de audio ainda pendente
+  - WhatsApp: áudio com transcrição funciona
+  - Chat interno `/viva`: gravação e transcrição funcionam; em caso de falha, regrave em ambiente mais silencioso
 
 ---
 

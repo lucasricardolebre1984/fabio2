@@ -98,7 +98,7 @@ async def create_user():
     async with AsyncSessionLocal() as db:
         user = User(
             email="fabio@fcsolucoes.com",
-            hashed_password=get_password_hash("senha123"),
+            hashed_password=get_password_hash("1234"),
             nome="Fábio",
             role="admin",
             ativo=True
@@ -117,7 +117,7 @@ exit()
 
 1. Acesse: http://localhost:3000
 2. Email: `fabio@fcsolucoes.com`
-3. Senha: `senha123`
+3. Senha: `1234`
 4. Clique em **Entrar**
 
 **Esperado:**
@@ -146,7 +146,7 @@ Teste via Swagger: http://localhost:8000/docs
 # Login
 curl -X POST "http://localhost:8000/api/v1/auth/login" \
   -H "Content-Type: application/json" \
-  -d '{"email": "fabio@fcsolucoes.com", "password": "senha123"}'
+  -d '{"email": "fabio@fcsolucoes.com", "password": "1234"}'
 
 # Listar templates
 curl -X GET "http://localhost:8000/api/v1/contratos/templates" \

@@ -729,3 +729,16 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
   - suporte a token CNH (`[NÚMERO CNH]` / `[NUMERO CNH]`) adicionado em frontend e backend.
 - status:
   - `BUG-085` => **Resolvido**.
+
+## Estado Institucional (2026-02-13 - saneamento de seguranca + docs)
+- seguranca:
+  - `docker-compose-prod.yml` sanitizado para remover segredos hardcoded e adotar variaveis de ambiente.
+- documentacao sincronizada com runtime:
+  - `README.md` atualizado com escopo real de modelos ativos;
+  - `SETUP.md` e `teste-local.md` alinhados com credencial dev `1234`;
+  - `docs/MANUAL_DO_CLIENTE.md` atualizado para audio ativo no chat interno `/viva`;
+  - `docs/API.md` atualizado com endpoints complementares ativos em producao local;
+  - `docs/DEPLOY_UBUNTU_DOCKER.md` alinhado para OpenAI (`OPENAI_API_KEY`).
+- governanca:
+  - `BUG-086` (drift de documentacao) => **Resolvido**;
+  - `BUG-087` (segredos em compose legado) => **Resolvido**.

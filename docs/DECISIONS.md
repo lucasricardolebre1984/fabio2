@@ -1082,3 +1082,29 @@ Foi solicitada memoria operacional completa da VIVA com continuidade apos limpez
 
 ### Data
 2026-02-10
+
+## DECISAO-032: saneamento institucional de seguranca e sincronizacao documental
+
+### Contexto
+Foi identificado drift entre documentacao operacional e runtime atual (credenciais dev divergentes, escopo de contratos defasado e manual de audio inconsistente), alem de exposicao de segredos em `docker-compose-prod.yml` legado.
+
+### Decisao
+- Sanitizar `docker-compose-prod.yml` para remover segredos hardcoded e adotar placeholders de ambiente.
+- Alinhar documentos operacionais com o runtime atual:
+  - `README.md`
+  - `SETUP.md`
+  - `teste-local.md`
+  - `docs/MANUAL_DO_CLIENTE.md`
+  - `docs/API.md`
+  - `docs/DEPLOY_UBUNTU_DOCKER.md`
+- Formalizar e baixar os bugs institucionais:
+  - `BUG-086` (drift documental)
+  - `BUG-087` (segredos no compose legado)
+
+### Impacto
+- Reducao de risco de vazamento de credenciais em repositorio.
+- Reducao de erro operacional por documentacao desatualizada.
+- Melhora de auditabilidade e onboarding tecnico do time.
+
+### Data
+2026-02-13

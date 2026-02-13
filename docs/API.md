@@ -2,7 +2,7 @@
 
 > **Base URL:** `http://localhost:8000/api/v1`  
 > **Versão:** 1.0.0  
-> **Data:** 2026-02-05
+> **Data:** 2026-02-13
 
 ---
 
@@ -771,14 +771,21 @@ Response 200
 
 Requer Bearer.
 
-Response 200 (exemplo modo local)
+Response 200 (exemplo OpenAI ativo)
 ```json
-{ "api_configurada": true, "modelo": "VIVA Local (Sem API)", "tipo": "Templates pré-programados" }
+{
+  "provider_preferido": "openai",
+  "openai": {
+    "api_configurada": true,
+    "modelo": "gpt-5-mini",
+    "tipo": "OpenAI"
+  }
+}
 ```
 
-Response 200 (exemplo OpenRouter)
+Response 200 (fallback local, sem OPENAI_API_KEY)
 ```json
-{ "api_configurada": true, "modelo": "meta-llama/llama-3.2-3b-instruct:free", "tipo": "OpenRouter (Gratuito)" }
+{ "api_configurada": true, "modelo": "VIVA Local (Sem API)", "tipo": "Templates pré-programados" }
 ```
 
 ---
@@ -801,7 +808,81 @@ Response 200
 
 ---
 
-*Documento atualizado em: 2026-02-05*
+## Endpoints Complementares (Atualização 2026-02-13)
+
+As rotas abaixo já estão ativas no backend e complementam os blocos acima:
+
+### POST /clientes/sincronizar-contratos
+- Requer Bearer.
+- Sincroniza/recalcula vínculos e métricas de contratos por cliente.
+
+### POST /clientes/deduplicar-documentos
+- Requer Bearer (admin).
+- Executa saneamento de duplicados de CPF/CNPJ normalizado.
+
+### GET /viva/chat/snapshot
+- Requer Bearer.
+- Retorna snapshot/histórico da sessão de chat atual.
+
+### GET /viva/chat/sessions
+- Requer Bearer.
+- Lista sessões de chat disponíveis para restauração de contexto.
+
+### POST /viva/chat/session/new
+- Requer Bearer.
+- Inicia nova sessão preservando histórico persistido.
+
+### GET /viva/memory/status
+- Requer Bearer.
+- Exibe status da memória híbrida (curta/média/longa).
+
+### GET /viva/memory/search
+- Requer Bearer.
+- Busca semântica na memória de longo prazo.
+
+### POST /viva/memory/reindex
+- Requer Bearer.
+- Dispara reindexação da memória vetorial.
+
+### GET /viva/capabilities
+- Requer Bearer.
+- Retorna catálogo de capacidades operacionais da VIVA.
+
+### POST /viva/handoff/schedule
+- Requer Bearer.
+- Agenda handoff operacional VIVA -> Viviane.
+
+### GET /viva/handoff
+- Requer Bearer.
+- Lista tarefas de handoff e status (`pending`, `sent`, `failed`).
+
+### POST /viva/handoff/process-due
+- Requer Bearer.
+- Processa tarefas de handoff vencidas.
+
+### POST /viva/campanhas
+- Requer Bearer.
+- Persiste campanha gerada com briefing/contexto.
+
+### GET /viva/campanhas
+- Requer Bearer.
+- Lista histórico de campanhas.
+
+### GET /viva/campanhas/{campanha_id}
+- Requer Bearer.
+- Consulta campanha específica por ID.
+
+### POST /viva/video/generate
+- Requer Bearer.
+- Nesta versão retorna `501` (não habilitado no provedor atual).
+
+### GET /viva/video/result/{task_id}
+- Requer Bearer.
+- Nesta versão retorna `501` (consulta de vídeo não habilitada).
+
+---
+
+*Documento atualizado em: 2026-02-13*
 
 ---
 
