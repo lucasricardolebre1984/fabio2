@@ -1,5 +1,0 @@
-﻿# Rollback Baseline
-timestamp=20260209-213516
-branch=main
-head=f5da1cd329288fa93318951ebe4a92650f5882dd
-restore_commit=git checkout f5da1cd329288fa93318951ebe4a92650f5882dd

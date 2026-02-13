@@ -1,8 +1,0 @@
-﻿Rollback institucional - rodada BUG-061
-Data: 2026-02-10
-Escopo:
-- backend/app/api/v1/viva.py
-- backend/app/services/viva_concierge_service.py
-- docs/BUGSREPORT.md
-Objetivo:
-- Restaurar estado anterior ao ajuste de aderencia de tema no fluxo de campanhas da VIVA.

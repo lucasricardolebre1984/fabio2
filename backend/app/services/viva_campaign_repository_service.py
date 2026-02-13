@@ -251,6 +251,31 @@ class VivaCampaignRepositoryService:
                 scene_ids.append(scene_id)
         return scene_ids
 
+    async def clear_campaign_history(
+        self,
+        db: AsyncSession,
+        user_id: UUID,
+        modo: Optional[str] = None,
+    ) -> int:
+        await self.ensure_table(db)
+        params: Dict[str, Any] = {"user_id": str(user_id)}
+        where = "WHERE user_id = :user_id"
+        if modo in ("FC", "REZETA"):
+            where += " AND modo = :modo"
+            params["modo"] = modo
+
+        result = await db.execute(
+            text(
+                f"""
+                DELETE FROM viva_campanhas
+                {where}
+                """
+            ),
+            params,
+        )
+        await db.commit()
+        return int(result.rowcount or 0)
+
     @staticmethod
     def _safe_json(value: Any, fallback: Any) -> Any:
         if value is None:

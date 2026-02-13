@@ -1,7 +1,0 @@
-﻿Rollback institucional - etapa 2 avancada VIVA
-Data: 2026-02-10 16:15:16
-Escopo:
-- viva_agenda_nlu_service
-- viva_handoff_service
-- viva_capabilities_service
-- integracao no router /api/v1/viva

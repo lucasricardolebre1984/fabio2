@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Bot, User, Sparkles, Trash2, Copy, Check, ImageIcon, Mic, X, FileUp, Layout, Palette, Image as ImageLucide, FileText, ChevronRight, Volume2, VolumeX } from 'lucide-react'
+import { Send, Bot, User, Sparkles, Trash2, Copy, Check, ImageIcon, Mic, X, FileUp, ChevronRight, Volume2, VolumeX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { api } from '@/lib/api'
@@ -26,14 +26,6 @@ interface Mensagem {
   }
 }
 
-interface PromptItem {
-  id: string
-  titulo: string
-  icone: React.ReactNode
-  descricao: string
-  cor: string
-}
-
 interface SnapshotMessage {
   id: string
   tipo: 'usuario' | 'ia'
@@ -50,52 +42,38 @@ interface ChatSnapshot {
   messages: SnapshotMessage[]
 }
 
+interface ChatSessionSummary {
+  id: string
+  modo?: string | null
+  message_count: number
+  created_at: string
+  updated_at: string
+  last_message_at: string
+}
+
+interface ChatSessionListResponse {
+  items: ChatSessionSummary[]
+  total: number
+  page: number
+  page_size: number
+}
+
 type ComposerAnexo = { file: File; tipo: 'imagem' | 'audio' | 'arquivo'; preview?: string }
 type SendOptions = {
   textoOverride?: string
   anexosOverride?: ComposerAnexo[]
 }
 
-const PROMPTS: PromptItem[] = [
-  {
-    id: 'CRIADORLANDPAGE',
-    titulo: 'Landing Pages',
-    icone: <Layout className="w-5 h-5" />,
-    descricao: 'Criar sites e landing pages',
-    cor: 'bg-blue-500'
-  },
-  {
-    id: 'LOGO',
-    titulo: 'Logos & Brand',
-    icone: <Palette className="w-5 h-5" />,
-    descricao: 'Gerar logos e identidade visual',
-    cor: 'bg-purple-500'
-  },
-  {
-    id: 'FC',
-    titulo: 'Imagens FC',
-    icone: <ImageLucide className="w-5 h-5" />,
-    descricao: 'Imagens para FC SoluÃ§Ãµes',
-    cor: 'bg-indigo-500'
-  },
-  {
-    id: 'REZETA',
-    titulo: 'Imagens Rezeta',
-    icone: <FileText className="w-5 h-5" />,
-    descricao: 'Imagens para RezetaBrasil',
-    cor: 'bg-green-500'
-  },
-  {
-    id: 'CRIADORPROMPT',
-    titulo: 'Criador Prompt',
-    icone: <Sparkles className="w-5 h-5" />,
-    descricao: 'Criar instruÃ§Ãµes de sistema',
-    cor: 'bg-amber-500'
-  }
-]
-
-const PROMPT_ID_ALIASES: Record<string, string> = {
+const MODE_ID_ALIASES: Record<string, string> = {
   CRIADORWEB: 'CRIADORPROMPT'
+}
+
+const MODE_LABELS: Record<string, string> = {
+  FC: 'Imagens FC',
+  REZETA: 'Imagens Rezeta',
+  LOGO: 'Logos & Brand',
+  CRIADORPROMPT: 'Criador Prompt',
+  CRIADORLANDPAGE: 'Landing Pages',
 }
 
 const IMAGE_TERMS = [
@@ -211,7 +189,7 @@ const VIVA_AVATAR_SOURCES = ['/viva-avatar.png', '/viva-avatar-3d.png', '/viva.p
 const createWelcomeMessage = (): Mensagem => ({
   id: 'welcome',
   tipo: 'ia',
-  conteudo: 'Ola! Sou a VIVA, assistente virtual da FC Solucoes Financeiras. Como posso ajudar voce hoje?\n\nSelecione um modo especial no menu lateral ou envie uma mensagem diretamente.',
+  conteudo: 'Ola! Sou a VIVA, assistente virtual da FC Solucoes Financeiras. Como posso ajudar voce hoje?',
   timestamp: new Date()
 })
 
@@ -286,6 +264,8 @@ export default function VivaChatPage() {
   const [erroAudio, setErroAudio] = useState<string | null>(null)
   const [pendingAudioAutoSend, setPendingAudioAutoSend] = useState<ComposerAnexo | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [chatSessions, setChatSessions] = useState<ChatSessionSummary[]>([])
+  const [loadingSessions, setLoadingSessions] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [anexos, setAnexos] = useState<ComposerAnexo[]>([])
   const [promptAtivo, setPromptAtivo] = useState<string | null>(null)
@@ -320,6 +300,15 @@ export default function VivaChatPage() {
   const INPUT_MIN_HEIGHT = 88
   const INPUT_MAX_HEIGHT = 220
 
+  const formatSessionLabel = (session: ChatSessionSummary) => {
+    const dt = new Date(session.last_message_at || session.updated_at || session.created_at)
+    const dateLabel = Number.isNaN(dt.getTime())
+      ? 'sem data'
+      : dt.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    const modeLabel = session.modo ? ` | ${session.modo}` : ''
+    return `${dateLabel}${modeLabel} | ${session.message_count} msg`
+  }
+
   const scrollToBottom = useCallback((smooth = false) => {
     const behavior: ScrollBehavior = smooth ? 'smooth' : 'auto'
     const viewport = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement | null
@@ -330,6 +319,45 @@ export default function VivaChatPage() {
     }
     messagesEndRef.current?.scrollIntoView({ block: 'end', behavior })
   }, [])
+
+  const loadSessions = useCallback(async (selectedSessionId?: string | null) => {
+    setLoadingSessions(true)
+    try {
+      const response = await api.get<ChatSessionListResponse>('/viva/chat/sessions', {
+        params: { page: 1, page_size: 30 }
+      })
+      const items = Array.isArray(response.data?.items) ? response.data.items : []
+      setChatSessions(items)
+
+      if (items.length > 0 && !selectedSessionId) {
+        setSessionId((prev) => prev || items[0].id)
+      }
+    } catch {
+      setChatSessions([])
+    } finally {
+      setLoadingSessions(false)
+    }
+  }, [])
+
+  const loadSessionSnapshot = useCallback(async (targetSessionId: string) => {
+    try {
+      const response = await api.get<ChatSnapshot>('/viva/chat/snapshot', {
+        params: { session_id: targetSessionId, limit: 180 }
+      })
+      const snapshot = response.data
+      const restoredMessages = mapSnapshotMessages(snapshot?.messages || [])
+
+      setSessionId(snapshot?.session_id || targetSessionId)
+      if (snapshot?.modo) {
+        const normalizedMode = MODE_ID_ALIASES[snapshot.modo] || snapshot.modo
+        setPromptAtivo(normalizedMode)
+      }
+      setMensagens(restoredMessages.length > 0 ? restoredMessages : [createWelcomeMessage()])
+      requestAnimationFrame(() => scrollToBottom())
+    } catch {
+      // Mantem sessao atual em caso de erro de leitura.
+    }
+  }, [scrollToBottom])
 
   const stopContinuousConversation = useCallback((clearIntent = true) => {
     if (clearIntent) {
@@ -456,6 +484,7 @@ export default function VivaChatPage() {
     let active = true
 
     const restoreSnapshot = async () => {
+      let restoredSessionId: string | null = null
       try {
         const response = await api.get<ChatSnapshot>('/viva/chat/snapshot', {
           params: { limit: 120 }
@@ -464,13 +493,14 @@ export default function VivaChatPage() {
 
         const snapshot = response.data
         const restoredMessages = mapSnapshotMessages(snapshot?.messages || [])
+        restoredSessionId = snapshot?.session_id || null
 
         if (snapshot?.session_id) {
           setSessionId(snapshot.session_id)
         }
 
         if (snapshot?.modo) {
-          const normalizedMode = PROMPT_ID_ALIASES[snapshot.modo] || snapshot.modo
+          const normalizedMode = MODE_ID_ALIASES[snapshot.modo] || snapshot.modo
           setPromptAtivo(normalizedMode)
         }
 
@@ -484,13 +514,17 @@ export default function VivaChatPage() {
           setMensagens([createWelcomeMessage()])
         }
       }
+
+      if (active) {
+        await loadSessions(restoredSessionId)
+      }
     }
 
     restoreSnapshot()
     return () => {
       active = false
     }
-  }, [])
+  }, [loadSessions])
 
   useEffect(() => {
     requestAnimationFrame(() => scrollToBottom())
@@ -693,6 +727,7 @@ export default function VivaChatPage() {
       })
       if (response.data?.session_id) {
         setSessionId(response.data.session_id)
+        void loadSessions(response.data.session_id)
       }
 
       const resposta = String(response.data?.resposta || '').trim() || 'Processado com sucesso!'
@@ -758,7 +793,7 @@ export default function VivaChatPage() {
     } finally {
       setLoading(false)
     }
-  }, [anexos, input, loading, mensagens, promptAtivo, sessionId])
+  }, [anexos, input, loadSessions, loading, mensagens, promptAtivo, sessionId])
 
   useEffect(() => {
     sendFromVoiceRef.current = (texto: string) => {
@@ -861,27 +896,6 @@ export default function VivaChatPage() {
     await startAudioRecording()
   }
 
-  const selecionarPrompt = async (promptId: string) => {
-    setPromptAtivo(promptId)
-
-    const nomeModo = PROMPTS.find(p => p.id === promptId)?.titulo
-    let novoContexto = `Modo **${nomeModo}** ativado.\n\nComo posso ajudar?`
-    if (promptId === 'FC' || promptId === 'REZETA') {
-      novoContexto = (
-        `Modo **${nomeModo}** ativado.\n\n` +
-        'Converse normal e me diga o que quer criar que eu gero a imagem.'
-      )
-    }
-
-    const iaMsg: Mensagem = {
-      id: Date.now().toString(),
-      tipo: 'ia',
-      conteudo: novoContexto,
-      timestamp: new Date()
-    }
-    setMensagens(prev => [...prev, iaMsg])
-  }
-
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, tipo: 'imagem' | 'audio' | 'arquivo') => {
     const files = e.target.files
     if (!files) return
@@ -939,11 +953,14 @@ export default function VivaChatPage() {
       })
       if (response.data?.session_id) {
         setSessionId(response.data.session_id)
+        await loadSessions(response.data.session_id)
       } else {
         setSessionId(null)
+        await loadSessions(null)
       }
     } catch {
       setSessionId(null)
+      await loadSessions(null)
     }
 
     setMensagens([createWelcomeMessage()])
@@ -1216,11 +1233,11 @@ export default function VivaChatPage() {
   return (
     <>
       <div className="flex h-[calc(100vh-4rem)]">
-      {/* Menu Lateral de Prompts */}
+      {/* Menu Lateral */}
       <div className={`bg-gray-50 border-r transition-all duration-300 ${menuAberto ? 'w-64' : 'w-0 overflow-hidden'}`}>
         <div className="p-4">
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-            Modos Especiais
+            Conversa
           </h3>
           <div className="space-y-2">
             <button
@@ -1244,36 +1261,7 @@ export default function VivaChatPage() {
                 <ChevronRight className="w-4 h-4 text-cyan-600 ml-auto" />
               )}
             </button>
-
-            {PROMPTS.map((prompt) => (
-              <button
-                key={prompt.id}
-                onClick={() => selecionarPrompt(prompt.id)}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
-                  promptAtivo === prompt.id
-                    ? 'bg-white shadow-md ring-2 ring-blue-500'
-                    : 'bg-white hover:shadow-md border border-gray-200'
-                }`}
-              >
-                <div className={`w-10 h-10 rounded-lg ${prompt.cor} flex items-center justify-center text-white`}>
-                  {prompt.icone}
-                </div>
-                <div className="text-left">
-                  <p className="font-medium text-sm">{prompt.titulo}</p>
-                  <p className="text-xs text-gray-500">{prompt.descricao}</p>
-                </div>
-                {promptAtivo === prompt.id && (
-                  <ChevronRight className="w-4 h-4 text-blue-500 ml-auto" />
-                )}
-              </button>
-            ))}
           </div>
-        </div>
-        
-        <div className="p-4 border-t">
-          <p className="text-xs text-gray-400">
-            Selecione um modo para ativar prompts especializados
-          </p>
         </div>
       </div>
 
@@ -1298,16 +1286,42 @@ export default function VivaChatPage() {
                 Assistente Virtual IA
                 {promptAtivo && (
                   <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">
-                    {PROMPTS.find(p => p.id === promptAtivo)?.titulo}
+                    {MODE_LABELS[promptAtivo] || promptAtivo}
                   </span>
                 )}
               </p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={clearChat} className="text-gray-500">
-            <Trash2 className="w-4 h-4 mr-2" />
-            Limpar
-          </Button>
+          <div className="flex items-center gap-2">
+            <select
+              value={sessionId || ''}
+              onChange={(e) => {
+                const target = e.target.value
+                if (!target) return
+                void loadSessionSnapshot(target)
+              }}
+              className="h-9 min-w-[230px] rounded-md border bg-white px-3 text-sm text-gray-700"
+              disabled={loadingSessions || chatSessions.length === 0}
+              title="Recuperar sessao anterior"
+            >
+              {chatSessions.length === 0 ? (
+                <option value="">{loadingSessions ? 'Carregando sessoes...' : 'Sem historico'}</option>
+              ) : (
+                chatSessions.map((session) => (
+                  <option key={session.id} value={session.id}>
+                    {formatSessionLabel(session)}
+                  </option>
+                ))
+              )}
+            </select>
+            <Button variant="ghost" size="sm" onClick={() => { void loadSessions(sessionId) }} className="text-gray-500">
+              Atualizar
+            </Button>
+            <Button variant="ghost" size="sm" onClick={clearChat} className="text-gray-500">
+              <Trash2 className="w-4 h-4 mr-2" />
+              Limpar
+            </Button>
+          </div>
         </div>
 
         {modoConversacaoAtivo ? (

@@ -1237,3 +1237,18 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
   - `BUG-091` criado em `docs/BUGSREPORT.md` para rastrear indisponibilidade funcional do RAG (infra ativa sem retorno semantico util).
 - checkpoint de pausa:
   - contexto desta pauta esta persistido em `SESSION`, `BUGSREPORT`, `DECISIONS` e no blueprint de arquitetura para retomada sem perda.
+
+## Atualizacao Operacional (2026-02-13 - auditoria de commits + limpeza de rollback)
+- auditoria de historico recente executada (`git log -n 40`) com foco em correcoes de bug e estabilidade institucional.
+- commits de referencia da rodada atual:
+  - `c1e24dc` - correcoes VIVA/handoff e baixa de bugs ativos;
+  - `be4d3f0` - saneamento de seguranca em compose + sincronizacao documental;
+  - `e6e41b3` e `8e68d7d` - correcoes de contratos (parcelamento e templates base);
+  - `aee6483` - consolidacao do blueprint de orquestrador+skills e status RAG.
+- hygiene operacional aplicada no repositorio:
+  - `docs/ROLLBACK` reduzido para apenas 3 checkpoints mais recentes:
+    - `rollback-20260213-072020-pre-viva-bridge-removal*`
+    - `rollback-20260213-072527-pre-viva-schema-extract*`
+    - `rollback-20260213-073005-pre-viva-chat-session-service-extract*`
+- status esperado apos esta rodada:
+  - repositorio limpo (`git status` sem pendencias) para pausa e retomada com contexto maximo.

@@ -1,8 +1,0 @@
-﻿contratos/cadinpfpjmodelo.docx
-contratos/logo2.jpeg
-contratos/logoFC.jpeg
-contratos/templates/cadin.json
-contratos/~$cenmodelo.docx
-docs/CONTRATOS/CAMPOS_CADIN.md
-docs/ROLLBACK/rollback-20260209-122338.patch
-frontend/public/logoFC.jpeg

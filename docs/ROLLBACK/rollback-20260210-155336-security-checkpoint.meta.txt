@@ -1,4 +1,0 @@
-﻿Rollback institucional - security checkpoint
-Data: 2026-02-10 15:53:38
-Motivo: baseline antes de refatoracao estrutural VIVA (etapas 2 e 3)
-Escopo: estado completo do repositorio no momento do commit de seguranca
