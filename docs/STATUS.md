@@ -795,3 +795,13 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
    - voz/avatars institucionais;
    - validacao de modelo/API de fala ao vivo;
    - certificacao de qualidade do RAG para operacao comercial sem perda de contexto.
+
+## Execucao Tecnica (2026-02-13 - gate 2 parcial)
+- endpoint novo para operacao comercial:
+  - `GET /api/v1/viva/modules/status` (Bearer).
+- entrega do endpoint:
+  - lista de gates (`gate_1`, `gate_2`, `gate_3`) com status e proximas acoes;
+  - lista de modulos comercializaveis e readiness (`core_saas`, `modulo_viva`, `modulo_viviane`, `modulo_campanhas`, `modulo_memoria`);
+  - sinal de runtime para decisao comercial (`rag_premium_ready`, `embedding_fallback_local`, `speech_stack`).
+- impacto:
+  - acelera pre-configuracao de novas vendas com status tecnico centralizado na API.

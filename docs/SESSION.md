@@ -1297,3 +1297,14 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
   - trocar avatar da VIVA para o novo asset institucional enviado pelo cliente;
   - definir voz oficial com qualidade superior para modo conversa continua;
   - validar API/modelo de voz ao vivo dedicado (nao dependente apenas de APIs nativas do navegador).
+
+## Atualizacao Operacional (2026-02-13 - gate 2 execucao parcial: catalogo de modulos)
+- backend:
+  - novo servico `backend/app/services/viva_modules_service.py` com status de gates e readiness de modulos comercializaveis;
+  - nova rota autenticada `GET /api/v1/viva/modules/status` em `backend/app/api/v1/viva_modules_routes.py`;
+  - agregador `backend/app/api/v1/viva.py` atualizado para incluir router de modulos;
+  - `backend/app/services/viva_capabilities_service.py` ampliado com dominio `modulos_produto`.
+- contrato HTTP:
+  - novos schemas em `backend/app/api/v1/viva_schemas.py` (`VivaGateItem`, `VivaModuleItem`, `VivaModulesRuntime`, `VivaModulesStatusResponse`).
+- objetivo:
+  - expor status tecnico unico para facilitar onboarding de novos clientes por pacote/modulo sem depender de leitura manual de documentos.

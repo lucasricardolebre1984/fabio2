@@ -101,6 +101,38 @@ class VivaCapabilitiesResponse(BaseModel):
     items: List[Dict[str, Any]]
 
 
+class VivaGateItem(BaseModel):
+    gate_id: str
+    title: str
+    status: str
+    summary: str
+    blockers: List[str] = Field(default_factory=list)
+    next_actions: List[str] = Field(default_factory=list)
+
+
+class VivaModuleItem(BaseModel):
+    module_id: str
+    nome: str
+    status: str
+    descricao: str
+    dependencias: List[str] = Field(default_factory=list)
+    endpoints: List[str] = Field(default_factory=list)
+    notes: List[str] = Field(default_factory=list)
+
+
+class VivaModulesRuntime(BaseModel):
+    openai_api_key_configured: bool
+    embedding_fallback_local: bool
+    rag_premium_ready: bool
+    speech_stack: str
+
+
+class VivaModulesStatusResponse(BaseModel):
+    gates: List[VivaGateItem] = Field(default_factory=list)
+    modules: List[VivaModuleItem] = Field(default_factory=list)
+    runtime: VivaModulesRuntime
+
+
 class HandoffScheduleRequest(BaseModel):
     cliente_numero: str
     mensagem: str

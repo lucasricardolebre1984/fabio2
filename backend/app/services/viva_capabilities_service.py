@@ -74,6 +74,17 @@ class VivaCapabilitiesService:
                     "/api/v1/viva/chat/snapshot",
                 ],
             },
+            {
+                "dominio": "modulos_produto",
+                "acoes": [
+                    "expor status dos gates institucionais",
+                    "listar readiness dos modulos comercializaveis",
+                    "publicar sinal de runtime para RAG premium e stack de voz",
+                ],
+                "rotas": [
+                    "/api/v1/viva/modules/status",
+                ],
+            },
         ]
 
 

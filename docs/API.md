@@ -848,6 +848,10 @@ As rotas abaixo já estão ativas no backend e complementam os blocos acima:
 - Requer Bearer.
 - Retorna catálogo de capacidades operacionais da VIVA.
 
+### GET /viva/modules/status
+- Requer Bearer.
+- Retorna estado dos gates institucionais e readiness dos modulos comercializaveis (`core_saas`, `modulo_viva`, `modulo_viviane`, `modulo_campanhas`, `modulo_memoria`).
+
 ### POST /viva/handoff/schedule
 - Requer Bearer.
 - Agenda handoff operacional VIVA -> Viviane.

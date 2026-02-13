@@ -1,0 +1,6 @@
+backend/app/api/v1/viva_modules_routes.py
+backend/app/services/viva_modules_service.py
+docs/ROLLBACK/rollback-20260213-142931-pre-gate2-modules-status-baseline.txt
+docs/ROLLBACK/rollback-20260213-142931-pre-gate2-modules-status-staged.patch
+docs/ROLLBACK/rollback-20260213-142931-pre-gate2-modules-status-untracked.txt
+docs/ROLLBACK/rollback-20260213-142931-pre-gate2-modules-status.patch
