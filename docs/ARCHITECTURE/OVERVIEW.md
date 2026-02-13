@@ -60,7 +60,10 @@ Arquivos-chave:
 Status:
 - memoria de sessao e continuidade operacional ativas;
 - memoria media em Redis ativa por sessao;
-- memoria longa vetorial ativa em pgvector (`viva_memory_vectors`).
+- memoria longa vetorial provisionada em pgvector (`viva_memory_vectors`), porem com indisponibilidade funcional na busca semantica nesta rodada.
+
+Referencia institucional desta rodada:
+- `docs/ARCHITECTURE/VIVA_ORQUESTRADOR_SKILLS_BLUEPRINT.md`
 
 ---
 

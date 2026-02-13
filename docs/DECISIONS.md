@@ -1125,3 +1125,28 @@ Durante a rodada de validacao dos bugs ativos de VIVA, o fluxo `agenda + aviso n
 
 ### Data
 2026-02-13
+
+## DECISAO-034: modelo de orquestrador unico com skills e contrato `generate_campanha`
+
+### Contexto
+Com a evolucao da VIVA, foi solicitado padronizar o fluxo em um unico orquestrador com roteamento automatico por skills, separar claramente VIVA (interna) de Viviane (externa), e consolidar governanca de prompt para reduzir ruido de memoria por legado.
+
+### Decisao
+- Adotar arquitetura alvo com um agente orquestrador (`viva_orchestrator`) e duas personas separadas por dominio:
+  - `viva_core_agent` (chat interno do SaaS);
+  - `viviane_handoff_agent` (execucao externa no WhatsApp).
+- Definir contrato formal de skill criativa de campanha:
+  - skill id: `skill_generate_campanha_ghd_copy`;
+  - acao obrigatoria: `generate_campanha`.
+- Manter prompt principal unico da VIVA como base conversacional e impedir que prompts legados contaminem memoria operacional.
+- Registrar blueprint tecnico e spec da skill em:
+  - `docs/ARCHITECTURE/VIVA_ORQUESTRADOR_SKILLS_BLUEPRINT.md`
+  - `docs/PROMPTS/SKILLS/VIVA_SKILL_GHD_COPY_CAMPAIGN.md`
+
+### Impacto
+- Roteamento de intencao passa a ser previsivel e auditavel.
+- Campanhas ficam com pipeline explicito (intencao -> skill -> imagem -> persistencia).
+- VIVA e Viviane deixam de competir no mesmo contexto, mantendo handoff estruturado.
+
+### Data
+2026-02-13

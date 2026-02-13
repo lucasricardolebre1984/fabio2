@@ -1,7 +1,7 @@
 ﻿# BUGSREPORT - Registro de Bugs
 
 > **Projeto:** FC SoluÃ§Ãµes Financeiras SaaS  
-> **Ãšltima AtualizaÃ§Ã£o:** 2026-02-12 (rodada contratos runtime)
+> **Ãšltima AtualizaÃ§Ã£o:** 2026-02-13 (rodada VIVA skills/orquestrador + status RAG)
 
 ---
 
@@ -56,8 +56,8 @@
 | BUG-058 | Alta | VIVA/RAG | Ausencia de camada vetorial moderna (RAG) para memoria/conhecimento evolutivo de longo prazo no piloto | Resolvido |
 | BUG-059 | Alta | Frontend/NextDev | `next dev` pode quebrar com `MODULE_NOT_FOUND` apontando para rota removida (`/api/viva/prompts/[promptId]/route`) por cache `.next` stale | Resolvido |
 | BUG-060 | Alta | Frontend/Auth+Docs | Login no front exibe erro generico para qualquer falha e README publica senha de teste divergente do runtime local | Resolvido |
-| BUG-061 | Alta | VIVA/Campanhas | Geracao de imagem pode ignorar tema do brief (ex.: Carnaval sem dividas) e cair em cena corporativa generica (senhor de terno em escritorio) | Em validacao (rodada 5 - tema+elenco+cenario) |
-| BUG-062 | Alta | VIVA/Arquitetura | `backend/app/api/v1/viva.py` monolitico (chat+agenda+campanhas+midia+SQL) com alto acoplamento e baixa manutenibilidade | Em validacao (fatiamento SQL em repositorios) |
+| BUG-061 | Alta | VIVA/Campanhas | Geracao de imagem pode ignorar tema do brief (ex.: Carnaval sem dividas) e cair em cena corporativa generica (senhor de terno em escritorio) | Em validacao (rodada 7 - reset de padrao + sujeito explicito + fluxo livre sem briefing rigido) |
+| BUG-062 | Alta | VIVA/Arquitetura | Router VIVA ainda concentra muita responsabilidade de dominio (chat+agenda+campanhas+midia) e exige fatiamento progressivo para manutencao segura | Resolvido |
 | BUG-063 | Alta | VIVA/Agenda UX | Fallback rigido de agenda exige formato textual prescritivo, reduz fluidez conversacional e gera efeito de "bot travado" | Resolvido |
 | BUG-064 | Alta | VIVA->Viviane Orquestracao | Nao existe handoff operacional completo para aviso programado no WhatsApp (agenda da VIVA disparando persona Viviane no horario) | Resolvido |
 | BUG-065 | Alta | VIVA/Handoff API | `GET /api/v1/viva/handoff` retorna `500` quando `meta_json` vem serializado como string e quebra validacao do schema | Resolvido |
@@ -78,6 +78,9 @@
 | BUG-083 | Media | Contratos/Encoding | Clausulas exibem simbolos residuais (`�`) em alguns titulos/textos no preview/PDF por decodificacao incompleta de mojibake CP1252/UTF-8 | Resolvido |
 | BUG-084 | Alta | Contratos/Parcelamento UX+Regra | Formulario exige prazos manuais e nao atende venda a vista/1x fluida; precisa trabalhar com qtd de parcelas (1..12), entrada opcional e calculo automatico institucional | Resolvido |
 | BUG-085 | Media | Contratos/Templates Base | Templates legados `bacen`, `cadin` e `cnh` permaneceram fora do metodo padrao novo (estrutura heterogenea e placeholders inconsistentes) | Resolvido |
+| BUG-089 | Alta | VIVA/Campanhas | Em modo `FC/REZETA`, conversa comum podia ser sequestrada para fluxo de campanha por inferencia ampla de tema livre | Resolvido |
+| BUG-090 | Alta | VIVA/UI Chat | Recuperacao de chats antigos indisponivel no frontend (somente snapshot da sessao mais recente) | Resolvido |
+| BUG-091 | Alta | VIVA/RAG Runtime | RAG semantico indisponivel no runtime atual (reindex sem indexacao e search vazio), com dependencia de embeddings OpenAI sem saldo | Ativo |
 
 ---
 
@@ -1464,3 +1467,279 @@
   - `backend/app/api/v1/viva.py` (`_extract_cliente_nome`);
   - ajuste para regex unicode estavel com escapes `\\u00C0-\\u00FF` e tokens de corte com `amanhã/às`;
   - validacao: fluxo de chat com handoff voltou a responder sem `500` por regex.
+
+### BUG-089: Modo FC/REZETA sequestra conversa comum para fluxo de campanha
+**Data:** 2026-02-13
+**Severidade:** Alta
+**Descricao:** ao manter modo `FC`/`REZETA` ativo, mensagens comuns de conversa (sem pedido de campanha/imagem) podiam cair no funil de campanha por inferencia ampla de tema livre.
+**Passos:** 1. abrir sessao em modo `FC` 2. enviar mensagem comum (`qual foi minha ultima mensagem?`) 3. observar retorno de "Sugestoes rapidas para sua campanha".
+**Esperado:** conversa comum segue como chat normal; funil de campanha apenas com sinal claro de campanha/imagem.
+**Atual:** gatilho ajustado para exigir sinal de campanha e manter inferencia contextual sem sequestrar dialogo.
+**Status:** Resolvido
+
+### BUG-090: Recuperacao de chats antigos indisponivel no frontend
+**Data:** 2026-02-13
+**Severidade:** Alta
+**Descricao:** backend possui `GET /api/v1/viva/chat/sessions`, mas o frontend `/viva` restaurava apenas snapshot da ultima sessao, sem seletor para recuperar sessoes anteriores.
+**Passos:** 1. criar multiplas sessoes (`/viva/chat/session/new`) 2. voltar para `/viva` 3. tentar abrir sessao antiga.
+**Esperado:** UI com selecao de sessoes antigas + carregamento do snapshot da sessao escolhida.
+**Atual:** frontend passou a listar sessoes no header e recuperar historico por sessao.
+**Status:** Resolvido
+
+### Atualizacao 2026-02-13 (execucao BUG-089 + BUG-090 + validacao memoria/RAG)
+- backend `backend/app/api/v1/viva.py`:
+  - novo gate `_has_campaign_signal` para separar conversa comum de intencao de campanha;
+  - inferencia de tema livre limitada a mensagens com sinal de campanha;
+  - coleta de contexto de campanha por sessao filtrada para nao poluir memoria com mensagens gerais;
+  - reforco anti-repeticao de campanha:
+    - seletor estavel por `sha256` em `_stable_pick`;
+    - cooldown para evitar repeticao imediata dos 2 perfis/cenarios mais recentes quando o pool estiver saturado.
+- frontend `frontend/src/app/viva/page.tsx`:
+  - adicionada listagem de sessoes (`/viva/chat/sessions`) no header da VIVA;
+  - troca de sessao com leitura de snapshot por `session_id`;
+  - botao de atualizar historico e refresh automatico apos envio/limpeza.
+- validacao executada:
+  - `POST /api/v1/viva/chat` (modo `FC`, pergunta comum) => resposta conversacional normal (sem funil de campanha);
+  - `POST /api/v1/viva/chat` (campanha explicita) => fluxo de campanha preservado;
+  - `GET /api/v1/viva/chat/sessions` + `GET /api/v1/viva/chat/snapshot?session_id=...` => recuperacao por sessao funcionando;
+  - `GET /api/v1/viva/memory/status` => `vector_enabled=true`, `redis_enabled=true`;
+  - `GET /api/v1/viva/memory/search` => hits semanticos retornados com sucesso.
+
+### Atualizacao 2026-02-13 (BUG-062 - fase 2: `viva.py` minimo)
+- refatoracao estrutural aplicada sem quebra de contrato HTTP:
+  - implementacao completa movida para `backend/app/api/v1/viva_core.py`;
+  - `backend/app/api/v1/viva.py` reduzido para agregador de rotas (`include_router`), conforme diretriz institucional de arquivo minimo.
+- validacao runtime:
+  - `GET /api/v1/viva/status` => `200`;
+  - `GET /api/v1/viva/chat/sessions` => `200`;
+  - `GET /api/v1/viva/chat/snapshot` => `200`;
+  - `POST /api/v1/viva/chat` => `200` com `session_id`.
+- status:
+  - `BUG-062` permanece **Em validacao** ate concluir fase 3 (fatiar orquestracao interna de `viva_core.py` em servicos de dominio).
+
+### Atualizacao 2026-02-13 (BUG-062 - fase 3: rotas por dominio)
+- fatiamento aplicado em modulos de rota dedicados:
+  - `backend/app/api/v1/viva_memory_routes.py`
+  - `backend/app/api/v1/viva_capabilities_routes.py`
+  - `backend/app/api/v1/viva_handoff_routes.py`
+  - `backend/app/api/v1/viva_campaign_routes.py`
+  - `backend/app/api/v1/viva_media_routes.py`
+- agregacao central:
+  - `backend/app/api/v1/viva.py` passou a incluir `viva_core` (chat) + routers de dominio.
+- resultado estrutural:
+  - `viva.py` mantido minimo (21 linhas);
+  - `viva_core.py` reduzido ao dominio de chat/sessao (sem endpoints de memoria, campanhas, handoff, midia).
+- validacao runtime:
+  - `GET /api/v1/viva/status` => `200`;
+  - `GET /api/v1/viva/capabilities` => `200`;
+  - `GET /api/v1/viva/memory/status` => `200`;
+  - `GET /api/v1/viva/handoff` => `200`;
+  - `GET /api/v1/viva/campanhas` => `200`;
+  - `POST /api/v1/viva/chat` => `200` com `session_id`.
+- status:
+  - `BUG-062` permanece **Em validacao** para fase 4 (extracao de helpers/casos de uso do `viva_core.py` para servicos).
+
+### Atualizacao 2026-02-13 (BUG-062 - fase 4 parcial: chat/sessao separado)
+- ajuste adicional de modularizacao:
+  - `backend/app/api/v1/viva_chat_session_routes.py` criado para:
+    - `GET /api/v1/viva/chat/snapshot`
+    - `GET /api/v1/viva/chat/sessions`
+    - `POST /api/v1/viva/chat/session/new`
+  - `backend/app/api/v1/viva_core.py` mantido apenas com `POST /api/v1/viva/chat` + helpers compartilhados.
+- agregacao:
+  - `backend/app/api/v1/viva.py` passou a incluir router dedicado de sessao.
+- validacao runtime:
+  - `POST /api/v1/viva/chat` => `200`;
+  - `POST /api/v1/viva/chat/session/new` => `200`;
+  - `GET /api/v1/viva/chat/sessions` => `200`;
+  - `GET /api/v1/viva/chat/snapshot` => `200`;
+  - `GET /api/v1/viva/memory/status` => `200`;
+  - `GET /api/v1/viva/campanhas` => `200`.
+- status:
+  - `BUG-062` segue **Em validacao** (pendente fase 5: mover helpers/orquestracao de `viva_core.py` para camada de servico).
+
+### Atualizacao 2026-02-13 (BUG-062 - fase 5 parcial: orquestracao `/chat` em service)
+- extracao aplicada:
+  - orquestracao pesada do endpoint `/api/v1/viva/chat` movida para:
+    - `backend/app/services/viva_chat_orchestrator_service.py`
+  - `backend/app/api/v1/viva_core.py` mantido com contrato HTTP do `/chat` delegando para service.
+- observacao tecnica:
+  - nesta fase foi usado bridge temporario (`globals().update(...)` no service) para reaproveitar helpers existentes do `viva_core` sem regressao de comportamento.
+- validacao runtime apos extracao:
+  - `POST /api/v1/viva/chat` => `200` com `session_id`;
+  - `POST /api/v1/viva/chat/session/new` => `200`;
+  - `GET /api/v1/viva/chat/sessions` => `200`;
+  - `GET /api/v1/viva/chat/snapshot` => `200`;
+  - `GET /api/v1/viva/memory/status` => `200`;
+  - `GET /api/v1/viva/capabilities` => `200`;
+  - `GET /api/v1/viva/handoff` => `200`;
+  - `GET /api/v1/viva/campanhas` => `200`;
+  - `GET /api/v1/viva/status` => `200`.
+- status:
+  - `BUG-062` segue **Em validacao** (fase final pendente: substituir bridge temporario por interfaces explicitas e extrair helpers restantes para services de dominio).
+
+### Atualizacao 2026-02-13 (BUG-062 - fase 5 avancada: bridge removido)
+- ajuste aplicado no orquestrador:
+  - removido bridge dinamico (`globals().update(...)`) de `backend/app/services/viva_chat_orchestrator_service.py`;
+  - substituido por imports explicitos dos simbolos usados na orquestracao de chat.
+- validacao:
+  - `python -m py_compile` do conjunto VIVA => OK;
+  - runtime autenticado:
+    - `POST /api/v1/viva/chat` => `200`;
+    - `POST /api/v1/viva/chat/session/new` => `200`;
+    - `GET /api/v1/viva/chat/sessions` => `200`;
+    - `GET /api/v1/viva/chat/snapshot` => `200`;
+    - `GET /api/v1/viva/memory/status` => `200`;
+    - `GET /api/v1/viva/capabilities` => `200`;
+    - `GET /api/v1/viva/handoff` => `200`;
+    - `GET /api/v1/viva/campanhas` => `200`;
+    - `GET /api/v1/viva/status` => `200`.
+- status:
+  - `BUG-062` segue **Em validacao** para fechamento final (extrair helpers remanescentes de `viva_core.py` para services dedicados e reduzir acoplamento interno).
+
+### Atualizacao 2026-02-13 (BUG-062 - fase 5 avancada B: schemas dedicados)
+- extracao aplicada:
+  - criado modulo de contratos compartilhados:
+    - `backend/app/api/v1/viva_schemas.py`
+  - classes Pydantic da VIVA movidas de `viva_core.py` para `viva_schemas.py`;
+  - routers e service atualizados para importar schemas do modulo dedicado.
+- validacao:
+  - `python -m py_compile` do conjunto VIVA => OK;
+  - runtime autenticado:
+    - `POST /api/v1/viva/chat` => `200`;
+    - `GET /api/v1/viva/chat/sessions` => `200`;
+    - `GET /api/v1/viva/memory/status` => `200`;
+    - `GET /api/v1/viva/capabilities` => `200`;
+    - `GET /api/v1/viva/handoff` => `200`;
+    - `GET /api/v1/viva/campanhas` => `200`;
+    - `GET /api/v1/viva/status` => `200`.
+- status:
+  - acoplamento `router -> viva_core` reduzido no contrato de tipos;
+  - `BUG-062` segue **Em validacao** para etapa final de extracao de helpers/casos de uso.
+
+### Atualizacao 2026-02-13 (BUG-062 - fase 5 avancada C: chat-session service)
+- extracao aplicada:
+  - criado `backend/app/services/viva_chat_session_service.py` para concentrar:
+    - persistencia de mensagens/sessoes;
+    - serializacao de midia;
+    - montagem de snapshot/contexto.
+  - `viva_chat_orchestrator_service` passou a usar o service de sessao (reduzindo dependencia de helpers em `viva_core`);
+  - `viva_chat_session_routes.py` passou a usar o service de sessao para `snapshot/sessions/session-new`.
+- correcao pontual de regressao na mesma rodada:
+  - conflito de nome em `create_chat_session` gerou chamada recursiva no endpoint `POST /api/v1/viva/chat/session/new`;
+  - ajuste com alias explicito (`create_chat_session_record`) no import da rota.
+- validacao runtime final:
+  - `POST /api/v1/viva/chat` => `200`;
+  - `POST /api/v1/viva/chat/session/new` => `200`;
+  - `GET /api/v1/viva/chat/sessions` => `200`;
+  - `GET /api/v1/viva/chat/snapshot` => `200`;
+  - `GET /api/v1/viva/memory/status` => `200`;
+  - `GET /api/v1/viva/capabilities` => `200`;
+  - `GET /api/v1/viva/handoff` => `200`;
+  - `GET /api/v1/viva/campanhas` => `200`;
+  - `GET /api/v1/viva/status` => `200`.
+- status:
+  - `BUG-062` segue **Em validacao** para fechamento final (extracao dos helpers utilitarios restantes de `viva_core.py`).
+
+### Atualizacao 2026-02-13 (BUG-062 - fase 5 avancada D: shared service + poda de legado)
+- extracao aplicada:
+  - criado `backend/app/services/viva_shared_service.py` para centralizar:
+    - normalizacao (`_normalize_mode`, `_normalize_key`);
+    - mapeadores de dominio (`_campaign_row_to_item`, `_handoff_row_to_item`);
+    - persistencia auxiliar de campanhas (`_save_campaign_record`, consultas de cast/cena recente);
+    - utilitarios de titulo/sanitizacao (`_derive_campaign_title`, `_sanitize_prompt`, `_extract_subject`).
+  - rotas/servicos atualizados para consumir `viva_shared_service` em vez de importar diretamente de `viva_core`:
+    - `backend/app/api/v1/viva_campaign_routes.py`;
+    - `backend/app/api/v1/viva_handoff_routes.py`;
+    - `backend/app/api/v1/viva_memory_routes.py`;
+    - `backend/app/api/v1/viva_chat_session_routes.py`;
+    - `backend/app/services/viva_chat_session_service.py`;
+    - `backend/app/services/viva_chat_orchestrator_service.py`.
+- poda de legado em `viva_core`:
+  - removido bloco morto de sessao/chat que ja estava extraido para `viva_chat_session_service`;
+  - removidos wrappers de campanha/handoff sem uso e imports obsoletos;
+  - tamanho do arquivo reduzido (de ~1822 para ~1479 linhas na rodada).
+- validacao:
+  - `python -m py_compile` dos modulos alterados => OK.
+- status:
+  - `BUG-062` segue **Em validacao** para fechamento final (extracao dos helpers de campanha/handoff/chat ainda remanescentes em `viva_core.py`).
+
+### Atualizacao 2026-02-13 (BUG-062 - fase 5 avancada E: runtime helpers de chat/handoff/imagem)
+- extracao aplicada:
+  - criado `backend/app/services/viva_chat_runtime_helpers_service.py` com helpers operacionais de:
+    - handoff (`_is_handoff_whatsapp_intent`, `_is_viviane_handoff_query_intent`, `_handoff_status_from_text`, `_normalize_any_datetime`, `_format_viviane_handoff_list`, `_extract_phone_candidate`, `_extract_cliente_nome`, `_extract_handoff_custom_message`, `_build_viviane_handoff_message`);
+    - imagem (`_extract_image_url`, `_is_stackoverflow_error`, `_build_image_prompt`, `_build_fallback_image_prompt`);
+    - saneamento de resposta (`_sanitize_fake_asset_delivery_reply`);
+    - suporte de copy (`_extract_overlay_source`).
+  - `backend/app/services/viva_chat_orchestrator_service.py` atualizado para consumir esses helpers do modulo dedicado, reduzindo imports diretos de `viva_core.py`;
+  - `backend/app/api/v1/viva_core.py` teve o bloco correspondente removido e passou a importar apenas o necessario para `_generate_campaign_copy`.
+- validacao:
+  - `python -m py_compile` dos modulos alterados => OK.
+- status:
+  - `viva_core.py` reduzido para ~1214 linhas;
+  - `BUG-062` segue **Em validacao** para etapa final (extrair helpers de campanha ainda remanescentes no `viva_core.py`).
+
+### Atualizacao 2026-02-13 (BUG-062 - fase 5 avancada F: `viva_core` minimo + dominio dedicado)
+- extracao aplicada:
+  - criado `backend/app/services/viva_chat_domain_service.py` com os helpers de dominio de chat/campanha antes acoplados ao `viva_core`;
+  - `backend/app/services/viva_chat_orchestrator_service.py` passou a importar os helpers desse modulo dedicado;
+  - `backend/app/api/v1/viva_core.py` reduzido para rota minima (`POST /chat`) delegando para o orquestrador.
+- validacao:
+  - `python -m py_compile` dos modulos alterados => OK.
+- status:
+  - `viva_core.py` reduzido para ~25 linhas;
+  - `BUG-062` segue **Em validacao** pendente apenas de prova runtime final autenticada no ambiente local.
+
+### Atualizacao 2026-02-13 (BUG-062 - validacao runtime final autenticada)
+- evidencias de validacao local (token JWT real):
+  - `POST /api/v1/auth/login` (`fabio@fcsolucoes.com` + `1234`) => `200`;
+  - `GET /api/v1/viva/status` => `200`;
+  - `GET /api/v1/viva/capabilities` => `200`;
+  - `GET /api/v1/viva/memory/status` => `200`;
+  - `GET /api/v1/viva/chat/sessions` => `200`;
+  - `GET /api/v1/viva/chat/snapshot` => `200`;
+  - `GET /api/v1/viva/handoff` => `200`;
+  - `GET /api/v1/viva/campanhas` => `200`;
+  - `POST /api/v1/viva/chat/session/new` => `200`;
+  - `POST /api/v1/viva/chat` => `200`.
+- conclusao:
+  - `viva_core` permanece minimo e a orquestracao segue operacional via services dedicados;
+  - `BUG-062` marcado como **Resolvido**.
+
+### Atualizacao 2026-02-13 (BUG-061 - rodada 7: campanha livre + reset de padrao)
+- backend:
+  - fluxo FC/REZETA ajustado para modo livre sem travar em briefing obrigatorio;
+  - suporte a reset de padrao de campanha:
+    - `POST /api/v1/viva/campanhas/reset-patterns` (limpa historico de campanha do usuario);
+    - comando de chat com intencao de reset (ex.: "reset memoria campanha") tambem limpa padrao.
+  - preferencia explicita de elenco extraida do pedido do usuario (ex.: "mulher", "homem", "casal", "grupo") e aplicada na selecao de personagem/prompt final.
+  - memoria de repeticao de cast/cena desativada no runtime de geracao (historico recente nao forcado).
+- frontend (`/viva`):
+  - menu lateral de modos especiais simplificado para manter apenas `Conversa VIVA`.
+- validacao executada:
+  - `python -m py_compile` dos modulos alterados => OK;
+  - `frontend` `npm run type-check` => OK;
+  - `POST /api/v1/viva/campanhas/reset-patterns` => `200` (`deleted: 15` em base local de teste);
+  - fluxo "me de uma sugestao antes de gerar" => resposta textual sem midia (comportamento esperado).
+- bloqueio para baixa final:
+  - geracao real de imagem no ambiente local retornou erro OpenAI de billing (`billing_hard_limit_reached`), impedindo prova visual final desta rodada.
+
+### BUG-091: RAG semantico indisponivel por falta de embeddings em runtime
+**Data:** 2026-02-13
+**Severidade:** Alta
+**Descricao:** embora a infraestrutura de memoria esteja ativa (`pgvector` + Redis), a camada semantica do RAG nao retorna contexto util no estado atual. O `reindex` processa mensagens mas nao indexa e a busca semantica retorna vazia.
+**Passos:** 1. autenticar e chamar `GET /api/v1/viva/memory/status` 2. chamar `POST /api/v1/viva/memory/reindex?limit=200` 3. chamar `GET /api/v1/viva/memory/search?q=agenda&limit=3`.
+**Esperado:** `reindex` com `indexed > 0` e `search` retornando itens com score.
+**Atual:** `memory/status` mostra `vector_enabled=true` e `redis_enabled=true`, mas `reindex` retorna `processed=200,indexed=0` e `search` retorna `items=[]`.
+**Status:** Ativo
+
+### Atualizacao 2026-02-13 (BUG-091 + governanca de skills/orquestrador)
+- evidencias runtime desta rodada:
+  - `GET /api/v1/viva/memory/status` => `vector_enabled=true`, `redis_enabled=true`, `total_vectors=373`;
+  - `POST /api/v1/viva/memory/reindex?limit=200` => `processed=200`, `indexed=0`;
+  - `GET /api/v1/viva/memory/search?q=agenda&limit=3` => `items=[]`.
+- impacto:
+  - memoria curta/media segue operacional para continuidade de sessao;
+  - memoria longa semantica (RAG) fica indisponivel funcionalmente.
+- acao institucional aberta:
+  - manter `BUG-091` ativo ate restaurar indexacao vetorial e busca semantica com prova de vida.
