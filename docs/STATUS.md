@@ -700,3 +700,22 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
   - preview/PDF com compatibilidade para placeholders legados e texto institucional para a vista.
 - status:
   - aguardando execucao do bloco BUG-084.
+
+## Estado Contratos (2026-02-13 - BUG-084 executado)
+- resultado funcional:
+  - fluxo de `novo contrato` nao exige mais prazos manuais;
+  - parcelamento limitado a `1..12x` com seletor fechado;
+  - entrada segue opcional;
+  - valor da parcela passa a ser calculado automaticamente.
+- regra de negocio aplicada:
+  - backend gera prazos padrao automaticamente:
+    - `1x` => `a vista`;
+    - `2x..12x` => `30/60/90/...`;
+  - cronograma salvo em `dados_extras.prazos_dias` para rastreabilidade;
+  - placeholders legados de prazo continuam funcionais com fallback `a vista` no preview e nos PDFs.
+- validacao tecnica:
+  - backend `py_compile` => OK;
+  - frontend `type-check` => OK;
+  - frontend `lint` direcionado => OK (warning nao bloqueante existente sobre `<img>`).
+- status:
+  - `BUG-084` => **Resolvido**.

@@ -96,6 +96,18 @@ class PDFService:
             return str(date_str)
 
     @staticmethod
+    def _format_prazo(value: Any) -> str:
+        prazo = int(value or 0)
+        return str(prazo) if prazo > 0 else "à vista"
+
+    @staticmethod
+    def _format_prazo_extenso(value: Any, extenso: Any) -> str:
+        prazo = int(value or 0)
+        if prazo <= 0:
+            return "à vista"
+        return str(extenso or "")
+
+    @staticmethod
     def _normalize_markdown_inline(value: str) -> str:
         text = re.sub(r"\*\*(.*?)\*\*", r"\1", value)
         text = re.sub(r"__(.*?)__", r"\1", text)
@@ -119,10 +131,10 @@ class PDFService:
             "[QTD PARCELAS EXTENSO]": str(contrato.qtd_parcelas_extenso or ""),
             "[VALOR PARCELA]": self._format_currency(contrato.valor_parcela),
             "[VALOR PARCELA EXTENSO]": str(contrato.valor_parcela_extenso or ""),
-            "[PRAZO 1]": str(contrato.prazo_1 or ""),
-            "[PRAZO 1 EXTENSO]": str(contrato.prazo_1_extenso or ""),
-            "[PRAZO 2]": str(contrato.prazo_2 or ""),
-            "[PRAZO 2 EXTENSO]": str(contrato.prazo_2_extenso or ""),
+            "[PRAZO 1]": self._format_prazo(contrato.prazo_1),
+            "[PRAZO 1 EXTENSO]": self._format_prazo_extenso(contrato.prazo_1, contrato.prazo_1_extenso),
+            "[PRAZO 2]": self._format_prazo(contrato.prazo_2),
+            "[PRAZO 2 EXTENSO]": self._format_prazo_extenso(contrato.prazo_2, contrato.prazo_2_extenso),
         }
 
         out = value

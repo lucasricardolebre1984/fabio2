@@ -120,6 +120,17 @@ function formatDocument(documento?: string): string {
   return String(documento || '')
 }
 
+function formatPrazoDisplay(value: unknown): string {
+  const numeric = Number(value || 0)
+  return numeric > 0 ? String(numeric) : 'à vista'
+}
+
+function formatPrazoExtensoDisplay(value: unknown, extenso: unknown): string {
+  const numeric = Number(value || 0)
+  if (numeric <= 0) return 'à vista'
+  return String(extenso || '')
+}
+
 function replaceTemplateTokens(value: string, contractData: any): string {
   const mapped: Record<string, string> = {
     '[NOME COMPLETO DO CLIENTE]': String(contractData?.contratante_nome || ''),
@@ -137,10 +148,10 @@ function replaceTemplateTokens(value: string, contractData: any): string {
     '[QTD PARCELAS EXTENSO]': String(contractData?.qtd_parcelas_extenso || ''),
     '[VALOR PARCELA]': formatCurrency(contractData?.valor_parcela),
     '[VALOR PARCELA EXTENSO]': String(contractData?.valor_parcela_extenso || ''),
-    '[PRAZO 1]': String(contractData?.prazo_1 || ''),
-    '[PRAZO 1 EXTENSO]': String(contractData?.prazo_1_extenso || ''),
-    '[PRAZO 2]': String(contractData?.prazo_2 || ''),
-    '[PRAZO 2 EXTENSO]': String(contractData?.prazo_2_extenso || ''),
+    '[PRAZO 1]': formatPrazoDisplay(contractData?.prazo_1),
+    '[PRAZO 1 EXTENSO]': formatPrazoExtensoDisplay(contractData?.prazo_1, contractData?.prazo_1_extenso),
+    '[PRAZO 2]': formatPrazoDisplay(contractData?.prazo_2),
+    '[PRAZO 2 EXTENSO]': formatPrazoExtensoDisplay(contractData?.prazo_2, contractData?.prazo_2_extenso),
   }
 
   return Object.entries(mapped).reduce((acc, [token, replacement]) => {

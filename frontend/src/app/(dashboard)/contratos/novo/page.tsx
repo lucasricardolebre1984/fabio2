@@ -29,6 +29,10 @@ const TEMPLATE_LABELS: Record<string, string> = {
 }
 
 const AVAILABLE_TEMPLATES = Object.keys(TEMPLATE_LABELS)
+const PARCEL_OPTIONS = Array.from({ length: 12 }, (_, index) => {
+  const value = index + 1
+  return { value: String(value), label: String(value).padStart(2, '0') }
+})
 
 function NovoContratoPageContent() {
   const router = useRouter()
@@ -51,20 +55,28 @@ function NovoContratoPageContent() {
     contratante_endereco: '',
     valor_total: '',
     valor_entrada: '',
-    qtd_parcelas: '',
-    prazo_1: '',
-    prazo_2: '',
+    qtd_parcelas: '1',
     local_assinatura: 'Ribeirão Preto/SP',
     data_assinatura: new Date().toLocaleDateString('pt-BR'),
   })
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target
     if (id === 'contratante_documento') {
       setClienteHint('')
     }
     setFormData((prev) => ({ ...prev, [id]: value }))
   }
+
+  const valorTotal = parseFloat(formData.valor_total) || 0
+  const valorEntrada = parseFloat(formData.valor_entrada) || 0
+  const qtdParcelas = Math.min(12, Math.max(1, parseInt(formData.qtd_parcelas || '1', 10) || 1))
+  const valorFinanciado = Math.max(valorTotal - valorEntrada, 0)
+  const valorParcelaCalculado = qtdParcelas > 0 ? valorFinanciado / qtdParcelas : 0
+  const prazoResumo =
+    qtdParcelas <= 1
+      ? 'À vista (sem prazo de parcelamento)'
+      : Array.from({ length: qtdParcelas }, (_, index) => String((index + 1) * 30)).join(' / ') + ' dias'
 
   const normalizeDocument = (value: string) => {
     return (value || '').replace(/\D/g, '')
@@ -107,6 +119,17 @@ function NovoContratoPageContent() {
     setError('')
 
     try {
+      if (valorEntrada > valorTotal) {
+        setError('Valor de entrada não pode ser maior que o valor total.')
+        setLoading(false)
+        return
+      }
+
+      const formaPagamento =
+        qtdParcelas === 1
+          ? `Entrada ${formData.valor_entrada || '0'} + à vista`
+          : `Entrada ${formData.valor_entrada || '0'} + ${qtdParcelas} parcelas`
+
       const contratoData = {
         template_id: selectedTemplate,
         contratante_nome: formData.contratante_nome,
@@ -114,12 +137,12 @@ function NovoContratoPageContent() {
         contratante_email: formData.contratante_email,
         contratante_telefone: formData.contratante_telefone,
         contratante_endereco: formData.contratante_endereco,
-        valor_total: parseFloat(formData.valor_total),
-        valor_entrada: parseFloat(formData.valor_entrada) || 0,
-        qtd_parcelas: parseInt(formData.qtd_parcelas),
-        valor_parcela: 0,
-        prazo_1: parseInt(formData.prazo_1),
-        prazo_2: parseInt(formData.prazo_2),
+        valor_total: valorTotal,
+        valor_entrada: valorEntrada,
+        qtd_parcelas: qtdParcelas,
+        valor_parcela: parseFloat(valorParcelaCalculado.toFixed(2)),
+        prazo_1: 0,
+        prazo_2: 0,
         local_assinatura: formData.local_assinatura,
         data_assinatura: formData.data_assinatura,
         valor_total_extenso: null,
@@ -131,7 +154,7 @@ function NovoContratoPageContent() {
         dados_extras:
           selectedTemplate === 'cadin'
             ? {
-                forma_pagamento: `Entrada ${formData.valor_entrada || '0'} + ${formData.qtd_parcelas || '0'} parcelas`,
+                forma_pagamento: formaPagamento,
               }
             : selectedTemplate === 'cnh'
               ? {
@@ -255,20 +278,28 @@ function NovoContratoPageContent() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="qtd_parcelas">Qtd. Parcelas</Label>
-                <Input id="qtd_parcelas" type="number" min={1} max={99} placeholder="12" required value={formData.qtd_parcelas} onChange={handleChange} />
+                <select
+                  id="qtd_parcelas"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  value={formData.qtd_parcelas}
+                  onChange={handleChange}
+                >
+                  {PARCEL_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="prazo_1">Prazo 1 (dias)</Label>
-                <Input id="prazo_1" type="number" min={1} placeholder="30" required value={formData.prazo_1} onChange={handleChange} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="prazo_2">Prazo 2 (dias)</Label>
-                <Input id="prazo_2" type="number" min={1} placeholder="60" required value={formData.prazo_2} onChange={handleChange} />
+                <Label>Valor da Parcela (R$)</Label>
+                <Input value={valorParcelaCalculado.toFixed(2).replace('.', ',')} readOnly disabled />
               </div>
             </div>
+            <p className="text-xs text-gray-500">Prazos automáticos: {prazoResumo}</p>
 
             <div className="flex justify-end gap-4 pt-4">
               <Link href="/contratos">

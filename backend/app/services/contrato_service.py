@@ -276,6 +276,22 @@ class ContratoService:
             .strip()
         )
 
+    @staticmethod
+    def _build_installment_schedule(qtd_parcelas: int) -> List[int]:
+        """Build default installment deadlines in days."""
+        if qtd_parcelas <= 1:
+            return []
+        return [30 * idx for idx in range(1, qtd_parcelas + 1)]
+
+    @staticmethod
+    def _extract_primary_prazos(schedule: List[int]) -> tuple[int, int]:
+        """Populate legacy prazo_1/prazo_2 fields from schedule."""
+        if not schedule:
+            return 0, 0
+        if len(schedule) == 1:
+            return schedule[0], schedule[0]
+        return schedule[0], schedule[1]
+
     async def _recalculate_cliente_metrics(self, cliente_id: UUID) -> None:
         result = await self.db.execute(
             select(
@@ -307,6 +323,11 @@ class ContratoService:
 
         valor_total = Decimal(str(data.valor_total))
         valor_entrada = Decimal(str(data.valor_entrada))
+        schedule = self._build_installment_schedule(data.qtd_parcelas)
+        prazo_1, prazo_2 = self._extract_primary_prazos(schedule)
+
+        data.prazo_1 = prazo_1
+        data.prazo_2 = prazo_2
 
         if not data.valor_total_extenso:
             data.valor_total_extenso = self.extenso.valor_por_extenso(valor_total)
@@ -315,16 +336,24 @@ class ContratoService:
         if not data.qtd_parcelas_extenso:
             data.qtd_parcelas_extenso = self.extenso.numero_por_extenso(data.qtd_parcelas)
 
-        if not data.valor_parcela:
-            data.valor_parcela = self.extenso.calcular_valor_parcela(
-                valor_total, valor_entrada, data.qtd_parcelas
-            )
+        data.valor_parcela = self.extenso.calcular_valor_parcela(
+            valor_total, valor_entrada, data.qtd_parcelas
+        )
         if not data.valor_parcela_extenso:
             data.valor_parcela_extenso = self.extenso.valor_por_extenso(data.valor_parcela)
-        if not data.prazo_1_extenso:
-            data.prazo_1_extenso = self.extenso.numero_por_extenso(data.prazo_1)
-        if not data.prazo_2_extenso:
-            data.prazo_2_extenso = self.extenso.numero_por_extenso(data.prazo_2)
+        if data.qtd_parcelas == 1:
+            data.prazo_1_extenso = "à vista"
+            data.prazo_2_extenso = "à vista"
+        else:
+            if not data.prazo_1_extenso:
+                data.prazo_1_extenso = self.extenso.numero_por_extenso(data.prazo_1)
+            if not data.prazo_2_extenso:
+                data.prazo_2_extenso = self.extenso.numero_por_extenso(data.prazo_2)
+
+        dados_extras = dict(data.dados_extras) if isinstance(data.dados_extras, dict) else {}
+        dados_extras["prazos_dias"] = schedule
+        dados_extras["parcelamento"] = "à vista" if data.qtd_parcelas == 1 else f"{data.qtd_parcelas}x"
+        data.dados_extras = dados_extras
 
         cliente_service = ClienteService(self.db)
         cliente = await cliente_service.get_by_documento(documento_limpo)

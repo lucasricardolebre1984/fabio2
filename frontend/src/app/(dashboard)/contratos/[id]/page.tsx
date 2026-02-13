@@ -146,6 +146,15 @@ function formatExtraLabel(key: string): string {
     .replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
+function formatPrazoDisplay(value: number): string {
+  return Number(value || 0) > 0 ? String(value) : 'à vista'
+}
+
+function formatPrazoExtensoDisplay(value: number, extenso?: string): string {
+  if (Number(value || 0) <= 0) return 'à vista'
+  return String(extenso || '')
+}
+
 function getClauseContent(clause?: TemplateClause): string {
   const content = String(clause?.conteudo || '').trim()
   if (content) return content
@@ -270,10 +279,10 @@ export default function VisualizarContratoPage() {
       '[QTD PARCELAS EXTENSO]': contrato.qtd_parcelas_extenso,
       '[VALOR PARCELA]': formatCurrency(contrato.valor_parcela),
       '[VALOR PARCELA EXTENSO]': contrato.valor_parcela_extenso,
-      '[PRAZO 1]': String(contrato.prazo_1),
-      '[PRAZO 1 EXTENSO]': contrato.prazo_1_extenso,
-      '[PRAZO 2]': String(contrato.prazo_2),
-      '[PRAZO 2 EXTENSO]': contrato.prazo_2_extenso,
+      '[PRAZO 1]': formatPrazoDisplay(contrato.prazo_1),
+      '[PRAZO 1 EXTENSO]': formatPrazoExtensoDisplay(contrato.prazo_1, contrato.prazo_1_extenso),
+      '[PRAZO 2]': formatPrazoDisplay(contrato.prazo_2),
+      '[PRAZO 2 EXTENSO]': formatPrazoExtensoDisplay(contrato.prazo_2, contrato.prazo_2_extenso),
     }
 
     return Object.entries(mapped).reduce((acc, [token, replacement]) => {

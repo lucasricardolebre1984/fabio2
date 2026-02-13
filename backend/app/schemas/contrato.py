@@ -23,10 +23,10 @@ class ContratoBase(BaseModel):
     # Valores
     valor_total: Decimal = Field(..., decimal_places=2)
     valor_entrada: Decimal = Field(..., decimal_places=2)
-    qtd_parcelas: int = Field(..., ge=1, le=99)
+    qtd_parcelas: int = Field(..., ge=1, le=12)
     valor_parcela: Decimal = Field(..., decimal_places=2)
-    prazo_1: int = Field(..., ge=1, le=999)
-    prazo_2: int = Field(..., ge=1, le=999)
+    prazo_1: int = Field(..., ge=0, le=999)
+    prazo_2: int = Field(..., ge=0, le=999)
     
     # Assinatura
     local_assinatura: str = Field(default="Ribeirão Preto/SP")

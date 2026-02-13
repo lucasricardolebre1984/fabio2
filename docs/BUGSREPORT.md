@@ -76,7 +76,7 @@
 | BUG-081 | Alta | Contratos/Templates Runtime | Clausulas nao aparecem no preview/PDF porque backend no container nao encontra `contratos/templates/*.json` e responde fallback vazio | Em validacao (runtime corrigido) |
 | BUG-082 | Alta | Contratos/Modelos MD | Modelos `rating_full_pj` e `jusbrasil` enviados em `.md` nao estao operacionais ponta a ponta (template/menu/criacao), impedindo uso funcional completo | Resolvido |
 | BUG-083 | Media | Contratos/Encoding | Clausulas exibem simbolos residuais (`�`) em alguns titulos/textos no preview/PDF por decodificacao incompleta de mojibake CP1252/UTF-8 | Resolvido |
-| BUG-084 | Alta | Contratos/Parcelamento UX+Regra | Formulario exige prazos manuais e nao atende venda a vista/1x fluida; precisa trabalhar com qtd de parcelas (1..12), entrada opcional e calculo automatico institucional | Planejado |
+| BUG-084 | Alta | Contratos/Parcelamento UX+Regra | Formulario exige prazos manuais e nao atende venda a vista/1x fluida; precisa trabalhar com qtd de parcelas (1..12), entrada opcional e calculo automatico institucional | Resolvido |
 
 ---
 
@@ -1333,7 +1333,7 @@
 **Passos:** 1. abrir `/contratos/novo?template=revisional` 2. preencher cliente e valores 3. tentar operar com 1x/a vista sem editar prazos 4. observar travas de validacao e obrigatoriedade de prazo manual.
 **Esperado:** formulario orientado por `qtd_parcelas` (1..12), `entrada` opcional, calculo automatico de parcela e cronograma padrao sem exigir prazos manuais.
 **Atual:** prazos manuais obrigatorios no front e backend, com validacao `ge=1`; UX trava fluxo de venda simples.
-**Status:** Planejado
+**Status:** Resolvido
 
 ### Plano aprovado para execucao BUG-084 (documentacao de planejamento)
 - etapa 1 - frontend (UX):
@@ -1350,3 +1350,33 @@
   - manter placeholders legados (`[PRAZO 1]`, `[PRAZO 2]`) com fallback automatico;
   - quando for a vista, renderizar texto institucional equivalente em preview/PDF;
   - executar validacao tecnica e funcional completa antes da baixa do bug.
+
+### Atualizacao 2026-02-13 (execucao BUG-084 - parcelamento institucional 1..12x)
+- frontend (`/contratos/novo`):
+  - campos manuais `prazo_1` e `prazo_2` removidos do formulario;
+  - `Qtd. Parcelas` convertida para seletor fechado `01..12`;
+  - `Valor Entrada` mantido opcional;
+  - `Valor da Parcela` exibido automaticamente em tempo real (`(valor_total - entrada) / qtd_parcelas`);
+  - resumo de prazos automaticos exibido no formulario:
+    - `1x` => `a vista`;
+    - `2x..12x` => `30/60/90/...`.
+- backend (regra e compatibilidade):
+  - schema `ContratoCreate` atualizado para:
+    - `qtd_parcelas: ge=1, le=12`;
+    - `prazo_1` e `prazo_2` aceitando `0` (`ge=0`) para fluxo `a vista`;
+  - `ContratoService.create` passou a:
+    - gerar cronograma automatico por quantidade (`prazos_dias` em multiplos de 30);
+    - preencher `prazo_1/prazo_2` automaticamente para manter compatibilidade de banco/templates;
+    - forcar calculo automatico de `valor_parcela`;
+    - gravar metadados em `dados_extras` (`prazos_dias` e `parcelamento`).
+- preview/PDF (placeholders legados):
+  - `[PRAZO 1]` e `[PRAZO 2]` agora renderizam `a vista` quando valor for `0`;
+  - `[PRAZO 1 EXTENSO]` e `[PRAZO 2 EXTENSO]` seguem o mesmo fallback institucional;
+  - aplicado em:
+    - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`;
+    - `frontend/src/lib/pdf.ts`;
+    - `backend/app/services/pdf_service_playwright.py`.
+- validacao tecnica:
+  - backend: `python -m py_compile backend/app/schemas/contrato.py backend/app/services/contrato_service.py backend/app/services/pdf_service_playwright.py` => OK;
+  - frontend: `npm run type-check` => OK;
+  - frontend: `npm run lint -- --file src/app/(dashboard)/contratos/novo/page.tsx --file src/app/(dashboard)/contratos/[id]/page.tsx --file src/lib/pdf.ts` => OK (warning nao bloqueante existente de `<img>` em preview).

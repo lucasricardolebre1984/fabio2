@@ -884,3 +884,27 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
 - governanca:
   - bug formalizado como `BUG-084` em `docs/BUGSREPORT.md`;
   - plano em 3 etapas documentado (UX frontend, regra backend, render preview/pdf) aguardando execucao.
+
+## Atualizacao Operacional (2026-02-13 - execucao BUG-084 parcelamento)
+- frontend:
+  - `frontend/src/app/(dashboard)/contratos/novo/page.tsx` atualizado para:
+    - remover `prazo_1` e `prazo_2` do formulario;
+    - usar seletor de parcelas `01..12`;
+    - manter entrada opcional;
+    - calcular parcela automaticamente e exibir resumo de prazos padrao (30/60/90...).
+- backend:
+  - `backend/app/schemas/contrato.py` com regra `qtd_parcelas <= 12` e `prazo_1/prazo_2 >= 0`;
+  - `backend/app/services/contrato_service.py` com cronograma automatico:
+    - `1x` => `a vista` (`prazo_1=0`, `prazo_2=0`);
+    - `2x..12x` => prazos em multiplo de 30;
+    - persistencia de cronograma em `dados_extras.prazos_dias`;
+    - calculo de `valor_parcela` feito automaticamente no backend.
+- renderizacao:
+  - fallback institucional de prazos para `a vista` aplicado em:
+    - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`;
+    - `frontend/src/lib/pdf.ts`;
+    - `backend/app/services/pdf_service_playwright.py`.
+- validacao tecnica:
+  - `python -m py_compile backend/app/schemas/contrato.py backend/app/services/contrato_service.py backend/app/services/pdf_service_playwright.py` => OK;
+  - `frontend`: `npm run type-check` => OK;
+  - `frontend`: `npm run lint -- --file src/app/(dashboard)/contratos/novo/page.tsx --file src/app/(dashboard)/contratos/[id]/page.tsx --file src/lib/pdf.ts` => OK (warning conhecido de `<img>` nao bloqueante).
