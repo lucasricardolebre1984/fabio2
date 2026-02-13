@@ -805,3 +805,10 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
   - sinal de runtime para decisao comercial (`rag_premium_ready`, `embedding_fallback_local`, `speech_stack`).
 - impacto:
   - acelera pre-configuracao de novas vendas com status tecnico centralizado na API.
+
+## Execucao Tecnica (2026-02-13 - gate 2 parcial B)
+- roteamento de skills no orquestrador:
+  - novo `viva_skill_router_service` para classificar skill ativa por intencao;
+  - `viva_chat_orchestrator_service` passou a anexar `skill_id` e metadados de roteamento nas respostas persistidas.
+- ganho:
+  - trilha auditavel de decisao do agente (qual skill foi escolhida e por qual motivo).

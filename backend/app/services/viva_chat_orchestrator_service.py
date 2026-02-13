@@ -72,6 +72,7 @@ from app.services.viva_shared_service import (
     _normalize_mode,
     _save_campaign_record,
 )
+from app.services.viva_skill_router_service import viva_skill_router_service
 
 
 class VivaChatOrchestratorService:
@@ -92,12 +93,14 @@ class VivaChatOrchestratorService:
                     requested_session_id=request.session_id,
                     modo=modo,
                 )
+                active_skill_meta: Dict[str, Any] = {}
 
                 async def finalize(
                     resposta: str,
                     midia: Optional[List[MediaItem]] = None,
                     meta: Optional[Dict[str, Any]] = None,
                 ) -> ChatResponse:
+                    final_meta = {**active_skill_meta, **(meta or {})}
                     await append_chat_message(
                         db=db,
                         session_id=session_id,
@@ -106,7 +109,7 @@ class VivaChatOrchestratorService:
                         conteudo=resposta,
                         modo=modo,
                         anexos=serialize_media_items(midia),
-                        meta=meta or {},
+                        meta=final_meta,
                     )
                     await viva_memory_service.append_memory(
                         db=db,
@@ -115,7 +118,7 @@ class VivaChatOrchestratorService:
                         tipo="ia",
                         conteudo=resposta,
                         modo=modo,
-                        meta={"source": "viva_chat_finalize", **(meta or {})},
+                        meta={"source": "viva_chat_finalize", **final_meta},
                     )
                     return ChatResponse(resposta=resposta, midia=midia, session_id=session_id)
 
@@ -161,6 +164,9 @@ class VivaChatOrchestratorService:
                 agenda_natural_command = viva_agenda_nlu_service.parse_agenda_natural_create(request.mensagem)
                 agenda_errors: List[str] = []
                 agenda_create_payload: Optional[Dict[str, Any]] = None
+                handoff_intent = _is_handoff_whatsapp_intent(request.mensagem)
+                viviane_handoff_query_intent = _is_viviane_handoff_query_intent(request.mensagem)
+                logo_request = _is_logo_request(request.mensagem)
 
                 if agenda_command is not None:
                     if agenda_command.get("error"):
@@ -173,6 +179,18 @@ class VivaChatOrchestratorService:
                         agenda_errors.append(str(agenda_natural_command["error"]))
                     else:
                         agenda_create_payload = agenda_natural_command
+
+                active_skill_meta = viva_skill_router_service.resolve_skill(
+                    mensagem=request.mensagem,
+                    modo=modo,
+                    agenda_query_intent=agenda_query_intent,
+                    has_agenda_create_payload=bool(agenda_create_payload),
+                    handoff_intent=handoff_intent,
+                    viviane_handoff_query_intent=viviane_handoff_query_intent,
+                    campaign_flow_requested=False,
+                    should_generate_image=False,
+                    logo_request=logo_request,
+                )
 
                 if agenda_create_payload:
                     evento = await service.create(
@@ -187,7 +205,7 @@ class VivaChatOrchestratorService:
                         ),
                         current_user.id,
                     )
-                    if _is_handoff_whatsapp_intent(request.mensagem):
+                    if handoff_intent:
                         numero = _extract_phone_candidate(request.mensagem)
                         cliente_nome = _extract_cliente_nome(request.mensagem)
                         if not numero:
@@ -287,7 +305,6 @@ class VivaChatOrchestratorService:
                         )
                     )
 
-                viviane_handoff_query_intent = _is_viviane_handoff_query_intent(request.mensagem)
                 if viviane_handoff_query_intent:
                     inicio, fim, period_label = viva_agenda_nlu_service.agenda_window_from_text(request.mensagem)
                     status_filter = _handoff_status_from_text(request.mensagem)
@@ -334,7 +351,6 @@ class VivaChatOrchestratorService:
                 campaign_flow_requested = False
                 campaign_fields: Dict[str, str] = {}
                 campaign_prompt_source = request.mensagem
-                logo_request = _is_logo_request(request.mensagem)
                 reset_campaign_memory_intent = _is_campaign_reset_intent(request.mensagem)
                 suggestion_first_intent = (
                     "antes de gerar" in _normalize_key(request.mensagem)
@@ -387,6 +403,17 @@ class VivaChatOrchestratorService:
                 should_generate_image = _is_image_request(request.mensagem) or (
                     campaign_flow_requested
                     and not suggestion_first_intent
+                )
+                active_skill_meta = viva_skill_router_service.resolve_skill(
+                    mensagem=request.mensagem,
+                    modo=modo,
+                    agenda_query_intent=agenda_query_intent,
+                    has_agenda_create_payload=bool(agenda_create_payload),
+                    handoff_intent=handoff_intent,
+                    viviane_handoff_query_intent=viviane_handoff_query_intent,
+                    campaign_flow_requested=campaign_flow_requested,
+                    should_generate_image=should_generate_image,
+                    logo_request=logo_request,
                 )
 
                 if should_generate_image:

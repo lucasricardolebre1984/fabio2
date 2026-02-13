@@ -1308,3 +1308,14 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
   - novos schemas em `backend/app/api/v1/viva_schemas.py` (`VivaGateItem`, `VivaModuleItem`, `VivaModulesRuntime`, `VivaModulesStatusResponse`).
 - objetivo:
   - expor status tecnico unico para facilitar onboarding de novos clientes por pacote/modulo sem depender de leitura manual de documentos.
+
+## Atualizacao Operacional (2026-02-13 - gate 2 execucao parcial B: roteador de skills)
+- backend:
+  - novo servico `backend/app/services/viva_skill_router_service.py` para resolver `skill_id` por intencao de mensagem;
+  - `backend/app/services/viva_chat_orchestrator_service.py` atualizado para:
+    - calcular skill ativa por contexto (`agenda`, `handoff`, `campaign_planner`, `generate_campanha`, `chat_geral`);
+    - persistir telemetria da skill em `meta` das respostas da IA.
+- objetivo:
+  - preparar a arquitetura de orquestrador unico + auto skills com rastreabilidade auditavel por conversa.
+- impacto funcional:
+  - sem quebra de comportamento existente; mudanca focada em observabilidade e governanca de roteamento.

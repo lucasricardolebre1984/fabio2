@@ -1,0 +1,6 @@
+3412f10
+ M backend/app/services/viva_chat_orchestrator_service.py
+ M docs/SESSION.md
+ M docs/STATUS.md
+?? backend/app/services/viva_skill_router_service.py
+?? docs/ROLLBACK/rollback-20260213-143501-pre-gate2-skill-router-baseline.txt
