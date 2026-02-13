@@ -81,8 +81,8 @@
 | BUG-089 | Alta | VIVA/Campanhas | Em modo `FC/REZETA`, conversa comum podia ser sequestrada para fluxo de campanha por inferencia ampla de tema livre | Resolvido |
 | BUG-090 | Alta | VIVA/UI Chat | Recuperacao de chats antigos indisponivel no frontend (somente snapshot da sessao mais recente) | Resolvido |
 | BUG-091 | Alta | VIVA/RAG Runtime | RAG semantico indisponivel no runtime atual (reindex sem indexacao e search vazio), com dependencia de embeddings OpenAI sem saldo | Resolvido |
-| BUG-092 | Alta | VIVA/Fala Continua | Conversa por voz depende de APIs nativas do navegador (SpeechRecognition + speechSynthesis), com qualidade/estabilidade variavel e sem pipeline realtime institucional | Ativo |
-| BUG-093 | Media | VIVA/Avatar | Avatar do modo Conversa VIVA ainda usa fallback local antigo e nao o asset institucional novo enviado pelo cliente | Em validacao (rodada avatar oficial aplicada) |
+| BUG-092 | Alta | VIVA/Fala Continua | Conversa por voz dependia de APIs nativas do navegador (SpeechRecognition + speechSynthesis), com qualidade/estabilidade variavel e sem pipeline realtime institucional | Em validacao (rodada server STT + MiniMax TTS) |
+| BUG-093 | Media | VIVA/Avatar | Avatar do modo Conversa VIVA ainda usa fallback local antigo e nao o asset institucional novo enviado pelo cliente | Resolvido |
 | BUG-094 | Alta | VIVA/RAG Qualidade | RAG roda com fallback local sem embeddings OpenAI, mas ainda sem homologacao semantica premium para operacao comercial | Ativo |
 | BUG-095 | Alta | Agenda/Google Calendar | Agenda interna do SaaS sem sincronizacao oficial com Google Calendar para operacao compartilhada VIVA/Viviane | Em validacao (rodada bridge OAuth + sync auto) |
 
@@ -446,7 +446,7 @@
 **Passos:** 1. Buscar integracao vetorial no backend 2. Validar inexistencia de provider vetorial.
 **Esperado:** RAG com embeddings + busca semantica em store vetorial.
 **Atual:** conhecimento dinamico baseado em texto/csv e regras locais.
-**Status:** Ativo
+**Status:** Resolvido
 
 ### Plano de Correcao Completo (rodada institucional)
 1. Bloco A (docs + rollback + inventario):
@@ -1772,6 +1772,22 @@
 **Esperado:** pipeline de voz ao vivo padronizado, com modelo/provedor controlado e qualidade previsivel.
 **Atual:** qualidade depende do browser e das vozes instaladas localmente.
 **Status:** Ativo
+
+### Atualizacao 2026-02-13 (BUG-092 - server STT + MiniMax TTS no modo conversa)
+- frontend (`frontend/src/app/viva/page.tsx`):
+  - escuta continua passou a usar como caminho principal:
+    - captura de audio por `MediaRecorder`,
+    - deteccao de fala/silencio por `AudioContext + AnalyserNode`,
+    - transcricao via backend (`POST /api/v1/viva/audio/transcribe`);
+  - fallback para `SpeechRecognition/webkitSpeechRecognition` mantido apenas quando pipeline principal nao puder iniciar;
+  - reproduz fala da assistente priorizando MiniMax (`POST /api/v1/viva/audio/speak`) com fallback local de navegador.
+- backend:
+  - endpoint `POST /api/v1/viva/audio/speak` ativo e servico `backend/app/services/minimax_tts_service.py` integrado.
+- validacao tecnica:
+  - `frontend npm run type-check` => OK;
+  - `frontend npm run lint -- --file src/app/viva/page.tsx` => OK (warnings nao bloqueantes de `<img>`).
+- status:
+  - `BUG-092` movido para **Em validacao**, pendente prova final de voz em runtime com credenciais MiniMax ativas.
 
 ### BUG-093: Avatar institucional da VIVA ainda nao aplicado
 **Data:** 2026-02-13

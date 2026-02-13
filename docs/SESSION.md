@@ -1347,3 +1347,23 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
   - `python -m py_compile` dos modulos novos/alterados => OK;
   - `frontend npm run type-check` => OK;
   - `frontend npm run lint -- --file src/app/(dashboard)/agenda/page.tsx --file src/lib/api.ts --file src/app/viva/page.tsx` => OK (warnings nao bloqueantes de `<img>` no `viva/page.tsx`).
+
+## Atualizacao Operacional (2026-02-13 - rodada voz premium com rollback)
+- rollback de seguranca desta etapa criado antes de editar:
+  - `docs/ROLLBACK/rollback-20260213-160819-pre-voice-premium-pass-baseline.txt`
+  - `docs/ROLLBACK/rollback-20260213-160819-pre-voice-premium-pass.patch`
+  - `docs/ROLLBACK/rollback-20260213-160819-pre-voice-premium-pass-staged.patch`
+  - `docs/ROLLBACK/rollback-20260213-160819-pre-voice-premium-pass-untracked.txt`
+- frontend (`frontend/src/app/viva/page.tsx`):
+  - modo `Conversa VIVA` agora prioriza pipeline institucional de escuta:
+    - captura com `MediaRecorder`;
+    - deteccao de fala/silencio com `AudioContext + AnalyserNode`;
+    - transcricao no backend por `POST /api/v1/viva/audio/transcribe`;
+  - `SpeechRecognition/webkitSpeechRecognition` mantido apenas como fallback.
+  - TTS segue priorizando MiniMax via `POST /api/v1/viva/audio/speak`.
+- status desta pauta:
+  - BUG-092 movido para **Em validacao** (faltando prova final em runtime com credenciais MiniMax ativas);
+  - agenda permanece na fila final conforme diretriz da rodada.
+- validacao tecnica:
+  - `frontend npm run type-check` => OK;
+  - `frontend npm run lint -- --file src/app/viva/page.tsx` => OK (warnings nao bloqueantes de `<img>`).

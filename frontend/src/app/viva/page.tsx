@@ -58,6 +58,23 @@ interface ChatSessionListResponse {
   page_size: number
 }
 
+interface ContinuousCaptureState {
+  stream: MediaStream
+  recorder: MediaRecorder
+  chunks: BlobPart[]
+  mimeType: string
+  audioContext: AudioContext | null
+  sourceNode: MediaStreamAudioSourceNode | null
+  analyser: AnalyserNode | null
+  dataArray: Uint8Array | null
+  rafId: number | null
+  timeoutId: number | null
+  hasSpeech: boolean
+  lastSpeechTs: number
+  startedAt: number
+  stopping: boolean
+}
+
 type ComposerAnexo = { file: File; tipo: 'imagem' | 'audio' | 'arquivo'; preview?: string }
 type SendOptions = {
   textoOverride?: string
@@ -292,11 +309,14 @@ export default function VivaChatPage() {
   const playbackAudioRef = useRef<HTMLAudioElement | null>(null)
   const lastSpokenMessageIdRef = useRef<string | null>(null)
   const speechRecognitionRef = useRef<any>(null)
+  const continuousCaptureRef = useRef<ContinuousCaptureState | null>(null)
+  const continuousStartInFlightRef = useRef(false)
   const conversationShouldListenRef = useRef(false)
   const assistantSpeakingRef = useRef(false)
   const loadingRef = useRef(false)
   const modoConversacaoRef = useRef(false)
   const sendFromVoiceRef = useRef<(text: string) => void>(() => {})
+  const startContinuousConversationRef = useRef<() => void>(() => {})
 
   const INPUT_MIN_HEIGHT = 88
   const INPUT_MAX_HEIGHT = 220
@@ -360,28 +380,51 @@ export default function VivaChatPage() {
     }
   }, [scrollToBottom])
 
-  const stopContinuousConversation = useCallback((clearIntent = true) => {
-    if (clearIntent) {
-      conversationShouldListenRef.current = false
+  const releaseContinuousCapture = useCallback((state: ContinuousCaptureState | null) => {
+    if (!state) return
+    state.stopping = true
+    if (state.rafId !== null) {
+      window.cancelAnimationFrame(state.rafId)
+      state.rafId = null
     }
-
-    const recognition = speechRecognitionRef.current
-    if (recognition) {
+    if (state.timeoutId !== null) {
+      window.clearTimeout(state.timeoutId)
+      state.timeoutId = null
+    }
+    if (state.sourceNode) {
       try {
-        recognition.stop()
+        state.sourceNode.disconnect()
       } catch {
-        // Ignora erro de stop em estados transientes.
+        // no-op
       }
     }
-
-    setEscutaContinuaAtiva(false)
-    setTranscricaoParcial('')
+    if (state.analyser) {
+      try {
+        state.analyser.disconnect()
+      } catch {
+        // no-op
+      }
+    }
+    if (state.audioContext && state.audioContext.state !== 'closed') {
+      state.audioContext.close().catch(() => undefined)
+    }
+    state.stream.getTracks().forEach(track => track.stop())
   }, [])
 
-  const startContinuousConversation = useCallback(() => {
-    if (typeof window === 'undefined') return
-    if (!modoConversacaoRef.current || loadingRef.current || assistantSpeakingRef.current) return
+  const transcribeAudioBlob = useCallback(async (audioBlob: Blob): Promise<string> => {
+    if (!audioBlob.size) return ''
+    const ext = audioBlob.type.includes('mp4') ? 'm4a' : 'webm'
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const audioFile = new File([audioBlob], `conversa-${stamp}.${ext}`, { type: audioBlob.type || 'audio/webm' })
+    const formData = new FormData()
+    formData.append('file', audioFile)
+    const response = await api.post('/viva/audio/transcribe', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    return String(response.data?.transcricao || '').trim()
+  }, [])
 
+  const startBrowserContinuousConversation = useCallback(() => {
     const SpeechCtor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SpeechCtor) {
       setErroAudio('Seu navegador nao suporta voz continua. Use Chrome ou Edge atualizado.')
@@ -416,17 +459,15 @@ export default function VivaChatPage() {
         }
 
         setTranscricaoParcial(interimText.trim())
-
         const textoFinal = finalText.trim()
         if (!textoFinal) return
 
         setTranscricaoParcial('')
         conversationShouldListenRef.current = false
-
         try {
           recognition.stop()
         } catch {
-          // No-op
+          // no-op
         }
 
         if (!loadingRef.current) {
@@ -436,16 +477,13 @@ export default function VivaChatPage() {
 
       recognition.onerror = (event: any) => {
         const code = String(event?.error || '')
-        if (code === 'no-speech') return
-        if (code === 'aborted') return
-
+        if (code === 'no-speech' || code === 'aborted') return
         if (code === 'not-allowed' || code === 'service-not-allowed') {
           setErroAudio('Permissao de microfone negada. Ative o microfone no navegador para usar conversa continua.')
           conversationShouldListenRef.current = false
           return
         }
-
-        setErroAudio('Falha de reconhecimento de voz. Tentando reconectar automaticamente.')
+        setErroAudio('Falha de reconhecimento no navegador. Tentando reconectar.')
       }
 
       recognition.onend = () => {
@@ -460,7 +498,7 @@ export default function VivaChatPage() {
           try {
             recognition.start()
           } catch {
-            // Evita quebra quando start ja estiver em progresso.
+            // no-op
           }
         }, 260)
       }
@@ -468,9 +506,7 @@ export default function VivaChatPage() {
       speechRecognitionRef.current = recognition
     }
 
-    conversationShouldListenRef.current = true
-    setErroAudio(null)
-
+    setErroAudio('Usando fallback de reconhecimento do navegador.')
     try {
       speechRecognitionRef.current.start()
     } catch (error) {
@@ -480,6 +516,228 @@ export default function VivaChatPage() {
       }
     }
   }, [])
+
+  const startServerContinuousConversation = useCallback(async (): Promise<boolean> => {
+    if (typeof window === 'undefined') return false
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') return false
+    if (continuousCaptureRef.current || continuousStartInFlightRef.current) return true
+
+    continuousStartInFlightRef.current = true
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        }
+      })
+
+      const preferredMime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : ''
+      const recorder = preferredMime ? new MediaRecorder(stream, { mimeType: preferredMime }) : new MediaRecorder(stream)
+
+      const state: ContinuousCaptureState = {
+        stream,
+        recorder,
+        chunks: [],
+        mimeType: recorder.mimeType || 'audio/webm',
+        audioContext: null,
+        sourceNode: null,
+        analyser: null,
+        dataArray: null,
+        rafId: null,
+        timeoutId: null,
+        hasSpeech: false,
+        lastSpeechTs: Date.now(),
+        startedAt: Date.now(),
+        stopping: false,
+      }
+      continuousCaptureRef.current = state
+      setEscutaContinuaAtiva(true)
+      setTranscricaoParcial('Escutando...')
+      setErroAudio(null)
+
+      recorder.ondataavailable = (event: BlobEvent) => {
+        if (event.data && event.data.size > 0) {
+          state.chunks.push(event.data)
+        }
+      }
+
+      recorder.onerror = () => {
+        setErroAudio('Falha ao capturar audio continuo. Retornando ao modo de fallback.')
+      }
+
+      recorder.onstop = () => {
+        const audioBlob = new Blob(state.chunks, { type: state.mimeType })
+        const hadSpeech = state.hasSpeech
+        const shouldContinue = conversationShouldListenRef.current && modoConversacaoRef.current
+        releaseContinuousCapture(state)
+        if (continuousCaptureRef.current === state) {
+          continuousCaptureRef.current = null
+        }
+        continuousStartInFlightRef.current = false
+        setEscutaContinuaAtiva(false)
+        setTranscricaoParcial('')
+
+        if (!shouldContinue || assistantSpeakingRef.current || loadingRef.current) {
+          return
+        }
+
+        const resume = () => {
+          window.setTimeout(() => {
+            if (!conversationShouldListenRef.current) return
+            if (!modoConversacaoRef.current || loadingRef.current || assistantSpeakingRef.current) return
+            startContinuousConversationRef.current()
+          }, 260)
+        }
+
+        if (!hadSpeech || !audioBlob.size) {
+          resume()
+          return
+        }
+
+        void (async () => {
+          try {
+            const texto = await transcribeAudioBlob(audioBlob)
+            if (texto) {
+              conversationShouldListenRef.current = false
+              sendFromVoiceRef.current(texto)
+              return
+            }
+            resume()
+          } catch {
+            resume()
+          }
+        })()
+      }
+
+      const AudioContextCtor = (window as any).AudioContext || (window as any).webkitAudioContext
+      if (AudioContextCtor) {
+        const audioContext: AudioContext = new AudioContextCtor()
+        const sourceNode = audioContext.createMediaStreamSource(stream)
+        const analyser = audioContext.createAnalyser()
+        analyser.fftSize = 1024
+        sourceNode.connect(analyser)
+        const dataArray = new Uint8Array(analyser.fftSize)
+
+        state.audioContext = audioContext
+        state.sourceNode = sourceNode
+        state.analyser = analyser
+        state.dataArray = dataArray
+
+        const detectSpeech = () => {
+          if (state.stopping) return
+          analyser.getByteTimeDomainData(dataArray)
+          let sum = 0
+          for (let i = 0; i < dataArray.length; i += 1) {
+            const normalized = (dataArray[i] - 128) / 128
+            sum += normalized * normalized
+          }
+          const rms = Math.sqrt(sum / dataArray.length)
+          const now = Date.now()
+          if (rms > 0.018) {
+            state.hasSpeech = true
+            state.lastSpeechTs = now
+          }
+
+          const elapsed = now - state.startedAt
+          const silenceMs = now - state.lastSpeechTs
+          if ((state.hasSpeech && silenceMs > 1150 && elapsed > 1000) || elapsed > 12000) {
+            state.stopping = true
+            if (recorder.state !== 'inactive') {
+              try {
+                recorder.stop()
+              } catch {
+                // no-op
+              }
+            }
+            return
+          }
+          state.rafId = window.requestAnimationFrame(detectSpeech)
+        }
+        state.rafId = window.requestAnimationFrame(detectSpeech)
+      } else {
+        state.timeoutId = window.setTimeout(() => {
+          state.stopping = true
+          if (recorder.state !== 'inactive') {
+            try {
+              recorder.stop()
+            } catch {
+              // no-op
+            }
+          }
+        }, 7000)
+      }
+
+      recorder.start(250)
+      return true
+    } catch {
+      const state = continuousCaptureRef.current
+      if (state) {
+        releaseContinuousCapture(state)
+      }
+      continuousCaptureRef.current = null
+      continuousStartInFlightRef.current = false
+      return false
+    }
+  }, [releaseContinuousCapture, transcribeAudioBlob])
+
+  const stopContinuousConversation = useCallback((clearIntent = true) => {
+    if (clearIntent) {
+      conversationShouldListenRef.current = false
+    }
+
+    continuousStartInFlightRef.current = false
+    const captureState = continuousCaptureRef.current
+    if (captureState) {
+      captureState.stopping = true
+      if (captureState.recorder.state !== 'inactive') {
+        try {
+          captureState.recorder.stop()
+        } catch {
+          // no-op
+        }
+      }
+      releaseContinuousCapture(captureState)
+      continuousCaptureRef.current = null
+    }
+
+    const recognition = speechRecognitionRef.current
+    if (recognition) {
+      try {
+        recognition.stop()
+      } catch {
+        // Ignora erro de stop em estados transientes.
+      }
+    }
+
+    setEscutaContinuaAtiva(false)
+    setTranscricaoParcial('')
+  }, [releaseContinuousCapture])
+
+  const startContinuousConversation = useCallback(() => {
+    if (typeof window === 'undefined') return
+    if (!modoConversacaoRef.current || loadingRef.current || assistantSpeakingRef.current) return
+
+    conversationShouldListenRef.current = true
+    if (continuousCaptureRef.current || continuousStartInFlightRef.current) return
+
+    void (async () => {
+      const startedServer = await startServerContinuousConversation()
+      if (!startedServer) {
+        startBrowserContinuousConversation()
+      }
+    })()
+  }, [startBrowserContinuousConversation, startServerContinuousConversation])
+
+  useEffect(() => {
+    startContinuousConversationRef.current = () => {
+      startContinuousConversation()
+    }
+  }, [startContinuousConversation])
 
   const stopAssistantPlayback = useCallback(() => {
     const currentAudio = playbackAudioRef.current
@@ -730,12 +988,7 @@ export default function VivaChatPage() {
             nome: anexo.file.name
           })
         } else if (anexo.tipo === 'audio') {
-          const formData = new FormData()
-          formData.append('file', anexo.file)
-          const response = await api.post('/viva/audio/transcribe', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          })
-          const transcricao = String(response.data?.transcricao || '').trim()
+          const transcricao = await transcribeAudioBlob(anexo.file)
           if (transcricao) {
             transcricoesAudio.push(transcricao)
           }
@@ -858,7 +1111,7 @@ export default function VivaChatPage() {
     } finally {
       setLoading(false)
     }
-  }, [anexos, input, loadSessions, loading, mensagens, promptAtivo, sessionId])
+  }, [anexos, input, loadSessions, loading, mensagens, promptAtivo, sessionId, transcribeAudioBlob])
 
   useEffect(() => {
     sendFromVoiceRef.current = (texto: string) => {
