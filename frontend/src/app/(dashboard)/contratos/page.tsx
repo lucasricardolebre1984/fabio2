@@ -1,17 +1,9 @@
-'use client'
+﻿'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import {
-  FileText,
-  ChevronRight,
-  Building2,
-  Landmark,
-  Scale,
-  FileCheck,
-  Plus,
-} from 'lucide-react'
+import { Building2, ChevronRight, FileCheck, FileText, Landmark, Plus, Scale } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 
@@ -24,6 +16,129 @@ interface Template {
   ativo: boolean
 }
 
+const CONTRACT_TEMPLATES: Template[] = [
+  {
+    id: 'bacen',
+    nome: 'Contrato Bacen',
+    categoria: 'Bacen',
+    descricao: 'Remoção de apontamentos de prejuízo no Sistema de Informações de Crédito (SCR) do Banco Central.',
+    icone: 'landmark',
+    ativo: true,
+  },
+  {
+    id: 'cadin',
+    nome: 'Contrato CADIN PF/PJ',
+    categoria: 'CADIN',
+    descricao: 'Regularização administrativa de pendências no CADIN.',
+    icone: 'file',
+    ativo: true,
+  },
+  {
+    id: 'cnh',
+    nome: 'Contrato CNH e Multas',
+    categoria: 'CNH',
+    descricao: 'Defesa administrativa/judicial para CNH cassada ou suspensa e recursos de multas.',
+    icone: 'scale',
+    ativo: true,
+  },
+  {
+    id: 'aumento_score',
+    nome: 'Contrato Aumento de Score',
+    categoria: 'Score',
+    descricao: 'Assessoria especializada para elevar score de crédito com plano personalizado e acompanhamento.',
+    icone: 'building',
+    ativo: true,
+  },
+  {
+    id: 'diagnostico360',
+    nome: 'Contrato Diagnóstico 360',
+    categoria: 'Diagnóstico',
+    descricao: 'Análise completa do perfil de crédito com relatório técnico e plano de ação.',
+    icone: 'file',
+    ativo: true,
+  },
+  {
+    id: 'limpa_nome_standard',
+    nome: 'Contrato Limpa Nome Standard',
+    categoria: 'Limpa Nome',
+    descricao: 'Regularização de pendências com prazo padrão, garantia e acompanhamento.',
+    icone: 'file',
+    ativo: true,
+  },
+  {
+    id: 'limpa_nome_express',
+    nome: 'Contrato Limpa Nome Express',
+    categoria: 'Limpa Nome',
+    descricao: 'Fluxo expresso para remoção de apontamentos com prioridade de execução.',
+    icone: 'file',
+    ativo: true,
+  },
+  {
+    id: 'rating_convencional',
+    nome: 'Contrato Rating Convencional',
+    categoria: 'Rating',
+    descricao: 'Execução de plano de rating com meta condicional e acompanhamento completo.',
+    icone: 'landmark',
+    ativo: true,
+  },
+  {
+    id: 'rating_express_pj',
+    nome: 'Contrato Rating Express PJ',
+    categoria: 'Rating PJ',
+    descricao: 'Modalidade expressa para melhoria de rating comercial de pessoa jurídica.',
+    icone: 'landmark',
+    ativo: true,
+  },
+  {
+    id: 'rating_full_pj',
+    nome: 'Contrato Rating Full PJ',
+    categoria: 'Rating PJ',
+    descricao: 'Execução full do plano de rating com apoio contábil (DRE) e fiscal (CND).',
+    icone: 'landmark',
+    ativo: true,
+  },
+  {
+    id: 'ccf',
+    nome: 'Contrato Regularização CCF',
+    categoria: 'CCF',
+    descricao: 'Assessoria para regularização de cheques sem fundos e baixa do cadastro CCF.',
+    icone: 'scale',
+    ativo: true,
+  },
+  {
+    id: 'certificado_digital',
+    nome: 'Contrato Certificado Digital',
+    categoria: 'Certificado',
+    descricao: 'Emissão de certificado digital com suporte completo de validação.',
+    icone: 'file',
+    ativo: true,
+  },
+  {
+    id: 'remocao_proposta',
+    nome: 'Contrato Remoção de Proposta',
+    categoria: 'Serasa',
+    descricao: 'Remoção de propostas de negociação no sistema Serasa.',
+    icone: 'building',
+    ativo: true,
+  },
+  {
+    id: 'revisional',
+    nome: 'Contrato Ação Revisional',
+    categoria: 'Jurídico',
+    descricao: 'Ação revisional com pedido de suspensão de busca e apreensão.',
+    icone: 'scale',
+    ativo: true,
+  },
+  {
+    id: 'jusbrasil',
+    nome: 'Contrato Jusbrasil/Escavador',
+    categoria: 'Desindexação',
+    descricao: 'Remoção, anonimização e desindexação de dados pessoais em agregadores jurídicos.',
+    icone: 'scale',
+    ativo: true,
+  },
+]
+
 export default function ContratosMenuPage() {
   const router = useRouter()
   const [templates, setTemplates] = useState<Template[]>([])
@@ -35,52 +150,7 @@ export default function ContratosMenuPage() {
 
   const loadTemplates = async () => {
     try {
-      // Por enquanto, templates mockados até o backend ter endpoint.
-      // Depois: const response = await api.get('/contratos/templates')
-      const templatesMock: Template[] = [
-        {
-          id: 'bacen',
-          nome: 'Contrato Bacen',
-          categoria: 'Bacen',
-          descricao:
-            'Remoção de apontamentos de prejuízo no Sistema de Informações de Crédito (SCR) do Banco Central.',
-          icone: 'landmark',
-          ativo: true,
-        },
-        {
-          id: 'cadin',
-          nome: 'Contrato CADIN PF/PJ',
-          categoria: 'CADIN',
-          descricao: 'Regularização administrativa de pendências no CADIN.',
-          icone: 'file',
-          ativo: true,
-        },
-        {
-          id: 'cnh',
-          nome: 'Contrato CNH e Multas',
-          categoria: 'CNH',
-          descricao: 'Defesa administrativa/judicial para CNH cassada ou suspensa e recursos de multas.',
-          icone: 'scale',
-          ativo: true,
-        },
-        {
-          id: 'serasa',
-          nome: 'Contrato Serasa',
-          categoria: 'Serasa',
-          descricao: 'Limpeza de nome e regularização de dívidas no Serasa.',
-          icone: 'building',
-          ativo: false,
-        },
-        {
-          id: 'protesto',
-          nome: 'Contrato Protesto',
-          categoria: 'Protesto',
-          descricao: 'Cancelamento de protestos de títulos.',
-          icone: 'scale',
-          ativo: false,
-        },
-      ]
-      setTemplates(templatesMock)
+      setTemplates(CONTRACT_TEMPLATES)
     } catch (err) {
       console.error('Erro ao carregar templates:', err)
     } finally {
@@ -97,7 +167,6 @@ export default function ContratosMenuPage() {
       case 'scale':
         return <Scale className="h-12 w-12" />
       case 'file':
-        return <FileText className="h-12 w-12" />
       default:
         return <FileText className="h-12 w-12" />
     }

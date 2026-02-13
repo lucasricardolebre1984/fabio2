@@ -1,9 +1,7 @@
 """Contrato service - Business logic for contracts."""
-import json
 import os
 import logging
 from datetime import datetime
-from pathlib import Path
 from decimal import Decimal
 from typing import List, Optional, Dict, Any
 from uuid import UUID
@@ -16,6 +14,7 @@ from app.models.cliente import Cliente
 from app.models.contrato_template import ContratoTemplate
 from app.schemas.contrato import ContratoCreate, ContratoUpdate
 from app.services.cliente_service import ClienteService
+from app.services.contrato_template_loader import load_contract_template, normalize_template_payload
 from app.services.extenso_service import ExtensoService
 
 
@@ -70,6 +69,126 @@ FALLBACK_TEMPLATES: Dict[str, Dict[str, Any]] = {
         "campos": [],
         "secoes": [],
     },
+    "aumento_score": {
+        "id": "aumento_score",
+        "nome": "Contrato de Prestacao de Servicos - Aumento de Score",
+        "tipo": "aumento_score",
+        "descricao": "Template institucional para aumento de score",
+        "versao": "1.0.0",
+        "ativo": True,
+        "campos": [],
+        "secoes": [],
+    },
+    "ccf": {
+        "id": "ccf",
+        "nome": "Contrato de Prestacao de Servicos - Regularizacao CCF",
+        "tipo": "ccf",
+        "descricao": "Template institucional para regularizacao de CCF",
+        "versao": "1.0.0",
+        "ativo": True,
+        "campos": [],
+        "secoes": [],
+    },
+    "certificado_digital": {
+        "id": "certificado_digital",
+        "nome": "Contrato de Prestacao de Servicos - Certificado Digital",
+        "tipo": "certificado_digital",
+        "descricao": "Template institucional para emissao de certificado digital",
+        "versao": "1.0.0",
+        "ativo": True,
+        "campos": [],
+        "secoes": [],
+    },
+    "diagnostico360": {
+        "id": "diagnostico360",
+        "nome": "Contrato de Prestacao de Servicos - Diagnostico 360",
+        "tipo": "diagnostico360",
+        "descricao": "Template institucional para diagnostico de credito 360",
+        "versao": "1.0.0",
+        "ativo": True,
+        "campos": [],
+        "secoes": [],
+    },
+    "limpa_nome_express": {
+        "id": "limpa_nome_express",
+        "nome": "Contrato de Prestacao de Servicos - Limpa Nome Express",
+        "tipo": "limpa_nome_express",
+        "descricao": "Template institucional para limpa nome express",
+        "versao": "1.0.0",
+        "ativo": True,
+        "campos": [],
+        "secoes": [],
+    },
+    "limpa_nome_standard": {
+        "id": "limpa_nome_standard",
+        "nome": "Contrato de Prestacao de Servicos - Limpa Nome Standard",
+        "tipo": "limpa_nome_standard",
+        "descricao": "Template institucional para limpa nome standard",
+        "versao": "1.0.0",
+        "ativo": True,
+        "campos": [],
+        "secoes": [],
+    },
+    "rating_convencional": {
+        "id": "rating_convencional",
+        "nome": "Contrato de Prestacao de Servicos - Rating Convencional",
+        "tipo": "rating_convencional",
+        "descricao": "Template institucional para rating convencional",
+        "versao": "1.0.0",
+        "ativo": True,
+        "campos": [],
+        "secoes": [],
+    },
+    "rating_express_pj": {
+        "id": "rating_express_pj",
+        "nome": "Contrato de Prestacao de Servicos - Rating Express PJ",
+        "tipo": "rating_express_pj",
+        "descricao": "Template institucional para rating express PJ",
+        "versao": "1.0.0",
+        "ativo": True,
+        "campos": [],
+        "secoes": [],
+    },
+    "remocao_proposta": {
+        "id": "remocao_proposta",
+        "nome": "Contrato de Prestacao de Servicos - Remocao de Proposta Serasa",
+        "tipo": "remocao_proposta",
+        "descricao": "Template institucional para remocao de proposta no Serasa",
+        "versao": "1.0.0",
+        "ativo": True,
+        "campos": [],
+        "secoes": [],
+    },
+    "revisional": {
+        "id": "revisional",
+        "nome": "Contrato de Prestacao de Servicos - Acao Revisional",
+        "tipo": "revisional",
+        "descricao": "Template institucional para acao revisional",
+        "versao": "1.0.0",
+        "ativo": True,
+        "campos": [],
+        "secoes": [],
+    },
+    "rating_full_pj": {
+        "id": "rating_full_pj",
+        "nome": "Contrato de Prestacao de Servicos - Rating Full PJ",
+        "tipo": "rating_full_pj",
+        "descricao": "Template institucional para rating full PJ",
+        "versao": "1.0.0",
+        "ativo": True,
+        "campos": [],
+        "secoes": [],
+    },
+    "jusbrasil": {
+        "id": "jusbrasil",
+        "nome": "Contrato de Prestacao de Servicos - Jusbrasil/Escavador",
+        "tipo": "jusbrasil",
+        "descricao": "Template institucional para remocao e desindexacao Jusbrasil/Escavador",
+        "versao": "1.0.0",
+        "ativo": True,
+        "campos": [],
+        "secoes": [],
+    },
 }
 
 logger = logging.getLogger(__name__)
@@ -106,14 +225,20 @@ class ContratoService:
     
     async def get_template(self, template_id: str) -> Optional[Dict[str, Any]]:
         """Get template by ID."""
-        # Try database first
+        template_key = str(template_id or "").strip().lower()
+
+        file_template = load_contract_template(template_key)
+        if file_template:
+            return file_template
+
+        # Try database when file template is unavailable.
         result = await self.db.execute(
-            select(ContratoTemplate).where(ContratoTemplate.tipo == template_id)
+            select(ContratoTemplate).where(ContratoTemplate.tipo == template_key)
         )
         template = result.scalar_one_or_none()
         
         if template:
-            return {
+            template_payload = {
                 "id": str(template.id),
                 "nome": template.nome,
                 "tipo": template.tipo,
@@ -133,20 +258,9 @@ class ContratoService:
                 "created_at": template.created_at,
                 "updated_at": template.updated_at
             }
+            return normalize_template_payload(template_payload)
         
-        # Fallback to JSON file
-        possible_paths = [
-            Path(__file__).parent.parent.parent / "contratos" / "templates" / f"{template_id}.json",
-            Path("C:/projetos/fabio2/contratos/templates") / f"{template_id}.json",
-            Path("C:/projetos/fabio2/backend/contratos/templates") / f"{template_id}.json"
-        ]
-        
-        for template_path in possible_paths:
-            if template_path.exists():
-                with open(template_path, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-
-        template_fallback = FALLBACK_TEMPLATES.get(template_id.lower())
+        template_fallback = FALLBACK_TEMPLATES.get(template_key)
         if template_fallback:
             return template_fallback
         
@@ -474,4 +588,3 @@ class ContratoService:
         except Exception:
             logger.exception("WeasyPrint falhou na geracao do contrato %s", contrato.id)
             return None
-

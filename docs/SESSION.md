@@ -805,3 +805,82 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
 - observacao importante:
   - existe copia de seguranca remota nesse commit;
   - estado atual ainda possui alteracoes locais nao commitadas (worktree suja), incluindo templates e ajustes de contratos.
+
+## Atualizacao Operacional (2026-02-12 - execucao BUG-081 contratos runtime)
+- correcoes aplicadas:
+  - `docker-compose.yml`:
+    - mount `./contratos:/app/contratos:ro` no backend;
+    - env `CONTRATOS_TEMPLATES_DIR=/app/contratos/templates`.
+  - novo loader central de templates:
+    - `backend/app/services/contrato_template_loader.py`;
+    - normalizacao de clausulas legadas (`paragrafos` -> `conteudo`).
+  - servicos atualizados:
+    - `backend/app/services/contrato_service.py` (carregamento robusto de template JSON no runtime);
+    - `backend/app/services/pdf_service_playwright.py` (mesmo loader + compatibilidade de clausulas).
+  - frontend atualizado:
+    - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`;
+    - `frontend/src/lib/pdf.ts`;
+    - ambos aceitando `conteudo` e `paragrafos`.
+- validacoes:
+  - `py_compile` backend => OK;
+  - `npm run type-check` => OK;
+  - `npm run lint -- --file src/app/(dashboard)/contratos/[id]/page.tsx --file src/lib/pdf.ts` => OK (warning nao bloqueante de `<img>`);
+  - API templates (`/api/v1/contratos/templates/{id}`) retornando clausulas para 13 IDs do lote;
+  - PDF backend (`/api/v1/contratos/{id}/pdf`) com `200 application/pdf` apos rebuild da imagem backend com `pydyf==0.10.0`.
+- status:
+  - `BUG-081` movido para **Em validacao (runtime corrigido)**.
+
+## Atualizacao Operacional (2026-02-12 - execucao BUG-082 contratos faltantes)
+- contexto:
+  - apos estabilizacao de runtime (`BUG-081`), restavam 2 modelos `.md` fora do fluxo funcional: `rating_full_pj` e `jusbrasil`.
+- execucao aplicada:
+  - templates criados:
+    - `contratos/templates/rating_full_pj.json`
+    - `contratos/templates/jusbrasil.json`
+  - backend:
+    - `backend/app/services/contrato_service.py` atualizado com fallback para os dois novos IDs.
+  - frontend:
+    - `frontend/src/app/(dashboard)/contratos/page.tsx` com cards ativos de `Rating Full PJ` e `Jusbrasil/Escavador`;
+    - `frontend/src/app/(dashboard)/contratos/novo/page.tsx` com labels/aceite para ambos os templates.
+- validacao:
+  - `python -m json.tool` nos templates novos => OK;
+  - `python -m py_compile` backend (contrato_service/loader/pdf_service_playwright) => OK;
+  - `npm run type-check` => OK;
+  - `npm run lint -- --file src/app/(dashboard)/contratos/page.tsx --file src/app/(dashboard)/contratos/novo/page.tsx` => OK;
+  - API runtime:
+    - `GET /api/v1/contratos/templates/rating_full_pj` => 10 clausulas;
+    - `GET /api/v1/contratos/templates/jusbrasil` => 8 clausulas;
+    - varredura dos 15 templates operacionais com clausulas > 0.
+- status:
+  - `BUG-082` => **Resolvido**.
+
+## Atualizacao Operacional (2026-02-12 - execucao BUG-083 encoding residual)
+- contexto:
+  - contratos exibiam simbolos residuais (`�`) em alguns titulos/clausulas no preview, apesar das clausulas estarem presentes.
+- correcoes aplicadas:
+  - backend:
+    - `backend/app/services/contrato_template_loader.py` recebeu normalizacao recursiva de strings do payload de template;
+    - estrategia de reparo de mojibake ampliada para `cp1252 -> utf-8` e `latin-1 -> utf-8` com score de qualidade.
+  - PDF backend:
+    - `backend/app/services/pdf_service_playwright.py` alinhado com o mesmo reparo robusto de encoding.
+  - frontend:
+    - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx` e `frontend/src/lib/pdf.ts` com decoder robusto de mojibake CP1252/UTF-8.
+- validacao:
+  - `py_compile` backend => OK;
+  - `npm run type-check` => OK;
+  - `npm run lint` direcionado => OK (warning nao bloqueante de `<img>`);
+  - validacao HTTP UTF-8 dos templates (`aumento_score`, `rating_convencional`, `revisional`) sem `�` e sem marcadores de mojibake no payload.
+- status:
+  - `BUG-083` => **Resolvido**.
+
+## Atualizacao Operacional (2026-02-13 - planejamento BUG-084 parcelamento)
+- contexto funcional:
+  - fluxo de `novo contrato` ainda exige `prazo_1` e `prazo_2` manuais e aceita ate 99 parcelas;
+  - operacao comercial solicitada: venda a vista/1x fluida, entrada opcional, parcelas ate 12x com prazos padrao automaticos.
+- diagnostico read-only executado:
+  - frontend exige campos de prazo (`required`) em `frontend/src/app/(dashboard)/contratos/novo/page.tsx`;
+  - backend schema ainda valida `prazo_1/prazo_2 >= 1` e `qtd_parcelas <= 99` em `backend/app/schemas/contrato.py`;
+  - `valor_parcela` ja possui calculo automatico no backend (`ContratoService.create`).
+- governanca:
+  - bug formalizado como `BUG-084` em `docs/BUGSREPORT.md`;
+  - plano em 3 etapas documentado (UX frontend, regra backend, render preview/pdf) aguardando execucao.

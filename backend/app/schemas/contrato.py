@@ -103,12 +103,15 @@ class ContratoTemplateResponse(BaseModel):
     id: str
     nome: str
     tipo: str
+    categoria: Optional[str] = None
+    subtitulo: Optional[str] = None
     descricao: Optional[str] = None
     versao: str
     ativo: bool
     campos: List[Dict[str, Any]]
     secoes: List[Dict[str, Any]]
-    created_at: datetime
+    clausulas: Optional[List[Dict[str, Any]]] = None
+    created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
 

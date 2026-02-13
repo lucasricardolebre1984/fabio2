@@ -112,8 +112,10 @@ services:
       - STORAGE_MODE=local
       - STORAGE_LOCAL_PATH=/app/storage
       - VIVA_RULES_DIR=/app/viva_rules
+      - CONTRATOS_TEMPLATES_DIR=/app/contratos/templates
     volumes:
       - ./backend:/app
+      - ./contratos:/app/contratos:ro
       - ./frontend/src/app/viva/REGRAS:/app/viva_rules
       - backend_storage:/app/storage
     depends_on:

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -10,22 +10,38 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
 
+const TEMPLATE_LABELS: Record<string, string> = {
+  bacen: 'Contrato de Adesão ao Bacen',
+  cadin: 'Instrumento de Prestação de Serviços - CADIN PF/PJ',
+  cnh: 'Contrato de Prestação de Serviços - CNH Cassada e Recurso de Multas',
+  aumento_score: 'Contrato de Prestação de Serviços - Aumento de Score',
+  diagnostico360: 'Contrato de Prestação de Serviços - Diagnóstico 360',
+  limpa_nome_standard: 'Contrato de Prestação de Serviços - Limpa Nome Standard',
+  limpa_nome_express: 'Contrato de Prestação de Serviços - Limpa Nome Express',
+  rating_convencional: 'Contrato de Prestação de Serviços - Execução de Rating',
+  rating_express_pj: 'Contrato de Prestação de Serviços - Rating Express PJ',
+  rating_full_pj: 'Contrato de Prestação de Serviços - Rating Full PJ',
+  ccf: 'Contrato de Prestação de Serviços - Regularização CCF (Cheques sem Fundos)',
+  certificado_digital: 'Contrato de Prestação de Serviços - Certificado Digital',
+  remocao_proposta: 'Contrato de Prestação de Serviços - Remoção de Propostas Serasa',
+  revisional: 'Contrato de Prestação de Serviços - Ação Revisional e Suspensão de Busca e Apreensão',
+  jusbrasil: 'Contrato de Prestação de Serviços - Jusbrasil/Escavador',
+}
+
+const AVAILABLE_TEMPLATES = Object.keys(TEMPLATE_LABELS)
+
 function NovoContratoPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const templateQuery = (searchParams.get('template') || 'bacen').toLowerCase()
-  const selectedTemplate = ['bacen', 'cadin', 'cnh'].includes(templateQuery) ? templateQuery : 'bacen'
-  const tituloTemplate = selectedTemplate === 'cadin'
-    ? 'Instrumento de Prestação de Serviços - CADIN PF/PJ'
-    : selectedTemplate === 'cnh'
-      ? 'Contrato de Prestacao de Servicos - CNH Cassada e Recurso de Multas'
-      : 'Contrato de Adesao ao Bacen'
+  const selectedTemplate = AVAILABLE_TEMPLATES.includes(templateQuery) ? templateQuery : 'bacen'
+  const tituloTemplate = TEMPLATE_LABELS[selectedTemplate] || TEMPLATE_LABELS.bacen
+
   const [loading, setLoading] = useState(false)
   const [checkingCliente, setCheckingCliente] = useState(false)
   const [error, setError] = useState('')
   const [clienteHint, setClienteHint] = useState('')
-  
-  // Form state
+
   const [formData, setFormData] = useState({
     contratante_nome: '',
     contratante_documento: '',
@@ -47,7 +63,7 @@ function NovoContratoPageContent() {
     if (id === 'contratante_documento') {
       setClienteHint('')
     }
-    setFormData(prev => ({ ...prev, [id]: value }))
+    setFormData((prev) => ({ ...prev, [id]: value }))
   }
 
   const normalizeDocument = (value: string) => {
@@ -66,7 +82,7 @@ function NovoContratoPageContent() {
       const response = await api.get(`/clientes/documento/${documento}`)
       const cliente = response.data
 
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         contratante_nome: cliente?.nome || prev.contratante_nome,
         contratante_email: cliente?.email || prev.contratante_email,
@@ -76,7 +92,7 @@ function NovoContratoPageContent() {
       setClienteHint('Cliente existente encontrado. Dados preenchidos automaticamente.')
     } catch (err: any) {
       if (err?.response?.status === 404) {
-        setClienteHint('Documento sem cadastro previo. O cliente sera criado junto com o contrato.')
+        setClienteHint('Documento sem cadastro prévio. O cliente será criado junto com o contrato.')
       } else {
         setError(err?.response?.data?.detail || 'Falha ao buscar cliente por documento.')
       }
@@ -124,28 +140,23 @@ function NovoContratoPageContent() {
               : null,
       }
 
-      console.log('Enviando dados:', contratoData)
-      const response = await api.post('/contratos', contratoData)
-      console.log('Sucesso:', response.data)
+      await api.post('/contratos', contratoData)
       alert('Contrato criado com sucesso!')
       router.push('/contratos')
     } catch (err: any) {
-      console.error('Erro completo:', err)
-      
-      // Tratar diferentes tipos de erro
       let errorMessage = 'Erro ao criar contrato'
-      
+
       if (err.response) {
         const { status, data } = err.response
-        
+
         if (status === 422 && data?.detail) {
-          // Erro de validação do Pydantic
           if (Array.isArray(data.detail)) {
-            // Pydantic v2 retorna array de erros
-            errorMessage = data.detail.map((e: any) => {
-              const field = e.loc?.join('.') || 'campo'
-              return `${field}: ${e.msg}`
-            }).join(', ')
+            errorMessage = data.detail
+              .map((item: any) => {
+                const field = item.loc?.join('.') || 'campo'
+                return `${field}: ${item.msg}`
+              })
+              .join(', ')
           } else if (typeof data.detail === 'string') {
             errorMessage = data.detail
           } else {
@@ -161,7 +172,7 @@ function NovoContratoPageContent() {
       } else if (err.message) {
         errorMessage = err.message
       }
-      
+
       setError(errorMessage)
     } finally {
       setLoading(false)
@@ -170,10 +181,10 @@ function NovoContratoPageContent() {
 
   return (
     <div>
-      <div className="flex items-center gap-4 mb-8">
+      <div className="mb-8 flex items-center gap-4">
         <Link href="/contratos">
           <Button variant="outline" size="icon">
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
         <h1 className="text-3xl font-bold text-gray-900">Novo Contrato</h1>
@@ -185,161 +196,88 @@ function NovoContratoPageContent() {
         </CardHeader>
         <CardContent>
           {error && (
-            <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-lg text-sm">
+            <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-600">
               <strong>Erro:</strong> {error}
             </div>
           )}
-          
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="contratante_nome">Nome do Cliente</Label>
-              <Input 
-                id="contratante_nome" 
-                placeholder="Nome completo" 
-                required 
-                value={formData.contratante_nome}
-                onChange={handleChange}
-              />
+              <Input id="contratante_nome" placeholder="Nome completo" required value={formData.contratante_nome} onChange={handleChange} />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="contratante_documento">CPF/CNPJ</Label>
-              <Input 
-                id="contratante_documento" 
-                placeholder="000.000.000-00" 
-                required 
+              <Input
+                id="contratante_documento"
+                placeholder="000.000.000-00"
+                required
                 value={formData.contratante_documento}
                 onChange={handleChange}
                 onBlur={buscarClientePorDocumento}
               />
-              {checkingCliente && (
-                <p className="text-xs text-gray-500">Buscando cliente...</p>
-              )}
-              {!checkingCliente && clienteHint && (
-                <p className="text-xs text-blue-700">{clienteHint}</p>
-              )}
+              {checkingCliente && <p className="text-xs text-gray-500">Buscando cliente...</p>}
+              {!checkingCliente && clienteHint && <p className="text-xs text-blue-700">{clienteHint}</p>}
             </div>
 
             {selectedTemplate === 'cnh' && (
               <div className="space-y-2">
-                <Label htmlFor="cnh_numero">Numero da CNH (opcional)</Label>
-                <Input
-                  id="cnh_numero"
-                  placeholder="00000000000"
-                  value={formData.cnh_numero}
-                  onChange={handleChange}
-                />
+                <Label htmlFor="cnh_numero">Número da CNH (opcional)</Label>
+                <Input id="cnh_numero" placeholder="00000000000" value={formData.cnh_numero} onChange={handleChange} />
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="contratante_email">Email</Label>
-                <Input 
-                  id="contratante_email" 
-                  type="email"
-                  placeholder="email@exemplo.com" 
-                  required 
-                  value={formData.contratante_email}
-                  onChange={handleChange}
-                />
+                <Input id="contratante_email" type="email" placeholder="email@exemplo.com" required value={formData.contratante_email} onChange={handleChange} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="contratante_telefone">Telefone</Label>
-                <Input 
-                  id="contratante_telefone" 
-                  placeholder="(00) 00000-0000" 
-                  value={formData.contratante_telefone}
-                  onChange={handleChange}
-                />
+                <Input id="contratante_telefone" placeholder="(00) 00000-0000" value={formData.contratante_telefone} onChange={handleChange} />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="contratante_endereco">Endereço Completo</Label>
-              <Input 
-                id="contratante_endereco" 
-                placeholder="Rua, número, bairro, cidade - Estado, CEP" 
-                required 
-                value={formData.contratante_endereco}
-                onChange={handleChange}
-              />
+              <Input id="contratante_endereco" placeholder="Rua, número, bairro, cidade - Estado, CEP" required value={formData.contratante_endereco} onChange={handleChange} />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="valor_total">Valor Total (R$)</Label>
-                <Input 
-                  id="valor_total" 
-                  type="number" 
-                  step="0.01" 
-                  placeholder="0,00" 
-                  required 
-                  value={formData.valor_total}
-                  onChange={handleChange}
-                />
+                <Input id="valor_total" type="number" step="0.01" placeholder="0,00" required value={formData.valor_total} onChange={handleChange} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="valor_entrada">Valor Entrada (R$)</Label>
-                <Input 
-                  id="valor_entrada" 
-                  type="number" 
-                  step="0.01" 
-                  placeholder="0,00" 
-                  value={formData.valor_entrada}
-                  onChange={handleChange}
-                />
+                <Input id="valor_entrada" type="number" step="0.01" placeholder="0,00" value={formData.valor_entrada} onChange={handleChange} />
               </div>
             </div>
 
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="qtd_parcelas">Qtd. Parcelas</Label>
-                <Input 
-                  id="qtd_parcelas" 
-                  type="number" 
-                  min={1} 
-                  max={99}
-                  placeholder="12" 
-                  required 
-                  value={formData.qtd_parcelas}
-                  onChange={handleChange}
-                />
+                <Input id="qtd_parcelas" type="number" min={1} max={99} placeholder="12" required value={formData.qtd_parcelas} onChange={handleChange} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="prazo_1">Prazo 1 (dias)</Label>
-                <Input 
-                  id="prazo_1" 
-                  type="number" 
-                  min={1}
-                  placeholder="30" 
-                  required 
-                  value={formData.prazo_1}
-                  onChange={handleChange}
-                />
+                <Input id="prazo_1" type="number" min={1} placeholder="30" required value={formData.prazo_1} onChange={handleChange} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="prazo_2">Prazo 2 (dias)</Label>
-                <Input 
-                  id="prazo_2" 
-                  type="number" 
-                  min={1}
-                  placeholder="60" 
-                  required 
-                  value={formData.prazo_2}
-                  onChange={handleChange}
-                />
+                <Input id="prazo_2" type="number" min={1} placeholder="60" required value={formData.prazo_2} onChange={handleChange} />
               </div>
             </div>
 
-            <div className="flex justify-end pt-4 gap-4">
+            <div className="flex justify-end gap-4 pt-4">
               <Link href="/contratos">
                 <Button type="button" variant="outline">
                   Cancelar
                 </Button>
               </Link>
               <Button type="submit" disabled={loading}>
-                {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Criar Contrato
               </Button>
             </div>
@@ -352,7 +290,7 @@ function NovoContratoPageContent() {
 
 export default function NovoContratoPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-gray-500">Carregando formulario...</div>}>
+    <Suspense fallback={<div className="p-6 text-gray-500">Carregando formulário...</div>}>
       <NovoContratoPageContent />
     </Suspense>
   )

@@ -413,7 +413,10 @@
     "testemunhas": {
       "quantidade": 2,
       "obrigatorias": false,
-      "campos": ["nome", "cpf"]
+      "campos": [
+        "nome",
+        "cpf"
+      ]
     }
   },
   "layout": {
@@ -433,5 +436,7 @@
       "texto": "FC Soluções Financeiras | (16) 99301-7396 | contato@fcsolucoesfinanceiras.com",
       "altura": "1cm"
     }
-  }
+  },
+  "subtitulo": "Bacen - Remocao SCR",
+  "categoria": "Bacen - Remocao SCR"
 }

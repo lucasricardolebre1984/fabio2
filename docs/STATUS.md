@@ -635,3 +635,68 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
 - implicacao:
   - rollback para checkpoint remoto e possivel a qualquer momento;
   - alteracoes locais atuais exigem commit dedicado antes de novo push.
+
+## Estado Contratos (2026-02-12 - runtime corrigido para templates)
+- correcao estrutural aplicada no ambiente local:
+  - backend agora monta `./contratos` no container (`/app/contratos`) e usa `CONTRATOS_TEMPLATES_DIR=/app/contratos/templates`;
+  - carregamento de templates centralizado em `backend/app/services/contrato_template_loader.py`.
+- impacto funcional:
+  - `GET /api/v1/contratos/templates/{id}` voltou a retornar clausulas reais para todos os templates operacionais;
+  - preview e PDF frontend/backend passam a aceitar clausulas em formato `conteudo` e `paragrafos` (retrocompatibilidade com BACEN legado).
+- sanity check de PDF:
+  - imagem backend reconstruida com dependencias alinhadas (`weasyprint==60.2` + `pydyf==0.10.0`);
+  - `GET /api/v1/contratos/{id}/pdf` validado com `200 application/pdf`.
+- status de bug:
+  - `BUG-081` em **Em validacao (runtime corrigido)**, aguardando prova visual final no navegador.
+
+## Estado Contratos (2026-02-12 - fechamento do lote funcional completo)
+- modelos adicionais integrados:
+  - `rating_full_pj`
+  - `jusbrasil`
+- artefatos criados/atualizados:
+  - `contratos/templates/rating_full_pj.json`
+  - `contratos/templates/jusbrasil.json`
+  - `backend/app/services/contrato_service.py` (fallbacks novos)
+  - `frontend/src/app/(dashboard)/contratos/page.tsx` (cards novos)
+  - `frontend/src/app/(dashboard)/contratos/novo/page.tsx` (labels novos)
+- validacao de stack:
+  - backend `py_compile` => OK;
+  - frontend `type-check` => OK;
+  - frontend `lint` direcionado => OK.
+- validacao funcional:
+  - API templates com clausulas:
+    - `rating_full_pj=10`
+    - `jusbrasil=8`
+  - varredura completa dos 15 templates operacionais retornando clausulas no runtime local.
+- status de bug:
+  - `BUG-082` em **Resolvido**.
+
+## Estado Contratos (2026-02-12 - saneamento final de encoding)
+- incidente:
+  - simbolos residuais (`�`) em parte das clausulas no preview/PDF.
+- correcao estrutural:
+  - normalizacao robusta de mojibake aplicada no backend loader de templates e no gerador PDF backend;
+  - normalizacao equivalente aplicada no preview/PDF frontend para manter consistencia visual.
+- arquivos-chave:
+  - `backend/app/services/contrato_template_loader.py`
+  - `backend/app/services/pdf_service_playwright.py`
+  - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`
+  - `frontend/src/lib/pdf.ts`
+- validacao:
+  - backend compile OK;
+  - frontend type-check/lint OK;
+  - payload UTF-8 de templates validado sem `�` nos modelos amostrados.
+- status de bug:
+  - `BUG-083` em **Resolvido**.
+
+## Estado Contratos (2026-02-13 - proximo bloco funcional priorizado)
+- bug de entrada formalizado:
+  - `BUG-084` (Parcelamento UX+Regra).
+- objetivo do bloco:
+  - remover friccao de venda a vista e padronizar parcelamento em `1..12x` sem prazos manuais no formulario.
+- escopo planejado:
+  - frontend com seletor de parcelas `1..12`, entrada opcional e simulacao de parcela;
+  - backend com limite `<=12`, prazos automaticos em multiplos de 30 e cronograma salvo em `dados_extras`;
+  - preview/PDF com compatibilidade para placeholders legados e texto institucional para a vista.
+- status:
+  - aguardando execucao do bloco BUG-084.
