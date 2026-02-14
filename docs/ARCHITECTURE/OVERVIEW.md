@@ -144,7 +144,7 @@ Contrato minimo de skill:
 - `observability_keys`
 
 Skill obrigatoria de campanhas:
-- `generate_campanha` (baseada em `docs/PROMPTS/SKILLS/VIVA_SKILL_GHD_COPY_CAMPAIGN.md`).
+- `generate_campanha_neutra` (fonte canonica em `agents/skillconteudo.txt`).
 
 ---
 

@@ -31,6 +31,7 @@ class VivaSkillRouterService:
                 "confidence": 0.95,
                 "mode": modo,
                 "input_chars": text_len,
+                "skill_source": "agents/AGENT.md",
             }
 
         if viviane_handoff_query_intent:
@@ -40,6 +41,7 @@ class VivaSkillRouterService:
                 "confidence": 0.92,
                 "mode": modo,
                 "input_chars": text_len,
+                "skill_source": "agents/AGENT.md",
             }
 
         if has_agenda_create_payload:
@@ -49,6 +51,7 @@ class VivaSkillRouterService:
                 "confidence": 0.94,
                 "mode": modo,
                 "input_chars": text_len,
+                "skill_source": "agents/AGENT.md",
             }
 
         if agenda_query_intent:
@@ -58,15 +61,17 @@ class VivaSkillRouterService:
                 "confidence": 0.9,
                 "mode": modo,
                 "input_chars": text_len,
+                "skill_source": "agents/AGENT.md",
             }
 
         if should_generate_image and campaign_flow_requested and modo in ("FC", "REZETA"):
             return {
-                "skill_id": "generate_campanha",
-                "reason": "fluxo criativo com geracao de campanha/imagem",
+                "skill_id": "generate_campanha_neutra",
+                "reason": "fluxo criativo de campanha/imagem com skill neutra",
                 "confidence": 0.96,
                 "mode": modo,
                 "input_chars": text_len,
+                "skill_source": "agents/skillconteudo.txt",
             }
 
         if should_generate_image and logo_request:
@@ -76,6 +81,7 @@ class VivaSkillRouterService:
                 "confidence": 0.9,
                 "mode": "LOGO",
                 "input_chars": text_len,
+                "skill_source": "agents/AGENT.md",
             }
 
         if campaign_flow_requested and modo in ("FC", "REZETA"):
@@ -85,6 +91,7 @@ class VivaSkillRouterService:
                 "confidence": 0.88,
                 "mode": modo,
                 "input_chars": text_len,
+                "skill_source": "agents/AGENT.md",
             }
 
         return {
@@ -93,8 +100,8 @@ class VivaSkillRouterService:
             "confidence": 0.8,
             "mode": modo,
             "input_chars": text_len,
+            "skill_source": "agents/AGENT.md",
         }
 
 
 viva_skill_router_service = VivaSkillRouterService()
-

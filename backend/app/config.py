@@ -106,6 +106,11 @@ class Settings(BaseSettings):
     VIVA_PROVIDER: str = "openai"
 
     # ==================================================================
+    # VIVA Memory (RAG/Redis/pgvector) - disabled by default (clean agent)
+    # ==================================================================
+    VIVA_MEMORY_ENABLED: bool = False
+
+    # ==================================================================
     # Google Calendar (agenda bridge)
     # ==================================================================
     FRONTEND_BASE_URL: str = "http://localhost:3000"

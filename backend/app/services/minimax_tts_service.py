@@ -128,14 +128,21 @@ class MinimaxTTSService:
         return audio_blob, media_type
 
     def get_status(self) -> Dict[str, Any]:
+        missing_env = []
+        if not self.api_key:
+            missing_env.append("MINIMAX_API_KEY")
+        if not self.group_id:
+            missing_env.append("MINIMAX_GROUP_ID")
+        if not self.voice_id:
+            missing_env.append("MINIMAX_TTS_VOICE_ID")
         return {
             "configured": self.is_configured(),
             "provider": "minimax",
             "model": self.model,
             "voice_id": self.voice_id,
             "format": self.format,
+            "missing_env": missing_env,
         }
 
 
 minimax_tts_service = MinimaxTTSService()
-

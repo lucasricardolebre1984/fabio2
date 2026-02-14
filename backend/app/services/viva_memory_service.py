@@ -51,7 +51,7 @@ class VivaMemoryService:
         if not modo:
             return None
         normalized = str(modo).strip().upper()
-        if normalized in {"FC", "REZETA", "LOGO", "CRIADORLANDPAGE", "CRIADORPROMPT", "CRIADORWEB"}:
+        if normalized in {"FC", "REZETA", "LOGO"}:
             return normalized
         return None
 

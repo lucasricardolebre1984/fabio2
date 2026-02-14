@@ -790,7 +790,7 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
    - contexto consolidado em `SESSION`, `STATUS`, `ARCHITECTURE` e `BUGSREPORT`.
 2. Gate 2 - Modularizacao para venda por pacotes (em andamento)
    - separar SaaS em modulos: `core_saas`, `modulo_viva`, `modulo_viviane`, `modulo_campanhas`, `modulo_memoria`;
-   - manter orquestrador unico com roteamento por skills (incluindo `generate_campanha`).
+   - manter orquestrador unico com roteamento por skills (incluindo `generate_campanha_neutra`).
 3. Gate 3 - Homologacao final de IA conversacional (a concluir)
    - voz/avatars institucionais;
    - validacao de modelo/API de fala ao vivo;

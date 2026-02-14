@@ -12,6 +12,76 @@ from typing import Any, Dict, List, Optional
 from app.services.viva_shared_service import _extract_subject, _normalize_key, _sanitize_prompt
 
 
+def _sanitize_idle_confirmations(resposta: str) -> str:
+    """Remove confirmacoes "ociosas" que deixam a conversa artificial.
+
+    Regra: nunca dizer "Confirmo que nenhuma acao foi executada" (nao agrega).
+    """
+
+    if not resposta:
+        return resposta
+
+    # Remove a frase mesmo que venha com variacoes ("ate o momento", pontuacao, etc).
+    resposta = re.sub(
+        r"(?im)^\s*confirmo\s+que\s+nenhuma\s+a[cç]ao\s+foi\s+executada.*$",
+        "",
+        resposta,
+    )
+
+    # Se sobrar duplo espaco/linhas, normaliza.
+    resposta = re.sub(r"\n{3,}", "\n\n", resposta).strip()
+    return resposta
+
+
+def _sanitize_unsolicited_capability_menu(user_texto: str, resposta: str) -> str:
+    """Remove "menus" de capacidades nao solicitados (ex.: 'Posso, por exemplo: ...').
+
+    O usuario quer interacao natural: cumprimentou -> 1 frase + 1 pergunta objetiva,
+    sem listar opcoes por default. Se o usuario pedir explicitamente "o que voce pode fazer",
+    nao sanitizamos.
+    """
+
+    if not resposta:
+        return resposta
+
+    user_norm = _normalize_key(user_texto or "")
+    if any(
+        term in user_norm
+        for term in (
+            "o que voce pode",
+            "oq voce pode",
+            "o que vc pode",
+            "oq vc pode",
+            "como voce pode ajudar",
+            "como vc pode ajudar",
+            "o que voce faz",
+            "oq voce faz",
+            "o que vc faz",
+            "oq vc faz",
+            "quais funcoes",
+            "quais tarefas",
+            "o que tem ai",
+        )
+    ):
+        return resposta
+
+    # Remove bloco "Posso, por exemplo:" + bullets subsequentes.
+    resposta = re.sub(
+        r"(?is)\n*\s*posso\s*(?:,\s*)?(?:por\s*exemplo|ex\.)\s*:?\s*(?:\n\s*[-•].*)+",
+        "",
+        resposta,
+    )
+    # Remove linha "Posso, por exemplo:" isolada.
+    resposta = re.sub(
+        r"(?im)^\s*posso\s*(?:,\s*)?(?:por\s*exemplo|ex\.)\s*:?\s*$",
+        "",
+        resposta,
+    )
+
+    resposta = re.sub(r"\n{3,}", "\n\n", resposta).strip()
+    return resposta
+
+
 def _sanitize_fake_asset_delivery_reply(resposta: str, modo: Optional[str]) -> str:
     if modo not in ("FC", "REZETA"):
         return resposta

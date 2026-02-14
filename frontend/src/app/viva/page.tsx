@@ -15,6 +15,7 @@ interface Mensagem {
   modo?: string
   overlay?: {
     brand: 'REZETA' | 'FC'
+    formato?: string
     text?: string
     copy?: {
       headline?: string
@@ -81,16 +82,14 @@ type SendOptions = {
   anexosOverride?: ComposerAnexo[]
 }
 
-const MODE_ID_ALIASES: Record<string, string> = {
-  CRIADORWEB: 'CRIADORPROMPT'
-}
-
-const MODE_LABELS: Record<string, string> = {
-  FC: 'Imagens FC',
-  REZETA: 'Imagens Rezeta',
-  LOGO: 'Logos & Brand',
-  CRIADORPROMPT: 'Criador Prompt',
-  CRIADORLANDPAGE: 'Landing Pages',
+const inferBrandMode = (text: string): 'FC' | 'REZETA' | null => {
+  const normalized = String(text || '').toLowerCase()
+  if (!normalized) return null
+  if (normalized.includes('rezeta')) return 'REZETA'
+  // Detecta "fc" como sigla (evita pegar trechos aleatorios)
+  if (/(^|\s|[^a-z0-9])fc(\s|[^a-z0-9]|$)/i.test(normalized)) return 'FC'
+  if (normalized.includes('fc solucoes') || normalized.includes('fc solucoes financeiras')) return 'FC'
+  return null
 }
 
 const IMAGE_TERMS = [
@@ -206,7 +205,7 @@ const VIVA_AVATAR_SOURCES = ['/viva-avatar-official.jpg', '/viva-avatar-official
 const createWelcomeMessage = (): Mensagem => ({
   id: 'welcome',
   tipo: 'ia',
-  conteudo: 'Ola! Sou a VIVA, assistente virtual da FC Solucoes Financeiras. Como posso ajudar voce hoje?',
+  conteudo: 'Oi, Fabio. Viva aqui. O que voce precisa agora?',
   timestamp: new Date()
 })
 
@@ -285,11 +284,11 @@ export default function VivaChatPage() {
   const [loadingSessions, setLoadingSessions] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [anexos, setAnexos] = useState<ComposerAnexo[]>([])
-  const [promptAtivo, setPromptAtivo] = useState<string | null>(null)
   const [menuAberto, setMenuAberto] = useState(true)
   const [modoConversacaoAtivo, setModoConversacaoAtivo] = useState(false)
   const [vozVivaAtiva, setVozVivaAtiva] = useState(true)
   const [ttsProviderConfigured, setTtsProviderConfigured] = useState(false)
+  const [ttsMissingEnv, setTtsMissingEnv] = useState<string[]>([])
   const [escutaContinuaAtiva, setEscutaContinuaAtiva] = useState(false)
   const [transcricaoParcial, setTranscricaoParcial] = useState('')
   const [avatarFallback, setAvatarFallback] = useState(false)
@@ -327,8 +326,7 @@ export default function VivaChatPage() {
     const dateLabel = Number.isNaN(dt.getTime())
       ? 'sem data'
       : dt.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
-    const modeLabel = session.modo ? ` | ${session.modo}` : ''
-    return `${dateLabel}${modeLabel} | ${session.message_count} msg`
+    return `${dateLabel} | ${session.message_count} msg`
   }
 
   const scrollToBottom = useCallback((smooth = false) => {
@@ -370,10 +368,6 @@ export default function VivaChatPage() {
       const restoredMessages = mapSnapshotMessages(snapshot?.messages || [])
 
       setSessionId(snapshot?.session_id || targetSessionId)
-      if (snapshot?.modo) {
-        const normalizedMode = MODE_ID_ALIASES[snapshot.modo] || snapshot.modo
-        setPromptAtivo(normalizedMode)
-      }
       setMensagens(restoredMessages.length > 0 ? restoredMessages : [createWelcomeMessage()])
       requestAnimationFrame(() => scrollToBottom())
     } catch {
@@ -771,11 +765,6 @@ export default function VivaChatPage() {
           setSessionId(snapshot.session_id)
         }
 
-        if (snapshot?.modo) {
-          const normalizedMode = MODE_ID_ALIASES[snapshot.modo] || snapshot.modo
-          setPromptAtivo(normalizedMode)
-        }
-
         if (restoredMessages.length > 0) {
           setMensagens(restoredMessages)
         } else {
@@ -804,12 +793,15 @@ export default function VivaChatPage() {
       try {
         const response = await api.get('/viva/status')
         const configured = Boolean(response?.data?.tts?.configured)
+        const missing = Array.isArray(response?.data?.tts?.missing_env) ? response.data.tts.missing_env : []
         if (mounted) {
           setTtsProviderConfigured(configured)
+          setTtsMissingEnv(missing)
         }
       } catch {
         if (mounted) {
           setTtsProviderConfigured(false)
+          setTtsMissingEnv([])
         }
       }
     }
@@ -964,7 +956,7 @@ export default function VivaChatPage() {
       if (!spoke && !ttsProviderConfigured) {
         await speakWithBrowserFallback()
       } else if (!spoke && ttsProviderConfigured) {
-        setErroAudio('Voz institucional indisponivel no momento. Verifique MiniMax no backend.')
+        setErroAudio('Voz institucional indisponivel no momento. Veja logs do backend (fabio2-backend) para o erro do MiniMax.')
       }
       if (cancelled) return
       finishSpeech()
@@ -983,8 +975,6 @@ export default function VivaChatPage() {
     const anexosAtuais = options?.anexosOverride ?? anexos
     const textoEntrada = (options?.textoOverride ?? input).trim()
     if ((!textoEntrada && anexosAtuais.length === 0) || loading) return
-
-    const modoAtual = promptAtivo
     const referenciasVisuais: string[] = []
     const transcricoesAudio: string[] = []
     const anexosUsuarioPreview: Mensagem['anexos'] = []
@@ -1027,6 +1017,7 @@ export default function VivaChatPage() {
 
       const textoAudio = transcricoesAudio.join('\n').trim()
       const mensagemBase = textoEntrada || textoAudio
+      const brandMode = inferBrandMode(mensagemBase)
       const mensagemComReferencia =
         referenciasVisuais.length > 0
           ? `${mensagemBase}\n\nReferencia visual enviada pelo usuario (usar como base):\n${referenciasVisuais.join('\n\n')}`
@@ -1045,7 +1036,7 @@ export default function VivaChatPage() {
 
       const deveGerarOverlay = Boolean(
         mensagemBase &&
-        (modoAtual === 'REZETA' || modoAtual === 'FC') &&
+        (brandMode === 'REZETA' || brandMode === 'FC') &&
         isImageRequest(mensagemBase)
       )
       const overlayText = deveGerarOverlay ? extractOverlaySource(mensagemBase) : null
@@ -1055,8 +1046,7 @@ export default function VivaChatPage() {
         tipo: 'usuario',
         conteudo: mensagemBase,
         timestamp: new Date(),
-        anexos: anexosUsuarioPreview.length > 0 ? anexosUsuarioPreview : undefined,
-        modo: modoAtual || undefined
+        anexos: anexosUsuarioPreview.length > 0 ? anexosUsuarioPreview : undefined
       }
       setMensagens(prev => [...prev, userMsg])
 
@@ -1064,7 +1054,6 @@ export default function VivaChatPage() {
       const response = await api.post('/viva/chat', {
         mensagem: mensagemComReferencia,
         contexto,
-        modo: modoAtual || undefined,
         session_id: sessionId || undefined
       })
       if (response.data?.session_id) {
@@ -1098,8 +1087,8 @@ export default function VivaChatPage() {
             }
           : undefined
 
-        const overlayFallback = overlayText && (modoAtual === 'REZETA' || modoAtual === 'FC')
-          ? { brand: modoAtual as 'REZETA' | 'FC', text: overlayText }
+        const overlayFallback = overlayText && (brandMode === 'REZETA' || brandMode === 'FC')
+          ? { brand: brandMode as 'REZETA' | 'FC', text: overlayText }
           : undefined
 
         const iaMsg: Mensagem = {
@@ -1119,8 +1108,8 @@ export default function VivaChatPage() {
         tipo: 'ia',
         conteudo: resposta,
         timestamp: new Date(),
-        overlay: overlayText && (modoAtual === 'REZETA' || modoAtual === 'FC')
-          ? { brand: modoAtual as 'REZETA' | 'FC', text: overlayText }
+        overlay: overlayText && (brandMode === 'REZETA' || brandMode === 'FC')
+          ? { brand: brandMode as 'REZETA' | 'FC', text: overlayText }
           : undefined
       }
       setMensagens(prev => [...prev, iaMsg])
@@ -1135,7 +1124,7 @@ export default function VivaChatPage() {
     } finally {
       setLoading(false)
     }
-  }, [anexos, input, loadSessions, loading, mensagens, promptAtivo, sessionId, transcribeAudioBlob])
+  }, [anexos, input, loadSessions, loading, mensagens, sessionId, transcribeAudioBlob])
 
   useEffect(() => {
     sendFromVoiceRef.current = (texto: string) => {
@@ -1290,9 +1279,7 @@ export default function VivaChatPage() {
 
   const clearChat = async () => {
     try {
-      const response = await api.post<ChatSnapshot>('/viva/chat/session/new', {
-        modo: promptAtivo || undefined
-      })
+      const response = await api.post<ChatSnapshot>('/viva/chat/session/new', {})
       if (response.data?.session_id) {
         setSessionId(response.data.session_id)
         await loadSessions(response.data.session_id)
@@ -1306,7 +1293,6 @@ export default function VivaChatPage() {
     }
 
     setMensagens([createWelcomeMessage()])
-    setPromptAtivo(null)
   }
 
   const copyMessage = (id: string, texto: string) => {
@@ -1428,12 +1414,13 @@ export default function VivaChatPage() {
 
       ctx.drawImage(image, 0, 0, width, height)
 
-      const topHeight = Math.round(height * 0.36)
-      const bottomHeight = Math.round(height * 0.44)
+      // Menos "overlay" para nao cobrir tanto a foto (melhor em 100% zoom).
+      const topHeight = Math.round(height * 0.30)
+      const bottomHeight = Math.round(height * 0.38)
       const margin = Math.round(width * 0.06)
-      const topMaxY = topHeight - Math.round(width * 0.02)
-      const bottomStartY = height - bottomHeight + Math.round(bottomHeight * 0.2)
-      const bottomMaxY = height - Math.round(bottomHeight * 0.14)
+      const topMaxY = topHeight - Math.round(width * 0.03)
+      const bottomStartY = height - bottomHeight + Math.round(bottomHeight * 0.18)
+      const bottomMaxY = height - Math.round(bottomHeight * 0.12)
 
       ctx.fillStyle = hexToRgba(theme.light, 0.86)
       ctx.fillRect(0, 0, width, topHeight)
@@ -1527,6 +1514,15 @@ export default function VivaChatPage() {
   }
 
   const assistenteFalando = loading || gravandoAudio
+
+  const resolveArteAspectClass = (formato: string) => {
+    const normalized = String(formato || '').replace(/\s+/g, '').toLowerCase()
+    if (normalized === '4:5') return 'aspect-[4/5]'
+    if (normalized === '1:1') return 'aspect-square'
+    if (normalized === '16:9') return 'aspect-video'
+    if (normalized === '9:16') return 'aspect-[9/16]'
+    return 'aspect-[4/5]'
+  }
 
   const toggleModoConversacao = () => {
     const novoEstado = !modoConversacaoAtivo
@@ -1624,11 +1620,6 @@ export default function VivaChatPage() {
               <p className="text-sm text-gray-500 flex items-center gap-1">
                 <Sparkles className="w-3 h-3" />
                 Assistente Virtual IA
-                {promptAtivo && (
-                  <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">
-                    {MODE_LABELS[promptAtivo] || promptAtivo}
-                  </span>
-                )}
               </p>
             </div>
           </div>
@@ -1716,6 +1707,11 @@ export default function VivaChatPage() {
                 {erroAudio && (
                   <p className="mt-2 max-w-xl text-sm text-amber-700">{erroAudio}</p>
                 )}
+                {!ttsProviderConfigured && ttsMissingEnv.length > 0 && (
+                  <p className="mt-2 max-w-xl text-sm text-slate-600">
+                    MiniMax TTS nao configurado: defina {ttsMissingEnv.join(', ')} em `backend/.env` e reinicie o container do backend.
+                  </p>
+                )}
                 <div className="mt-3 flex items-center justify-center gap-2">
                   <Button
                     type="button"
@@ -1779,7 +1775,7 @@ export default function VivaChatPage() {
                                 <img 
                                   src={anexo.url} 
                                   alt={anexo.nome || 'Imagem'} 
-                                  className="max-w-sm sm:max-w-md rounded-lg cursor-zoom-in"
+                                  className="max-w-[320px] sm:max-w-[420px] max-h-[60vh] object-contain rounded-lg cursor-zoom-in bg-white"
                                   onLoad={() => scrollToBottom()}
                                   onClick={() => setImagemAtiva({ url: anexo.url, nome: anexo.nome })}
                                 />
@@ -2040,7 +2036,9 @@ export default function VivaChatPage() {
                 const parsed = parseOverlayText(arteAtiva.overlay)
 
                 return (
-                  <div className="relative mx-auto w-full max-w-[680px] aspect-square overflow-hidden rounded-lg border bg-gray-100">
+                  <div
+                    className={`relative mx-auto w-full max-w-[680px] ${resolveArteAspectClass(arteAtiva.overlay.formato || '')} overflow-hidden rounded-lg border bg-gray-100`}
+                  >
                     <img
                       src={arteAtiva.url}
                       alt={arteAtiva.nome || 'Arte gerada'}
@@ -2049,7 +2047,7 @@ export default function VivaChatPage() {
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
                     />
-                    <div className="absolute inset-x-0 top-0 h-[36%] overflow-y-auto bg-white/90 px-5 py-4">
+                    <div className="absolute inset-x-0 top-0 h-[30%] overflow-y-auto bg-white/90 px-5 py-4">
                       <p className="text-xs uppercase tracking-widest" style={{ color: theme.accent }}>
                         {theme.label}
                       </p>
@@ -2063,7 +2061,7 @@ export default function VivaChatPage() {
                       )}
                     </div>
                     <div
-                      className="absolute inset-x-0 bottom-0 h-[44%] overflow-y-auto px-5 py-4 text-white"
+                      className="absolute inset-x-0 bottom-0 h-[38%] overflow-y-auto px-5 py-4 text-white"
                       style={{
                         background: `linear-gradient(90deg, ${theme.dark}e6, ${theme.accent}e6)`
                       }}

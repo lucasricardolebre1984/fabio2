@@ -1,4 +1,5 @@
 import base64
+import logging
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
@@ -13,6 +14,7 @@ from app.services.viva_local_service import viva_local_service
 from app.services.viva_model_service import viva_model_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/vision")
@@ -91,6 +93,7 @@ async def speak_text(
         audio_bytes, media_type = await minimax_tts_service.synthesize(payload.text)
         return Response(content=audio_bytes, media_type=media_type)
     except Exception as exc:
+        logger.warning("viva_tts_failed: %s", str(exc)[:220])
         raise HTTPException(status_code=502, detail=f"Erro TTS: {str(exc)}")
 
 

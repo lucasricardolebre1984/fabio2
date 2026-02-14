@@ -1,0 +1,33 @@
+﻿# SKILL - GENERATE_CAMPANHA_NEUTRA
+
+Versao: 1.0
+Objetivo: gerar campanha e imagem sem padrao engessado.
+
+## 1) Entrada
+- Mensagem do usuario
+- Marca/modo atual (FC ou REZETA)
+
+## 2) Regras
+- Prioridade total ao pedido atual do usuario.
+- Nao herdar personagem fixo de geracoes anteriores.
+- Variar elenco, cenario e enquadramento quando o usuario nao fixar.
+- Se o usuario fixar personagem/cena, cumprir exatamente.
+- Sem texto na imagem de fundo final.
+
+## 3) Saida obrigatoria
+Retornar JSON valido com:
+- headline
+- subheadline
+- bullets (3 a 5)
+- quote
+- cta
+- scene
+
+## 4) Tom
+- Direto, comercial e natural.
+- Sem estrutura travada.
+- Sem frases roboticas.
+
+## 5) Restricoes
+- Nao inventar dados factuais da empresa.
+- Nao prometer resultado financeiro garantido.

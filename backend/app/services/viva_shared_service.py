@@ -30,14 +30,8 @@ def _normalize_mode(modo: Optional[str]) -> Optional[str]:
     if not modo:
         return None
     normalized = str(modo).strip().upper()
-    allowed = {
-        "LOGO",
-        "FC",
-        "REZETA",
-        "CRIADORLANDPAGE",
-        "CRIADORPROMPT",
-        "CRIADORWEB",
-    }
+    # Modos da VIVA (chat continuo) - removemos modos laterais/menus.
+    allowed = {"LOGO", "FC", "REZETA"}
     return normalized if normalized in allowed else None
 
 

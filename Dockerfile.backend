@@ -16,6 +16,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar código do backend
 COPY backend/app ./app
 
+# Copiar persona/skills do agente único (usado pelo backend em runtime)
+COPY agents ./agents
+
 # Variáveis de ambiente
 ENV PYTHONPATH=/app
 ENV ENVIRONMENT=production

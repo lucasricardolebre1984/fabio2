@@ -1,7 +1,7 @@
 ﻿# BUGSREPORT - Registro de Bugs
 
 > **Projeto:** FC SoluÃ§Ãµes Financeiras SaaS  
-> **Ãšltima AtualizaÃ§Ã£o:** 2026-02-13 (rodada de governanca 3 gates + voz/avatar/RAG premium)
+> **Ãšltima AtualizaÃ§Ã£o:** 2026-02-14 (rodada VIVA clean agent + ajustes de campanhas/voz/UI)
 
 ---
 
@@ -85,8 +85,48 @@
 | BUG-093 | Media | VIVA/Avatar | Avatar do modo Conversa VIVA ainda usa fallback local antigo e nao o asset institucional novo enviado pelo cliente | Resolvido |
 | BUG-094 | Alta | VIVA/RAG Qualidade | RAG roda com fallback local sem embeddings OpenAI, mas ainda sem homologacao semantica premium para operacao comercial | Em validacao (rodada hybrid rerank + telemetria de tier semantico) |
 | BUG-095 | Alta | Agenda/Google Calendar | Agenda interna do SaaS sem sincronizacao oficial com Google Calendar para operacao compartilhada VIVA/Viviane | Em validacao (rodada bridge OAuth + sync auto) |
+| BUG-096 | Media | VIVA/UI | Tela `/viva` e previews exigem zoom < 100% para uso confortavel (escala/layout grandes demais) | Em validacao (ajuste de tamanhos/limites no /viva) |
+| BUG-097 | Media | VIVA/Arte Final | Overlay "Arte final" cobre/recorta foto e nao respeita bem formatos (4:5, 1:1), causando texto "comendo" a imagem | Em validacao (overlay menor + preview por formato) |
+| BUG-098 | Alta | VIVA/Voz | Modo "Conversa VIVA" com MiniMax: voz institucional indisponivel e falta diagnostico claro (status/env/erro) | Em validacao (status missing_env + logs) |
+| BUG-099 | Alta | VIVA/Performance | Tempo de resposta alto no chat (sem streaming + contexto grande); precisa otimizar janela e/ou streaming | Aberto |
 
 ---
+
+### BUG-096: VIVA UI grande demais (zoom 100%)
+**Data:** 2026-02-14  
+**Severidade:** Media  
+**Descricao:** Em `/viva`, imagens/preview e alguns elementos ficam grandes demais no zoom 100%, forÃ§ando o uso de zoom 70-80% no navegador para ficar confortÃ¡vel.  
+**Passos:** 1. Abrir `/viva` no Chrome em zoom 100% 2. Gerar campanha/imagem 3. Abrir modal "Arte final".  
+**Esperado:** Layout confortÃ¡vel em 100% (responsivo, sem necessidade de zoom).  
+**Atual:** Necessita reduzir zoom do navegador para caber/ficar legÃ­vel.  
+**Status:** Em validacao  
+
+### BUG-097: Overlay "Arte final" cobre a foto / nÃ£o respeita formato
+**Data:** 2026-02-14  
+**Severidade:** Media  
+**Descricao:** O preview/export do "Arte final" usa overlays altos (topo/rodapÃ©) e pode "comer" a foto; preview tambÃ©m precisa respeitar o `formato` (ex.: 4:5).  
+**Passos:** 1. Gerar campanha (4:5) 2. Clicar "Ver arte final" 3. Comparar foto x overlay.  
+**Esperado:** Overlay proporcional, texto legÃ­vel sem esconder demais a foto e preview no formato correto.  
+**Atual:** Overlay ocupa Ã¡rea demais e o preview pode recortar a foto.  
+**Status:** Em validacao  
+
+### BUG-098: Voz MiniMax indisponÃ­vel / diagnÃ³stico insuficiente
+**Data:** 2026-02-14  
+**Severidade:** Alta  
+**Descricao:** No modo "Conversa VIVA", a voz institucional pode falhar e o usuÃ¡rio nÃ£o recebe diagnÃ³stico objetivo (env faltando, erro de API, voice_id, GroupId).  
+**Passos:** 1. Ativar "Conversa VIVA" 2. Aguardar resposta 3. Ver mensagem "Voz institucional indisponivel...".  
+**Esperado:** TTS funcionar ou explicar claramente a causa (ex.: `MINIMAX_*` faltando) e fallback previsÃ­vel.  
+**Atual:** Mensagem genÃ©rica e voz nÃ£o toca.  
+**Status:** Em validacao  
+
+### BUG-099: LatÃªncia alta no chat interno (sem streaming)
+**Data:** 2026-02-14  
+**Severidade:** Alta  
+**Descricao:** Tempo de resposta alto no chat, especialmente com histÃ³rico grande. Falta streaming e a janela de contexto pode estar grande demais.  
+**Passos:** 1. Conversar por vÃ¡rias mensagens 2. Fazer nova pergunta 3. Medir espera atÃ© resposta.  
+**Esperado:** Resposta mais rÃ¡pida e/ou streaming.  
+**Atual:** Espera longa ("lento demais").  
+**Status:** Aberto  
 
 ## Atualizacao 2026-02-11 (triagem geral de status)
 

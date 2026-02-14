@@ -13,6 +13,7 @@ import re
 
 from app.config import settings
 from app.services.openai_service import openai_service
+from app.services.viva_agent_profile_service import viva_agent_profile_service
 from app.services.viva_concierge_service import viva_concierge_service
 from app.services.viva_chat_runtime_helpers_service import _extract_overlay_source
 from app.services.viva_shared_service import (
@@ -97,20 +98,20 @@ def _has_campaign_signal(texto: str) -> bool:
 
 
 def _is_greeting(texto: str) -> bool:
-    lower = texto.lower().strip()
-    termos = ["oi", "olÃƒÂ¡", "ola", "bom dia", "boa tarde", "boa noite"]
-    return any(lower.startswith(t) for t in termos)
+    normalized = _normalize_key(texto or "")
+    termos = ("oi", "ola", "bom dia", "boa tarde", "boa noite")
+    return any(normalized.startswith(t) for t in termos)
 
 
 def _preferred_greeting(texto: str) -> str:
-    lower = texto.lower()
-    if "boa noite" in lower:
+    normalized = _normalize_key(texto or "")
+    if normalized.startswith("boa noite"):
         return "Boa noite Fabio!"
-    if "boa tarde" in lower:
+    if normalized.startswith("boa tarde"):
         return "Boa tarde Fabio!"
-    if "bom dia" in lower:
+    if normalized.startswith("bom dia"):
         return "Bom dia Fabio!"
-    return "OlÃƒÂ¡ Fabio!"
+    return "Ola Fabio!"
 
 
 def _ensure_fabio_greeting(user_text: str, resposta: str) -> str:
@@ -122,7 +123,7 @@ def _ensure_fabio_greeting(user_text: str, resposta: str) -> str:
 
     greeting = _preferred_greeting(user_text)
     atualizado = re.sub(
-        r"^(boa\s+noite|boa\s+tarde|bom\s+dia|ol[aÃƒÂ¡]|oi)[!,.\s-]*",
+        r"^(boa\s+noite|boa\s+tarde|bom\s+dia|ola|oi)[!,.\s-]*",
         f"{greeting} ",
         resposta,
         flags=re.IGNORECASE,
@@ -181,7 +182,6 @@ def _mode_hint(modo: Optional[str]) -> Optional[str]:
         "LOGO": "Fundo clean, moderno e neutro para identidade visual.",
         "FC": "Fundo corporativo moderno. Paleta dominante azul institucional (#071c4a) e destaque #00a3ff.",
         "REZETA": "Fundo promocional moderno. Paleta azul marinho (#1E3A5F) e verde esmeralda (#3DAA7F).",
-        "CRIADORLANDPAGE": "Fundo clean e moderno para landing page.",
     }
     return hints.get(modo)
 
@@ -197,8 +197,6 @@ def _infer_mode_from_message(mensagem: str) -> Optional[str]:
         return "FC"
     if "logo" in normalized or "logotipo" in normalized or "identidade visual" in normalized:
         return "LOGO"
-    if "landing page" in normalized or "lp" in normalized:
-        return "CRIADORLANDPAGE"
     return None
 
 
@@ -868,7 +866,7 @@ def _select_scene_profile(seed: str, publico: str, recent_scene_ids: Optional[Li
     return candidates[0]
 
 
-def _persona_scene_variant(seed: str, publico: str) -> str:
+def _persona_scene_variant(seed: str, publico: str, cast_preference: Optional[str] = None) -> str:
     normalized = _normalize_key(publico)
     if "mei" in normalized or "microempreendedor" in normalized:
         personas = [
@@ -912,6 +910,28 @@ def _persona_scene_variant(seed: str, publico: str) -> str:
             "ambiente comercial neutro com foco em atendimento humano",
             "cenario de rotina real com documentos e celular em uso",
         ]
+
+    # Forca coerencia com preferencia explicita do usuario quando fornecida.
+    pref = _normalize_key(str(cast_preference or ""))
+    if pref:
+        if pref in {"feminino", "dupla feminina"}:
+            filtered = [p for p in personas if "mulher" in _normalize_key(p) or "lider feminina" in _normalize_key(p)]
+            personas = filtered or personas
+        elif pref == "masculino":
+            filtered = []
+            for p in personas:
+                key = _normalize_key(p)
+                if "mulher" in key or "feminina" in key:
+                    continue
+                if "homem" in key or "gestor" in key or "empreendedor" in key or "lider" in key:
+                    filtered.append(p)
+            personas = filtered or personas
+        elif pref == "casal":
+            filtered = [p for p in personas if "casal" in _normalize_key(p) or "homem e mulher" in _normalize_key(p)]
+            personas = filtered or personas
+        elif pref == "grupo":
+            filtered = [p for p in personas if "grupo" in _normalize_key(p) or "equipe" in _normalize_key(p)]
+            personas = filtered or personas
 
     acoes = [
         "interagindo com documentos e celular de forma natural",
@@ -1077,6 +1097,7 @@ async def _generate_campaign_copy(
     scene_seed = _build_scene_seed(fields, modo)
     human_seed = _persona_scene_variant(f"{modo}|{fonte}", str(fields.get("publico") or ""))
     cast_preference = _extract_cast_preference(fonte)
+    campaign_skill_prompt = viva_agent_profile_service.get_campaign_skill_prompt(max_chars=2200)
 
     if modo == "REZETA":
         guardrail = (
@@ -1091,11 +1112,10 @@ async def _generate_campaign_copy(
 
     system = (
         f"{guardrail}\n"
-        "Voce e diretor(a) de criacao de campanhas financeiras. "
-        "Responda apenas JSON valido e siga o brief. "
-        "Nunca imponha homem de terno ou escritorio como padrao, "
-        "a menos que o brief peca isso explicitamente. "
-        "Varie personagens, faixa etaria, genero aparente, etnia e composicao entre campanhas."
+        "Use a skill oficial abaixo como regra de execucao.\n"
+        f"{campaign_skill_prompt}\n"
+        "Responda apenas JSON valido e siga o brief atual. "
+        "Nao imponha padrao fixo de personagem/cenario; a prioridade e o pedido atual do usuario."
     )
 
     brand_reference = _sanitize_prompt(prompt_extra_image or "", 1800)
@@ -1109,7 +1129,7 @@ async def _generate_campaign_copy(
         f"Referencia de marca: {brand_reference or 'nao informada'}\n\n"
         "Retorne JSON com chaves exatas:\n"
         "headline, subheadline, bullets (array 3-5), quote, cta, scene.\n"
-        "scene deve refletir o tema/oferta do brief sem texto na imagem e sem repetir o mesmo perfil humano de campanhas recentes."
+        "scene deve refletir o tema/oferta do brief sem texto na imagem."
     )
     if cast_preference:
         user += f"\nPreferencia obrigatoria de personagem: {cast_preference}."
@@ -1167,7 +1187,8 @@ def _build_branded_background_prompt(modo: str, campaign_copy: Dict[str, Any], v
     audience_hint = _audience_scene_hint(publico)
     visual_seed = f"{variation_id}|{tema}|{publico}|{oferta}|{scene}"
     visual_variant = _composition_variant(visual_seed)
-    persona_variant = _persona_scene_variant(visual_seed, publico)
+    cast_preference = _sanitize_prompt(str(campaign_copy.get("cast_user_preference") or "").strip(), 160).lower()
+    persona_variant = _persona_scene_variant(visual_seed, publico, cast_preference=cast_preference)
     appearance_variant = _appearance_variant(visual_seed)
     mood_variant = _stable_pick(
         visual_seed,
@@ -1180,42 +1201,19 @@ def _build_branded_background_prompt(modo: str, campaign_copy: Dict[str, Any], v
         ],
     )
     normalized_scene = _normalize_key(scene)
-    cast_profile = campaign_copy.get("cast_profile") if isinstance(campaign_copy.get("cast_profile"), dict) else {}
-    cast_profile_id = str(cast_profile.get("id") or "").strip()
-    cast_profile_prompt = _sanitize_prompt(str(cast_profile.get("prompt") or "").strip(), 260)
-    recent_cast_ids = campaign_copy.get("recent_cast_ids") if isinstance(campaign_copy.get("recent_cast_ids"), list) else []
-    recent_cast_ids_text = ", ".join(str(item).strip() for item in recent_cast_ids[:6] if str(item).strip())
-    scene_profile = campaign_copy.get("scene_profile") if isinstance(campaign_copy.get("scene_profile"), dict) else {}
-    scene_profile_id = str(scene_profile.get("id") or "").strip()
-    scene_profile_prompt = _sanitize_prompt(str(scene_profile.get("prompt") or "").strip(), 260)
-    recent_scene_ids = campaign_copy.get("recent_scene_ids") if isinstance(campaign_copy.get("recent_scene_ids"), list) else []
-    recent_scene_ids_text = ", ".join(str(item).strip() for item in recent_scene_ids[:6] if str(item).strip())
-    cast_block = (
-        f"Elenco obrigatorio desta peca ({cast_profile_id}): {cast_profile_prompt}. "
-        if cast_profile_prompt
-        else ""
-    )
-    scene_block = (
-        f"Cenario obrigatorio desta peca ({scene_profile_id}): {scene_profile_prompt}. "
-        if scene_profile_prompt
-        else ""
-    )
-    cast_preference_text = _sanitize_prompt(str(campaign_copy.get("cast_user_preference") or "").strip(), 160)
-    cast_preference_block = (
-        f"Preferencia explicita de personagem: {cast_preference_text}. Cumprir obrigatoriamente. "
-        if cast_preference_text
-        else ""
-    )
-    anti_repeat_history = (
-        f"Perfis recentes para evitar repeticao: {recent_cast_ids_text}. "
-        if recent_cast_ids_text
-        else ""
-    )
-    anti_repeat_scene_history = (
-        f"Cenarios recentes para evitar repeticao: {recent_scene_ids_text}. "
-        if recent_scene_ids_text
-        else ""
-    )
+    # Nao usar perfis persistidos (cast/scene profiles) para nao herdar padrao visual antigo.
+    # A variacao deve ser guiada pelo brief + seeds deterministicas por campaign.
+    cast_guardrail = ""
+    if cast_preference in {"feminino", "dupla_feminina", "dupla feminina"}:
+        cast_guardrail = "Personagem principal obrigatoriamente mulher; nao usar homem como protagonista. "
+    elif cast_preference == "masculino":
+        cast_guardrail = "Personagem principal obrigatoriamente homem. "
+    elif cast_preference == "casal":
+        cast_guardrail = "Composicao obrigatoria com homem e mulher em destaque conjunto. "
+    elif cast_preference == "grupo":
+        cast_guardrail = "Composicao obrigatoria de grupo diverso em colaboracao. "
+    anti_repeat_history = ""
+    anti_repeat_scene_history = ""
     avoid_corporate_stereotype = (
         " Evitar estereotipo de homem de terno em escritorio, salvo se a cena pedir explicitamente."
         if ("terno" not in normalized_scene and "escritorio" not in normalized_scene)
@@ -1242,7 +1240,7 @@ def _build_branded_background_prompt(modo: str, campaign_copy: Dict[str, Any], v
             "Distribuicao de cor: azul/branco dominante, evitando verde como cor principal. "
             "Sem texto, sem letras, sem logotipo. "
             "Nao repetir personagem de geracoes anteriores; crie rosto, cabelo, faixa etaria e composicao novos nesta imagem. "
-            f"{cast_preference_block}{cast_block}{scene_block}{anti_repeat_history}{anti_repeat_scene_history}"
+            f"{cast_guardrail}{anti_repeat_history}{anti_repeat_scene_history}"
             f"{anti_repeat_stereotype}"
             f"{avoid_corporate_stereotype} "
             f"{theme_anchor}{offer_anchor}{scene_anchor}"
@@ -1259,7 +1257,7 @@ def _build_branded_background_prompt(modo: str, campaign_copy: Dict[str, Any], v
         "Distribuicao de cor: verde/azul dominante, com contraste limpo e humano. "
         "Sem texto, sem letras, sem logotipo. "
         "Nao repetir personagem de geracoes anteriores; crie rosto, cabelo, faixa etaria e composicao novos nesta imagem. "
-        f"{cast_preference_block}{cast_block}{scene_block}{anti_repeat_history}{anti_repeat_scene_history}"
+        f"{cast_guardrail}{anti_repeat_history}{anti_repeat_scene_history}"
         f"{anti_repeat_stereotype}"
         f"{avoid_corporate_stereotype} "
         f"{theme_anchor}{offer_anchor}{scene_anchor}"
@@ -1279,10 +1277,9 @@ def _build_branded_background_prompt_compact(modo: str, campaign_copy: Dict[str,
     formato = _normalize_formato_value(str(campaign_copy.get("formato") or "4:5"))
     cast_preference = _sanitize_prompt(str(campaign_copy.get("cast_user_preference") or "").strip(), 80).lower()
 
-    cast_profile = campaign_copy.get("cast_profile") if isinstance(campaign_copy.get("cast_profile"), dict) else {}
-    cast_profile_prompt = _sanitize_prompt(str(cast_profile.get("prompt") or "").strip(), 180)
-    scene_profile = campaign_copy.get("scene_profile") if isinstance(campaign_copy.get("scene_profile"), dict) else {}
-    scene_profile_prompt = _sanitize_prompt(str(scene_profile.get("prompt") or "").strip(), 180)
+    # Nao usar perfis persistidos para evitar heranca de padrao visual antigo.
+    cast_profile_prompt = ""
+    scene_profile_prompt = ""
 
     if cast_preference in {"feminino", "dupla_feminina"}:
         cast_guardrail = "Personagem principal obrigatoriamente mulher; nao usar homem como protagonista."
@@ -1305,8 +1302,8 @@ def _build_branded_background_prompt_compact(modo: str, campaign_copy: Dict[str,
         f"Formato {formato}. {brand_block} "
         f"Tema: {tema or 'reorganizacao financeira humana'}. Oferta: {oferta or 'consultoria financeira'}. "
         f"Publico: {publico or 'publico geral'}. "
-        f"Cena obrigatoria: {scene or scene_profile_prompt or 'atendimento financeiro humanizado em contexto real'}. "
-        f"Elenco obrigatorio: {cast_profile_prompt or 'pessoa brasileira em contexto financeiro real'}. "
+        f"Cena obrigatoria: {scene or 'atendimento financeiro humanizado em contexto real'}. "
+        "Elenco obrigatorio: pessoa brasileira em contexto financeiro real. "
         f"{cast_guardrail} "
         "Nao repetir personagem padrao masculino de escritorio; variar rosto, cabelo, idade e enquadramento. "
         f"Variacao: {variation_id}."

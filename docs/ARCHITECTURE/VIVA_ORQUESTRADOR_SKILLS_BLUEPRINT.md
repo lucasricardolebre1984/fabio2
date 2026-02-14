@@ -78,15 +78,18 @@ Cada skill deve expor:
 
 ## 3) Skill obrigatoria de campanha
 
-Skill id: `skill_generate_campanha_ghd_copy`
-Acao principal: `generate_campanha`
+Skill id: `skill_generate_campanha_neutra`
+Acao principal: `generate_campanha_neutra`
+
+Fonte canonica da skill (runtime):
+- `agents/skillconteudo.txt`
 
 ### 3.1 Quando acionar automaticamente
 - usuario pedir campanha/post/banner/imagem criativa;
 - usuario pedir "me de sugestao antes de gerar";
 - usuario informar preferencia de elenco (mulher/homem/casal/grupo).
 
-### 3.2 Contrato `generate_campanha`
+### 3.2 Contrato `generate_campanha_neutra`
 Input minimo:
 - `brand`: `FC` ou `REZETA`
 - `objetivo`
@@ -108,6 +111,9 @@ Regras:
 - evitar repeticao visual obvia;
 - nao impor estereotipo fixo de personagem;
 - usar linguagem fluida (sem formulas proibidas).
+
+Nota:
+- o documento legado `docs/PROMPTS/SKILLS/VIVA_SKILL_GHD_COPY_CAMPAIGN.md` passa a ser referencia historica e nao e mais a fonte canonica do runtime.
 
 Fonte base da skill:
 - `C:/Users/Lucas/Desktop/skillconteudo.txt`
@@ -176,7 +182,7 @@ Criterio de aceite do RAG:
 Persistido nesta rodada:
 - status tecnico real do RAG (operacional com fallback local e homologacao premium pendente);
 - blueprint alvo do orquestrador unico + personas separadas;
-- contrato da skill `generate_campanha`;
+- contrato da skill `generate_campanha_neutra`;
 - shortlist oficial de skills para uso no projeto.
 
 Documento de referencia principal desta pauta:

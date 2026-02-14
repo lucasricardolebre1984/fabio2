@@ -1313,7 +1313,7 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
 - backend:
   - novo servico `backend/app/services/viva_skill_router_service.py` para resolver `skill_id` por intencao de mensagem;
   - `backend/app/services/viva_chat_orchestrator_service.py` atualizado para:
-    - calcular skill ativa por contexto (`agenda`, `handoff`, `campaign_planner`, `generate_campanha`, `chat_geral`);
+    - calcular skill ativa por contexto (`agenda`, `handoff`, `campaign_planner`, `generate_campanha_neutra`, `chat_geral`);
     - persistir telemetria da skill em `meta` das respostas da IA.
 - objetivo:
   - preparar a arquitetura de orquestrador unico + auto skills com rastreabilidade auditavel por conversa.
@@ -1401,3 +1401,21 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
   - `frontend/src/app/viva/page.tsx` passou a detectar status de TTS institucional;
   - quando MiniMax estiver configurado, nao faz fallback para voz nativa do navegador (Google) em falha de sintese;
   - exibe mensagem de erro curta para ajuste do provider.
+
+## Atualizacao Operacional (2026-02-14 - VIVA clean agent + ajustes UI/voz/performance)
+- objetivo: reduzir drift de persona/memoria e deixar o chat interno "a prova de erro".
+- persona canonica:
+  - fonte unica em `agents/AGENT.md` (orquestrador + regras + marcas);
+  - skill neutra de campanha em `agents/skillconteudo.txt`.
+- backend:
+  - `docker-compose.yml` monta `./agents` em `/app/agents:ro` para leitura canonica em container;
+  - `backend/app/config.py`: `VIVA_MEMORY_ENABLED=false` por padrao (memoria/RAG desativados por default);
+  - janela do snapshot do chat reduzida para diminuir latencia (sem streaming ainda).
+- frontend:
+  - modal "Arte final" agora respeita `formato` (ex.: 4:5) e usa overlay menor para nao cobrir tanto a foto;
+  - preview de anexos de imagem limitado em altura para nao dominar o viewport.
+- voz (MiniMax):
+  - status de TTS passa a informar `missing_env` para diagnostico (sem expor secrets);
+  - logs de falha TTS adicionados no backend para auditoria rapida.
+- governanca:
+  - bugs novos registrados: `BUG-096` a `BUG-099` (UI/Arte final/Voz/Performance).

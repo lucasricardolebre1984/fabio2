@@ -115,6 +115,7 @@ services:
       - CONTRATOS_TEMPLATES_DIR=/app/contratos/templates
     volumes:
       - ./backend:/app
+      - ./agents:/app/agents:ro
       - ./contratos:/app/contratos:ro
       - ./frontend/src/app/viva/REGRAS:/app/viva_rules
       - backend_storage:/app/storage
