@@ -12,6 +12,13 @@ from app.config import settings
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify password - DEV MODE: comparação direta para teste"""
+    # SECURITY: Stub only works in development/staging
+    if settings.ENVIRONMENT == "production":
+        raise RuntimeError(
+            "security_stub.py must not be used in production! "
+            "Use the real security.py module with bcrypt."
+        )
+    
     # MODO DESENVOLVIMENTO: aceita senha "1234" para qualquer hash
     # ou comparação direta se o hash for o nosso conhecido
     DEV_PASSWORD = "1234"
