@@ -26,20 +26,60 @@ from app.services.viva_shared_service import (
 logger = logging.getLogger(__name__)
 
 def _is_image_request(texto: str) -> bool:
-    termos = [
+    """Heuristica para pedido de GERAR imagem.
+
+    Importante: mencionar "imagem" nao significa solicitar geracao. Ex.: "o que foi essa imagem?"
+    """
+
+    normalized = _normalize_key(texto or "")
+    if not normalized:
+        return False
+
+    keywords = (
         "imagem",
         "banner",
-        "logo",
-        "logotipo",
         "post",
         "flyer",
         "arte",
         "cartaz",
         "thumbnail",
         "capa",
-    ]
-    texto_lower = texto.lower()
-    return any(t in texto_lower for t in termos)
+        "logo",
+        "logotipo",
+    )
+    if not any(k in normalized for k in keywords):
+        return False
+
+    # Evita falso positivo quando o usuario esta se referindo a uma imagem ja gerada.
+    # Se nao houver verbo de acao, nao tratamos como geracao.
+    if any(
+        phrase in normalized
+        for phrase in (
+            "o que foi essa imagem",
+            "o que e essa imagem",
+            "por que essa imagem",
+            "essa imagem",
+            "esta imagem",
+            "a imagem",
+            "aquela imagem",
+            "essa arte",
+            "esta arte",
+        )
+    ) and not re.search(r"\b(gera|gerar|cria|criar|fazer|faz|produzir|produz)\b", normalized):
+        return False
+
+    # Intencao explicita (gerar/criar/fazer) ou desejo ("quero/preciso") com asset.
+    if re.search(r"\b(gera|gerar|cria|criar|fazer|faz|produzir|produz)\b", normalized):
+        return True
+    if re.search(r"\b(quero|preciso|pode|consegue|manda|envia)\b", normalized):
+        # Caso "quero um banner", "preciso de um post", etc.
+        return True
+
+    # Frases curtas do tipo "imagem de carnaval", "banner para rezeta".
+    if normalized.startswith(("imagem ", "banner ", "post ", "arte ", "flyer ", "cartaz ", "thumbnail ", "capa ")):
+        return True
+
+    return False
 
 
 def _is_campaign_request(texto: str) -> bool:

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { ArrowLeft, Download, Edit, Mail, Printer } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -352,7 +353,7 @@ export default function VisualizarContratoPage() {
         <div className="-mx-10 -mt-10 mb-8 bg-[#1e3a5f] px-8 py-5 text-white">
           <div className="flex items-center gap-4">
             <div className="flex-shrink-0">
-              <img src="/logo2.png" alt="FC Soluções Financeiras" className="h-[92px] w-auto object-contain" />
+              <Image src="/logo2.png" alt="FC Soluções Financeiras" width={140} height={92} className="h-[92px] w-auto object-contain" priority />
             </div>
             <div className="flex-1">
               <h1 className="text-[2rem] font-bold tracking-wide">F C Soluções Financeiras</h1>

@@ -296,17 +296,87 @@ class VivaMemoryService:
         modo: Optional[str],
         meta: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, bool]:
-        medium_ok = await self.append_medium_memory(session_id=session_id, tipo=tipo, conteudo=conteudo, modo=modo)
-        long_ok = await self.append_long_memory(
-            db=db,
-            user_id=user_id,
+        """
+        Append em memoria hibrida.
+
+        Nota: Long memory (pgvector) deve ser usada de forma controlada para evitar "sujar" o RAG.
+        Por isso, append_long_memory so ocorre quando meta["pinned"]==True OU meta["force_long"]==True.
+        """
+
+        medium_ok = await self.append_medium_memory(
             session_id=session_id,
             tipo=tipo,
             conteudo=conteudo,
             modo=modo,
-            meta=meta,
         )
+
+        meta = meta or {}
+        allow_long = bool(meta.get("pinned") or meta.get("force_long"))
+        long_ok = False
+        if allow_long:
+            long_ok = await self.append_long_memory(
+                db=db,
+                user_id=user_id,
+                session_id=session_id,
+                tipo=tipo,
+                conteudo=conteudo,
+                modo=modo,
+                meta=meta,
+            )
+
         return {"medium": medium_ok, "long": long_ok}
+
+    async def list_pinned_long_memory(
+        self,
+        db: AsyncSession,
+        user_id: UUID,
+        modo: Optional[str] = None,
+        limit: int = 12,
+    ) -> List[Dict[str, Any]]:
+        await self.ensure_storage(db)
+        if not self.vector_enabled:
+            return []
+
+        safe_limit = max(1, min(limit, 50))
+        normalized_mode = self._normalize_mode(modo)
+        where = "WHERE user_id = :user_id AND COALESCE((meta_json->>'pinned')::boolean, false) = true"
+        params: Dict[str, Any] = {"user_id": str(user_id)}
+        if normalized_mode:
+            where += " AND modo = :modo"
+            params["modo"] = normalized_mode
+
+        try:
+            async with db.begin_nested():
+                result = await db.execute(
+                    text(
+                        f"""
+                        SELECT id, tipo, modo, conteudo, created_at
+                        FROM viva_memory_vectors
+                        {where}
+                        ORDER BY created_at DESC
+                        LIMIT :limit
+                        """
+                    ),
+                    {**params, "limit": safe_limit},
+                )
+                rows = result.fetchall()
+        except Exception:
+            return []
+
+        items: List[Dict[str, Any]] = []
+        for row in rows or []:
+            items.append(
+                {
+                    "id": str(getattr(row, "id", "")),
+                    "tipo": str(getattr(row, "tipo", "")),
+                    "modo": getattr(row, "modo", None),
+                    "conteudo": str(getattr(row, "conteudo", "")),
+                    "created_at": getattr(row, "created_at", None),
+                    "score": 1.0,
+                    "pinned": True,
+                }
+            )
+        return items
 
     async def search_long_memory(
         self,
@@ -464,13 +534,23 @@ class VivaMemoryService:
         query: str,
         modo: Optional[str],
     ) -> str:
+        # Medium (Redis) e Long (pgvector) sao fontes diferentes.
+        # Long deve priorizar itens "pinned" (memoria eterna por comando explicito).
+        pinned = await self.list_pinned_long_memory(db=db, user_id=user_id, modo=modo, limit=6)
         medium = await self.get_medium_memory(session_id=session_id, limit=8)
         long_hits = await self.search_long_memory(db=db, user_id=user_id, query=query, modo=modo, limit=6)
 
         lines: List[str] = []
+        if pinned:
+            lines.append("Memoria eterna (pinned):")
+            for item in pinned[:6]:
+                content = self._clean_text(str(item.get("conteudo") or ""))
+                if content:
+                    lines.append(f"- {content[:260]}")
+
         if medium:
             lines.append("Memoria media recente da sessao:")
-            for item in medium[-6:]:
+            for item in medium[-4:]:
                 tipo = str(item.get("tipo") or "msg")
                 content = self._clean_text(str(item.get("conteudo") or ""))
                 if content:
@@ -478,7 +558,7 @@ class VivaMemoryService:
 
         if long_hits:
             lines.append("Memoria longa recuperada por similaridade:")
-            for hit in long_hits:
+            for hit in long_hits[:6]:
                 content = self._clean_text(str(hit.get("conteudo") or ""))
                 if content:
                     lines.append(f"- {content[:260]}")

@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CalendarPlus, CheckCircle2, Link2, Loader2, RefreshCw, Trash2, Unlink } from 'lucide-react'
 
@@ -42,7 +42,7 @@ const tipoLabel: Record<string, string> = {
   outro: 'Outro',
 }
 
-export default function AgendaPage() {
+function AgendaPageContent() {
   const searchParams = useSearchParams()
   const [eventos, setEventos] = useState<Evento[]>([])
   const [loading, setLoading] = useState(true)
@@ -406,5 +406,13 @@ export default function AgendaPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function AgendaPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-8 text-gray-500">Carregando agenda...</div>}>
+      <AgendaPageContent />
+    </Suspense>
   )
 }

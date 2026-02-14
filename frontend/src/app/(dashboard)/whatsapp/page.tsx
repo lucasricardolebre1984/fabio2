@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import Image from 'next/image'
 import { MessageCircle, QrCode, RefreshCw } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -192,7 +193,7 @@ export default function WhatsAppPage() {
         <CardContent>
           {qrSrc ? (
             <div className="flex flex-col items-center gap-3">
-              <img src={qrSrc} alt="QR Code WhatsApp" className="h-72 w-72 rounded-lg border bg-white p-2" />
+              <Image src={qrSrc} alt="QR Code WhatsApp" width={288} height={288} className="h-72 w-72 rounded-lg border bg-white p-2" unoptimized />
               <p className="text-sm text-gray-600">Escaneie com o WhatsApp no aparelho principal.</p>
             </div>
           ) : (

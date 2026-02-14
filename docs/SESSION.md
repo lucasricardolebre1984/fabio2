@@ -68,6 +68,16 @@ passo e evoluir para melhorias incrementais sem quebrar o fluxo homologado.
   - comando suportado: `agendar TITULO | DD/MM/AAAA HH:MM | descricao opcional`;
   - cria evento real no backend e retorna confirmacao.
 - `BUG-026` corrigido:
+
+## Atualizacao 2026-02-14 (memoria clean + voz MiniMax + anti-disparo de imagem)
+- memoria/RAG:
+  - memoria longa (pgvector) agora escreve apenas por comando explicito (pinned):
+    - comando: `memorizar: <texto curto>`
+  - evita poluicao do RAG por respostas da propria IA.
+- imagem:
+  - heuristica de intencao reforcada para nao gerar imagem quando o usuario apenas mencionar/criticar uma imagem ja gerada.
+- voz:
+  - container backend passa a carregar `backend/.env` via `docker-compose.yml` (`env_file`) para disponibilizar `MINIMAX_*` no runtime.
   - fallback robusto de geracao PDF no backend (Playwright -> WeasyPrint);
   - dependencia `pydyf` fixada para versao compativel (`0.10.0`);
   - validacao real da rota `GET /api/v1/contratos/{id}/pdf` com retorno `200`.

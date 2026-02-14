@@ -70,17 +70,24 @@ class MinimaxTTSService:
         if not self.is_configured():
             raise ValueError("MiniMax TTS nao configurado")
 
+        # MiniMax valida alguns campos como int64 (nao aceita float tipo 3.64).
+        speed_int = int(round(self.speed))
+        pitch_int = int(round(self.pitch))
+        vol_int = int(round(self.volume))
+
         endpoint = f"{self.base_url}/v1/t2a_v2?GroupId={self.group_id}"
         payload = {
             "model": self.model,
             "text": clean,
             "stream": False,
-            "output_format": self.format,
+            # MiniMax usa output_format para definir o formato de retorno do audio (hex/url),
+            # nao o codec final (isso fica em audio_setting.format).
+            "output_format": "hex",
             "voice_setting": {
                 "voice_id": self.voice_id,
-                "speed": self.speed,
-                "vol": self.volume,
-                "pitch": self.pitch,
+                "speed": speed_int,
+                "vol": vol_int,
+                "pitch": pitch_int,
             },
             "audio_setting": {
                 "sample_rate": self.sample_rate,

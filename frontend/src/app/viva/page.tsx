@@ -1,6 +1,7 @@
-﻿'use client'
+'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import { Send, Bot, User, Sparkles, Trash2, Copy, Check, ImageIcon, Mic, X, FileUp, ChevronRight, Volume2, VolumeX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -1790,10 +1791,11 @@ export default function VivaChatPage() {
                 </div>
                 <div className="holo-avatar">
                   {!avatarFallback ? (
-                    <img
+                    <Image
                       src={VIVA_AVATAR_SOURCES[avatarSourceIndex]}
                       alt="VIVA"
-                      className="h-full w-full rounded-[20px] object-contain object-center"
+                      fill
+                      className="rounded-[20px] object-contain object-center"
                       onError={() => {
                         if (avatarSourceIndex < VIVA_AVATAR_SOURCES.length - 1) {
                           setAvatarSourceIndex((prev) => prev + 1)
@@ -1801,6 +1803,7 @@ export default function VivaChatPage() {
                         }
                         setAvatarFallback(true)
                       }}
+                      unoptimized
                     />
                   ) : (
                     <Bot className="holo-brain-icon" />
@@ -1844,9 +1847,9 @@ export default function VivaChatPage() {
           </div>
         ) : (
         <>
-        {/* Ãrea de mensagens */}
+        {/* Ãrea de mensagens */}
         <ScrollArea className="flex-1 px-4" ref={scrollAreaRef}>
-          <div className="max-w-3xl mx-auto py-6 space-y-6">
+          <div className="max-w-4xl mx-auto py-6 space-y-6">
 
             {mensagens.map((msg) => (
               <div
@@ -1884,12 +1887,15 @@ export default function VivaChatPage() {
                           <div key={idx}>
                             {anexo.tipo === 'imagem' && anexo.url && (
                               <div className="space-y-2">
-                                <img 
+                                <Image 
                                   src={anexo.url} 
                                   alt={anexo.nome || 'Imagem'} 
+                                  width={420}
+                                  height={400}
                                   className="max-w-[320px] sm:max-w-[420px] max-h-[60vh] object-contain rounded-lg cursor-zoom-in bg-white"
                                   onLoad={() => scrollToBottom()}
                                   onClick={() => setImagemAtiva({ url: anexo.url, nome: anexo.nome })}
+                                  unoptimized
                                 />
                                 {msg.overlay && (
                                   <button
@@ -1980,10 +1986,13 @@ export default function VivaChatPage() {
               {anexos.map((anexo, idx) => (
                 <div key={idx} className="relative flex-shrink-0">
                   {anexo.tipo === 'imagem' && anexo.preview ? (
-                    <img 
+                    <Image 
                       src={anexo.preview} 
                       alt="Preview" 
+                      width={64}
+                      height={64}
                       className="w-16 h-16 object-cover rounded-lg"
+                      unoptimized
                     />
                   ) : (
                     <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
@@ -2004,7 +2013,7 @@ export default function VivaChatPage() {
 
         {/* Input area */}
         <div className="p-4 border-t bg-white">
-          <div className="max-w-3xl mx-auto">
+          <div className="max-w-4xl mx-auto">
             <div className="flex gap-2 items-end">
               {/* BotÃµes de anexo */}
               <div className="flex gap-1">
@@ -2105,10 +2114,13 @@ export default function VivaChatPage() {
           >
             <X className="w-6 h-6" />
           </button>
-          <img
+          <Image
             src={imagemAtiva.url}
             alt={imagemAtiva.nome || 'Imagem ampliada'}
+            width={1200}
+            height={1200}
             className="w-full h-auto rounded-lg"
+            unoptimized
           />
         </div>
       </div>
@@ -2151,13 +2163,15 @@ export default function VivaChatPage() {
                   <div
                     className={`relative mx-auto w-full max-w-[680px] ${resolveArteAspectClass(arteAtiva.overlay.formato || '')} overflow-hidden rounded-lg border bg-gray-100`}
                   >
-                    <img
+                    <Image
                       src={arteAtiva.url}
                       alt={arteAtiva.nome || 'Arte gerada'}
-                      className="absolute inset-0 h-full w-full object-cover"
+                      fill
+                      className="object-cover"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
+                      unoptimized
                     />
                     <div className="absolute inset-x-0 top-0 h-[30%] overflow-y-auto bg-white/90 px-5 py-4">
                       <p className="text-xs uppercase tracking-widest" style={{ color: theme.accent }}>

@@ -1,7 +1,8 @@
 'use client'
 
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Image from 'next/image'
 import { CalendarDays, Download, Megaphone, RefreshCw, X } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -60,7 +61,7 @@ function CampanhasPageContent() {
     return { modo, limit: 80 }
   }, [modo])
 
-  const loadCampanhas = async () => {
+  const loadCampanhas = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -72,11 +73,11 @@ function CampanhasPageContent() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params])
 
   useEffect(() => {
     loadCampanhas()
-  }, [modo])
+  }, [loadCampanhas])
 
   return (
     <div className="space-y-6">
@@ -140,11 +141,13 @@ function CampanhasPageContent() {
                 className={`overflow-hidden rounded-xl border bg-white shadow-sm ${isSelected ? 'ring-2 ring-blue-500' : ''}`}
               >
                 <div className="relative aspect-square bg-gray-100">
-                  <img
+                  <Image
                     src={item.image_url}
                     alt={item.titulo}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                    unoptimized
                   />
                 </div>
                 <div className="space-y-2 p-4">
@@ -206,10 +209,13 @@ function CampanhasPageContent() {
             >
               <X className="h-5 w-5" />
             </button>
-            <img
+            <Image
               src={imagemAtiva.image_url}
               alt={imagemAtiva.titulo}
+              width={1200}
+              height={1200}
               className="mx-auto max-h-[80vh] w-auto max-w-full rounded-md object-contain"
+              unoptimized
             />
             <div className="mt-3 flex justify-end">
               <Button size="sm" onClick={() => baixarImagem(imagemAtiva)}>

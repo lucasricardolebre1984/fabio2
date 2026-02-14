@@ -1955,3 +1955,40 @@
   - variaveis novas em `backend/app/config.py`:
     - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`,
     - `GOOGLE_CALENDAR_DEFAULT_ID`, `GOOGLE_CALENDAR_SCOPE`, `GOOGLE_CALENDAR_SYNC_ENABLED`.
+
+### BUG-100: Mencionar "imagem/arte" dispara geracao sem pedido explicito
+**Data:** 2026-02-14
+**Severidade:** Alta
+**Descricao:** ao usuario questionar uma imagem ja gerada ("o que foi essa imagem?") o orquestrador tratava como novo pedido de geracao e disparava outra imagem automaticamente.
+**Passos:** 1. gerar uma imagem 2. enviar "o que foi essa imagem nao pedi nada" 3. observar nova geracao indevida.
+**Esperado:** so gerar imagem quando houver verbo/intencao explicita de gerar (ex.: "gerar", "criar", "fazer", "quero uma imagem").
+**Atual:** heuristica de intencao reforcada + greeting short-circuit para evitar disparos acidentais.
+**Status:** Em validacao
+
+### BUG-101: Layout do chat VIVA e modal "Arte final" ficam grandes demais em 100% (zoom)
+**Data:** 2026-02-14
+**Severidade:** Media
+**Descricao:** em resolucoes comuns, o palco/preview de imagem ocupa area excessiva, levando o operador a reduzir zoom do navegador (70-80%) para trabalhar confortavelmente.
+**Passos:** 1. abrir `/viva` em 100% 2. gerar imagem 3. observar preview e modal "Arte final" consumindo a foto.
+**Esperado:** layout responsivo confortavel em 100%, com preview e modal limitando altura/largura e preservando a foto.
+**Atual:** pendente ajuste fino de UI (max-width/max-height e safe areas do overlay).
+**Status:** Aberto
+
+### BUG-102: Voz institucional MiniMax indisponivel por variaveis de ambiente nao carregadas no container
+**Data:** 2026-02-14
+**Severidade:** Alta
+**Descricao:** o container do backend nao recebia as variaveis `MINIMAX_*` (docker-compose nao carregava `backend/.env`), causando "Voz institucional indisponivel" e travas no modo conversa.
+**Passos:** 1. abrir "Conversa VIVA" 2. ativar voz 3. observar status "missing_env" no backend.
+**Esperado:** `MINIMAX_*` presentes no runtime do container e endpoint de fala funcional.
+**Atual:** `docker-compose.yml` agora usa `env_file: ./backend/.env` no servico `backend` e o container recebe `MINIMAX_*`.
+Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo estiver sem saldo, mesmo com env correto.
+**Status:** Em validacao
+
+### BUG-103: RAG poluido por gravacao automatica de respostas da IA (memoria longa)
+**Data:** 2026-02-14
+**Severidade:** Alta
+**Descricao:** a memoria longa (pgvector) armazenava automaticamente respostas da IA, causando "resquicio de memoria" e comportamento prolixo/menus mesmo apos reset de persona.
+**Passos:** 1. ativar `VIVA_MEMORY_ENABLED=true` 2. conversar por alguns minutos 3. notar que a IA passa a repetir menus/rotas antigas.
+**Esperado:** memoria longa ser escrita apenas por comando explicito (memoria eterna/pinned) e por eventos realmente relevantes.
+**Atual:** append em long memory passou a exigir `meta.pinned=true` ou `meta.force_long=true` (comando `memorizar:`).
+**Status:** Em validacao

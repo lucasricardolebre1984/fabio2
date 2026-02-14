@@ -1,4 +1,4 @@
-"""Runtime helpers for VIVA chat orchestration.
+﻿"""Runtime helpers for VIVA chat orchestration.
 
 Centraliza utilitarios de handoff/imagem e regras de sanitizacao de resposta.
 """
@@ -21,12 +21,19 @@ def _sanitize_idle_confirmations(resposta: str) -> str:
     if not resposta:
         return resposta
 
-    # Remove a frase mesmo que venha com variacoes ("ate o momento", pontuacao, etc).
-    resposta = re.sub(
-        r"(?im)^\s*confirmo\s+que\s+nenhuma\s+a[cç]ao\s+foi\s+executada.*$",
-        "",
-        resposta,
-    )
+    # Evita bugs de encoding: filtra por linha usando normalizacao ASCII.
+    cleaned_lines: List[str] = []
+    for line in str(resposta).splitlines():
+        norm = _normalize_key(line)
+        if not norm:
+            cleaned_lines.append(line)
+            continue
+        if "confirmo que nenhuma acao foi executada" in norm:
+            continue
+        if "nao executei nenhuma acao" in norm or "nao realizei nenhuma acao" in norm:
+            continue
+        cleaned_lines.append(line)
+    resposta = "\n".join(cleaned_lines)
 
     # Se sobrar duplo espaco/linhas, normaliza.
     resposta = re.sub(r"\n{3,}", "\n\n", resposta).strip()
@@ -65,9 +72,10 @@ def _sanitize_unsolicited_capability_menu(user_texto: str, resposta: str) -> str
     ):
         return resposta
 
-    # Remove bloco "Posso, por exemplo:" + bullets subsequentes.
+    # Remove bloco "Posso, por exemplo:" + itens subsequentes.
+    # Aceita bullets '-', '*', '•' e enumeracoes simples.
     resposta = re.sub(
-        r"(?is)\n*\s*posso\s*(?:,\s*)?(?:por\s*exemplo|ex\.)\s*:?\s*(?:\n\s*[-•].*)+",
+        r"(?is)\n*\s*posso\s*(?:,\s*)?(?:por\s*exemplo|ex\.)\s*:?\s*(?:\n\s*(?:[-*]|â€¢|\d+\.)\s+.*)+",
         "",
         resposta,
     )
@@ -351,3 +359,5 @@ def _brand_guardrail(modo: str) -> str:
         "Marca RezetaBrasil. Paleta obrigatoria: #1E3A5F, #3DAA7F, #2A8B68, #FFFFFF. "
         "Tom humano, confiavel e promocional."
     )
+
+
