@@ -35,6 +35,24 @@ async def analyze_image(
         raise HTTPException(status_code=500, detail=f"Erro: {str(exc)}")
 
 
+@router.get("/tts/status")
+async def tts_status(
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        status = minimax_tts_service.get_status()
+        if status.get("configured"):
+            try:
+                ok = await minimax_tts_service.test_connection()
+                status["test"] = "success" if ok else "failed"
+            except Exception as exc:
+                status["test"] = "failed"
+                status["error"] = str(exc)[:220]
+        return status
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Erro status TTS: {str(exc)}")
+
+
 @router.post("/vision/upload")
 async def analyze_image_upload(
     file: UploadFile = File(...),

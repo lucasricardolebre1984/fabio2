@@ -920,36 +920,69 @@ export default function VivaChatPage() {
     }
 
     const speakWithMinimax = async (): Promise<boolean> => {
-      try {
-        const response = await api.post('/viva/audio/speak', { text: texto }, { responseType: 'blob' })
-        const mediaType = String(response.headers?.['content-type'] || 'audio/mpeg')
-        const blob = new Blob([response.data], { type: mediaType })
-        if (!blob.size) return false
+      const maxRetries = 2
+      const timeoutMs = 30_000
 
-        const url = URL.createObjectURL(blob)
-        const audio = new Audio(url)
-        playbackAudioRef.current = audio
-
-        await new Promise<void>((resolve) => {
-          audio.onended = () => {
-            URL.revokeObjectURL(url)
-            resolve()
-          }
-          audio.onerror = () => {
-            URL.revokeObjectURL(url)
-            resolve()
-          }
-          void audio.play().catch(() => {
-            URL.revokeObjectURL(url)
-            resolve()
-          })
-        })
-
-        playbackAudioRef.current = null
-        return true
-      } catch {
-        return false
+      const describeFailure = (err: any) => {
+        const status = err?.response?.status
+        const detail = String(err?.response?.data?.detail || '').trim()
+        if (status === 401) return 'Nao autenticado. Recarregue a pagina e faca login novamente.'
+        if (status === 403) return 'Sem permissao para usar a voz institucional.'
+        if (status === 502) return detail || 'Falha no provedor MiniMax TTS.'
+        if (status) return `Falha no TTS (HTTP ${status}).`
+        if (String(err?.code || '') === 'ECONNABORTED') return 'Timeout ao chamar MiniMax TTS.'
+        return 'Falha de rede ao chamar MiniMax TTS.'
       }
+
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          const response = await api.post(
+            '/viva/audio/speak',
+            { text: texto },
+            {
+              responseType: 'blob',
+              timeout: timeoutMs,
+            }
+          )
+          const mediaType = String(response.headers?.['content-type'] || 'audio/mpeg')
+          const blob = new Blob([response.data], { type: mediaType })
+          if (!blob.size) throw new Error('empty-audio')
+
+          const url = URL.createObjectURL(blob)
+          const audio = new Audio(url)
+          playbackAudioRef.current = audio
+
+          await new Promise<void>((resolve) => {
+            audio.onended = () => {
+              URL.revokeObjectURL(url)
+              resolve()
+            }
+            audio.onerror = () => {
+              URL.revokeObjectURL(url)
+              resolve()
+            }
+            void audio.play().catch(() => {
+              URL.revokeObjectURL(url)
+              resolve()
+            })
+          })
+
+          playbackAudioRef.current = null
+          return true
+        } catch (err: any) {
+          const shouldRetry = !err?.response?.status || (err?.response?.status >= 500 && err?.response?.status !== 501)
+          if (attempt < maxRetries && shouldRetry) {
+            await new Promise((r) => setTimeout(r, 600 + attempt * 600))
+            continue
+          }
+          if (ttsProviderConfigured) {
+            setErroAudio(`MiniMax indisponivel: ${describeFailure(err)}`)
+          }
+          return false
+        }
+      }
+
+      return false
     }
 
     const run = async () => {
@@ -958,9 +991,6 @@ export default function VivaChatPage() {
       let spoke = await speakWithMinimax()
       if (!spoke) {
         await speakWithBrowserFallback()
-        if (ttsProviderConfigured) {
-          setErroAudio('MiniMax indisponivel no momento. Usei a voz do navegador como fallback.')
-        }
       }
       if (cancelled) return
       finishSpeech()
@@ -1640,6 +1670,37 @@ export default function VivaChatPage() {
     return 'aspect-[4/5]'
   }
 
+  const checkTtsStatus = useCallback(async () => {
+    try {
+      const response = await api.get('/viva/tts/status')
+      const data = response?.data || {}
+
+      const configured = Boolean(data.configured)
+      const missingVars = Array.isArray(data.missing_env) ? data.missing_env : []
+      const testFailed = String(data.test || '').toLowerCase() === 'failed'
+      const errorMsg = String(data.error || '').trim()
+
+      if (!configured) {
+        setErroAudio(
+          missingVars.length > 0
+            ? `Voz institucional indisponivel. Variaveis faltando: ${missingVars.join(', ')}`
+            : 'Voz institucional indisponivel. Configuracao incompleta.'
+        )
+        return false
+      }
+
+      if (testFailed) {
+        setErroAudio(errorMsg ? `Falha ao testar MiniMax TTS: ${errorMsg}` : 'Falha ao testar MiniMax TTS.')
+        return false
+      }
+
+      return true
+    } catch {
+      setErroAudio('Nao foi possivel verificar o status da voz institucional (MiniMax).')
+      return false
+    }
+  }, [])
+
   const toggleModoConversacao = () => {
     const novoEstado = !modoConversacaoAtivo
     setModoConversacaoAtivo(novoEstado)
@@ -1655,6 +1716,7 @@ export default function VivaChatPage() {
       stopAssistantPlayback()
       stopContinuousConversation()
     } else {
+      void checkTtsStatus()
       conversationShouldListenRef.current = true
       startContinuousConversation()
     }

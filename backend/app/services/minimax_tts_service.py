@@ -3,6 +3,7 @@ MiniMax Text-to-Speech service for VIVA voice playback.
 """
 from __future__ import annotations
 
+import asyncio
 import base64
 import re
 from typing import Any, Dict, Optional, Tuple
@@ -63,6 +64,20 @@ class MinimaxTTSService:
             except Exception:
                 return b""
 
+    async def test_connection(self) -> bool:
+        if not self.is_configured():
+            return False
+        try:
+            audio_bytes, _ = await self.synthesize("ok")
+            return bool(audio_bytes)
+        except Exception:
+            return False
+
+    def _should_retry_http_status(self, status_code: int) -> bool:
+        if status_code in (408, 409, 425, 429):
+            return True
+        return status_code >= 500
+
     async def synthesize(self, text: str) -> Tuple[bytes, str]:
         clean = str(text or "").strip()
         if not clean:
@@ -97,42 +112,71 @@ class MinimaxTTSService:
             },
         }
 
-        async with httpx.AsyncClient(timeout=45.0) as client:
-            response = await client.post(
-                endpoint,
-                headers=self._headers(),
-                json=payload,
-            )
+        last_error: Optional[Exception] = None
+        max_retries = 2
+        timeout_seconds = 30.0
 
-        if response.status_code != 200:
-            raise ValueError(f"MiniMax erro ({response.status_code}): {response.text[:280]}")
+        for attempt in range(max_retries + 1):
+            try:
+                async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+                    response = await client.post(
+                        endpoint,
+                        headers=self._headers(),
+                        json=payload,
+                    )
 
-        data = response.json() if response.text else {}
-        base_resp = data.get("base_resp") if isinstance(data, dict) else {}
-        if isinstance(base_resp, dict):
-            status_code = int(base_resp.get("status_code") or 0)
-            if status_code not in (0, 200):
-                raise ValueError(f"MiniMax status {status_code}: {str(base_resp.get('status_msg') or 'erro')[:180]}")
+                if response.status_code != 200:
+                    message = f"MiniMax erro ({response.status_code}): {response.text[:280]}"
+                    if attempt < max_retries and self._should_retry_http_status(response.status_code):
+                        last_error = ValueError(message)
+                        await asyncio.sleep(1 + attempt)
+                        continue
+                    raise ValueError(message)
 
-        payload_data = data.get("data") if isinstance(data, dict) else {}
-        audio_blob = b""
-        if isinstance(payload_data, dict):
-            audio_blob = self._decode_audio_payload(payload_data.get("audio"))
-            if not audio_blob and isinstance(payload_data.get("audio_base64"), str):
-                audio_blob = self._decode_audio_payload(payload_data.get("audio_base64"))
+                data = response.json() if response.text else {}
+                base_resp = data.get("base_resp") if isinstance(data, dict) else {}
+                if isinstance(base_resp, dict):
+                    status_code = int(base_resp.get("status_code") or 0)
+                    if status_code not in (0, 200):
+                        raise ValueError(
+                            f"MiniMax status {status_code}: {str(base_resp.get('status_msg') or 'erro')[:180]}"
+                        )
 
-            audio_url = str(payload_data.get("audio_url") or "").strip()
-            if not audio_blob and audio_url:
-                async with httpx.AsyncClient(timeout=45.0) as client:
-                    get_resp = await client.get(audio_url)
-                if get_resp.status_code == 200:
-                    audio_blob = get_resp.content
+                payload_data = data.get("data") if isinstance(data, dict) else {}
+                audio_blob = b""
+                if isinstance(payload_data, dict):
+                    audio_blob = self._decode_audio_payload(payload_data.get("audio"))
+                    if not audio_blob and isinstance(payload_data.get("audio_base64"), str):
+                        audio_blob = self._decode_audio_payload(payload_data.get("audio_base64"))
 
-        if not audio_blob:
-            raise ValueError("MiniMax nao retornou audio valido")
+                    audio_url = str(payload_data.get("audio_url") or "").strip()
+                    if not audio_blob and audio_url:
+                        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+                            get_resp = await client.get(audio_url)
+                        if get_resp.status_code == 200:
+                            audio_blob = get_resp.content
 
-        media_type = "audio/mpeg" if self.format.lower() == "mp3" else "audio/wav"
-        return audio_blob, media_type
+                if not audio_blob:
+                    raise ValueError("MiniMax nao retornou audio valido")
+
+                media_type = "audio/mpeg" if self.format.lower() == "mp3" else "audio/wav"
+                return audio_blob, media_type
+            except (httpx.TimeoutException, httpx.RequestError) as exc:
+                last_error = exc
+                if attempt < max_retries:
+                    await asyncio.sleep(1 + attempt)
+                    continue
+                raise ValueError(f"MiniMax timeout/rede: {str(exc)[:220]}")
+            except ValueError as exc:
+                last_error = exc
+                if attempt < max_retries:
+                    await asyncio.sleep(1 + attempt)
+                    continue
+                raise
+
+        if last_error:
+            raise ValueError(f"MiniMax falha: {str(last_error)[:220]}")
+        raise ValueError("MiniMax falha desconhecida")
 
     def get_status(self) -> Dict[str, Any]:
         missing_env = []
@@ -145,6 +189,7 @@ class MinimaxTTSService:
         return {
             "configured": self.is_configured(),
             "provider": "minimax",
+            "base_url": self.base_url,
             "model": self.model,
             "voice_id": self.voice_id,
             "format": self.format,
