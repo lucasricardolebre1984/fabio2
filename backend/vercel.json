@@ -11,5 +11,32 @@
       "src": "/(.*)",
       "dest": "api/index.py"
     }
-  ]
+  ],
+  "functions": {
+    "api/index.py": {
+      "excludeFiles": [
+        "tests/**",
+        "__tests__/**",
+        "**/*.test.py",
+        "**/test_*.py",
+        "fixtures/**",
+        "__fixtures__/**",
+        "testdata/**",
+        "sample-data/**",
+        "static/**",
+        "assets/**",
+        "docs/**",
+        ".github/**",
+        "*.md",
+        "Dockerfile*",
+        "docker-compose*",
+        "Makefile",
+        "*.yml",
+        "*.yaml",
+        ".env*",
+        ".gitignore",
+        ".git/**"
+      ]
+    }
+  }
 }
