@@ -208,6 +208,73 @@ class OpenAIService:
         detail = responses_error or error or "falha desconhecida"
         return f"Erro OpenAI chat: {detail}"
 
+    async def chat_stream(
+        self,
+        messages: List[Dict[str, Any]],
+        temperature: float = 0.7,
+        max_tokens: int = 800,
+    ):
+        """Stream chat completion tokens em tempo real.
+        
+        Yields:
+            str: Chunks de texto conforme OpenAI retorna
+        """
+        if not self.api_key:
+            yield "Erro: OPENAI_API_KEY nao configurada"
+            return
+
+        normalized = self._normalize_messages(messages)
+        if not normalized:
+            yield "Erro: mensagem invalida para chat OpenAI"
+            return
+
+        payload: Dict[str, Any] = {
+            "model": self.model_chat,
+            "messages": normalized,
+            "temperature": temperature,
+            "max_completion_tokens": max_tokens,
+            "stream": True,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                async with client.stream(
+                    "POST",
+                    f"{self.base_url}/chat/completions",
+                    headers=self._headers(),
+                    json=payload,
+                ) as response:
+                    if response.status_code != 200:
+                        error_text = await response.aread()
+                        yield f"Erro OpenAI stream ({response.status_code}): {error_text.decode()[:400]}"
+                        return
+
+                    async for line in response.aiter_lines():
+                        if not line.strip():
+                            continue
+                        
+                        if line.startswith("data: "):
+                            data_str = line[6:]  # Remove "data: " prefix
+                            
+                            if data_str == "[DONE]":
+                                break
+                            
+                            try:
+                                import json
+                                chunk_data = json.loads(data_str)
+                                choices = chunk_data.get("choices", [])
+                                
+                                if choices:
+                                    delta = choices[0].get("delta", {})
+                                    content = delta.get("content")
+                                    
+                                    if content:
+                                        yield content
+                            except json.JSONDecodeError:
+                                continue
+        except Exception as e:
+            yield f"Erro no streaming: {str(e)}"
+
     async def audio_transcribe_bytes(
         self,
         audio_bytes: bytes,

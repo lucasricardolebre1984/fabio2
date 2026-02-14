@@ -953,10 +953,11 @@ export default function VivaChatPage() {
       beginSpeech()
       stopAssistantPlayback()
       let spoke = await speakWithMinimax()
-      if (!spoke && !ttsProviderConfigured) {
+      if (!spoke) {
         await speakWithBrowserFallback()
-      } else if (!spoke && ttsProviderConfigured) {
-        setErroAudio('Voz institucional indisponivel no momento. Veja logs do backend (fabio2-backend) para o erro do MiniMax.')
+        if (ttsProviderConfigured) {
+          setErroAudio('MiniMax indisponivel no momento. Usei a voz do navegador como fallback.')
+        }
       }
       if (cancelled) return
       finishSpeech()
@@ -970,6 +971,101 @@ export default function VivaChatPage() {
       stopAssistantPlayback()
     }
   }, [mensagens, modoConversacaoAtivo, vozVivaAtiva, startContinuousConversation, stopContinuousConversation, stopAssistantPlayback, ttsProviderConfigured])
+
+  const handleSendStream = useCallback(async (
+    mensagemComReferencia: string,
+    contexto: any[],
+    sessionIdAtual: string | null
+  ) => {
+    try {
+      const response = await fetch('/api/v1/viva/chat/stream', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          mensagem: mensagemComReferencia,
+          contexto,
+          session_id: sessionIdAtual || undefined
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      if (!response.body) {
+        throw new Error('Response body not available')
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+
+      // Criar mensagem do assistente que será atualizada
+      const assistantMsgId = (Date.now() + 1).toString()
+      setMensagens(prev => [...prev, {
+        id: assistantMsgId,
+        tipo: 'ia',
+        conteudo: '',
+        timestamp: new Date(),
+        streaming: true
+      }])
+
+      let fullResponse = ''
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.trim() || !line.startsWith('data: ')) continue
+
+          try {
+            const data = JSON.parse(line.slice(6))
+
+            if (data.error) {
+              throw new Error(data.error)
+            }
+
+            if (data.content) {
+              fullResponse += data.content
+              setMensagens(prev => prev.map(msg =>
+                msg.id === assistantMsgId
+                  ? { ...msg, conteudo: fullResponse }
+                  : msg
+              ))
+            }
+
+            if (data.done) {
+              setMensagens(prev => prev.map(msg =>
+                msg.id === assistantMsgId
+                  ? { ...msg, streaming: false }
+                  : msg
+              ))
+              if (data.session_id) {
+                setSessionId(data.session_id)
+                void loadSessions(data.session_id)
+              }
+              return true
+            }
+          } catch (e) {
+            console.error('Error parsing SSE:', e)
+          }
+        }
+      }
+
+      return true
+    } catch (error) {
+      console.error('Streaming error:', error)
+      return false
+    }
+  }, [loadSessions, setMensagens, setSessionId])
 
   const handleSend = useCallback(async (options?: SendOptions) => {
     const anexosAtuais = options?.anexosOverride ?? anexos
@@ -1051,19 +1147,34 @@ export default function VivaChatPage() {
       setMensagens(prev => [...prev, userMsg])
 
       const contexto = mensagens.slice(-10)
-      const response = await api.post('/viva/chat', {
-        mensagem: mensagemComReferencia,
-        contexto,
-        session_id: sessionId || undefined
-      })
-      if (response.data?.session_id) {
-        setSessionId(response.data.session_id)
-        void loadSessions(response.data.session_id)
+
+      // Tentar streaming primeiro (apenas para chat textual simples)
+      const usarStreaming = !deveGerarOverlay && !referenciasVisuais.length
+      let streamingSuccess = false
+
+      if (usarStreaming) {
+        streamingSuccess = await handleSendStream(
+          mensagemComReferencia,
+          contexto,
+          sessionId
+        )
       }
 
-      const resposta = String(response.data?.resposta || '').trim() || 'Processado com sucesso!'
-      const midia = Array.isArray(response.data.midia) ? response.data.midia : []
-      if (midia.length > 0) {
+      // Fallback para modo não-streaming se streaming falhar ou não for usado
+      if (!streamingSuccess) {
+        const response = await api.post('/viva/chat', {
+          mensagem: mensagemComReferencia,
+          contexto,
+          session_id: sessionId || undefined
+        })
+        if (response.data?.session_id) {
+          setSessionId(response.data.session_id)
+          void loadSessions(response.data.session_id)
+        }
+
+        const resposta = String(response.data?.resposta || '').trim() || 'Processado com sucesso!'
+        const midia = Array.isArray(response.data.midia) ? response.data.midia : []
+        if (midia.length > 0) {
         const anexosIA = midia
           .filter((item: any) => item && item.url)
           .map((item: any) => ({
@@ -1103,16 +1214,17 @@ export default function VivaChatPage() {
         return
       }
 
-      const iaMsg: Mensagem = {
-        id: (Date.now() + 1).toString(),
-        tipo: 'ia',
-        conteudo: resposta,
-        timestamp: new Date(),
-        overlay: overlayText && (brandMode === 'REZETA' || brandMode === 'FC')
-          ? { brand: brandMode as 'REZETA' | 'FC', text: overlayText }
-          : undefined
+        const iaMsg: Mensagem = {
+          id: (Date.now() + 1).toString(),
+          tipo: 'ia',
+          conteudo: resposta,
+          timestamp: new Date(),
+          overlay: overlayText && (brandMode === 'REZETA' || brandMode === 'FC')
+            ? { brand: brandMode as 'REZETA' | 'FC', text: overlayText }
+            : undefined
+        }
+        setMensagens(prev => [...prev, iaMsg])
       }
-      setMensagens(prev => [...prev, iaMsg])
     } catch {
       const errorMsg: Mensagem = {
         id: (Date.now() + 1).toString(),
@@ -1124,7 +1236,7 @@ export default function VivaChatPage() {
     } finally {
       setLoading(false)
     }
-  }, [anexos, input, loadSessions, loading, mensagens, sessionId, transcribeAudioBlob])
+  }, [anexos, input, loadSessions, loading, mensagens, sessionId, transcribeAudioBlob, handleSendStream])
 
   useEffect(() => {
     sendFromVoiceRef.current = (texto: string) => {

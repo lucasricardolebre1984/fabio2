@@ -20,6 +20,9 @@ from app.services.viva_chat_domain_service import (
     _collect_campaign_fields_from_context,
     _extract_cast_preference,
     _extract_campaign_brief_fields,
+    _has_pending_campaign_brief,
+    _is_greeting,
+    _preferred_greeting,
     _generate_campaign_copy,
     _has_campaign_signal,
     _infer_campaign_fields_from_free_text,
@@ -373,6 +376,63 @@ class VivaChatOrchestratorService:
                     )
                 )
 
+            # Cumprimento simples: resposta curta e sem acionar fluxo de campanha/imagem.
+            if (
+                _is_greeting(request.mensagem)
+                and not handoff_intent
+                and not viviane_handoff_query_intent
+                and not logo_request
+                and not agenda_query_intent
+                and agenda_command is None
+                and agenda_natural_command is None
+            ):
+                pending_campaign = bool(modo in ("FC", "REZETA") and _has_pending_campaign_brief(contexto_efetivo))
+                if pending_campaign:
+                    return await finalize(
+                        resposta=(
+                            f"{_preferred_greeting(request.mensagem)} "
+                            "Quer continuar a campanha anterior ou prefere outra tarefa?"
+                        ),
+                        meta={"greeting_short_circuit": True, "pending_campaign": True},
+                    )
+                return await finalize(
+                    resposta=f"{_preferred_greeting(request.mensagem)} O que voce precisa agora?",
+                    meta={"greeting_short_circuit": True},
+                )
+
+            # Memoria eterna (pinned) - somente por comando explicito.
+            normalized_input = _normalize_key(request.mensagem or "")
+            pinned_prefixes = (
+                "memorizar:",
+                "memoria:",
+                "memoria eterna:",
+                "salvar memoria:",
+                "salvar na memoria:",
+                "fixar memoria:",
+            )
+            if normalized_input.startswith(pinned_prefixes):
+                raw = str(request.mensagem or "")
+                payload = raw.split(":", 1)[1].strip() if ":" in raw else ""
+                if not payload:
+                    return await finalize(
+                        resposta="O que devo memorizar? Use: memorizar: <texto curto>.",
+                        meta={"pinned_missing_payload": True},
+                    )
+
+                saved = await viva_memory_service.append_memory(
+                    db=db,
+                    user_id=current_user.id,
+                    session_id=session_id,
+                    tipo="pinned",
+                    conteudo=payload,
+                    modo=modo,
+                    meta={"pinned": True, "source": "explicit_command"},
+                )
+                return await finalize(
+                    resposta="Memoria salva.",
+                    meta={"pinned_saved": True, "memory_write": saved},
+                )
+
             campaign_flow_requested = False
             campaign_fields: Dict[str, str] = {}
             campaign_prompt_source = request.mensagem
@@ -399,14 +459,17 @@ class VivaChatOrchestratorService:
                 )
 
             if modo in ("FC", "REZETA") and not logo_request:
+                pending_campaign = _has_pending_campaign_brief(contexto_efetivo)
                 campaign_fields = _collect_campaign_fields_from_context(contexto_efetivo)
-                inferred_fields = _infer_campaign_fields_from_free_text(request.mensagem)
-                explicit_fields = _extract_campaign_brief_fields(request.mensagem)
                 has_campaign_signal = _has_campaign_signal(request.mensagem)
+                inferred_fields = (
+                    _infer_campaign_fields_from_free_text(request.mensagem) if (has_campaign_signal or pending_campaign) else {}
+                )
+                explicit_fields = _extract_campaign_brief_fields(request.mensagem) if (has_campaign_signal or pending_campaign) else {}
                 campaign_fields.update(explicit_fields)
                 if has_campaign_signal:
                     campaign_fields.update(inferred_fields)
-                campaign_flow_requested = has_campaign_signal or bool(explicit_fields) or bool(inferred_fields)
+                campaign_flow_requested = has_campaign_signal or pending_campaign or bool(explicit_fields) or bool(inferred_fields)
                 if campaign_flow_requested:
                     campaign_fields = _apply_campaign_defaults(campaign_fields)
                     # Fluxo livre: usar a mensagem original do usuario como fonte principal
@@ -427,7 +490,9 @@ class VivaChatOrchestratorService:
 
             should_generate_image = _is_image_request(request.mensagem) or (
                 campaign_flow_requested
+                and _has_campaign_signal(request.mensagem)
                 and not suggestion_first_intent
+                and not _is_greeting(request.mensagem)
             )
             active_skill_meta = viva_skill_router_service.resolve_skill(
                 mensagem=request.mensagem,
@@ -587,6 +652,127 @@ class VivaChatOrchestratorService:
             raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
 
 
+
+
+    async def handle_chat_with_viva_stream(self, request: Any, current_user: Any, db: Any):
+        """Chat com VIVA usando streaming de resposta (SSE).
+        
+        NOTA: Versão simplificada focada em chat textual.
+        Para geração de imagens/campanhas, usa o endpoint não-streaming.
+        """
+        try:
+            await ensure_chat_tables(db)
+
+            modo = (
+                _normalize_mode(request.modo)
+                or _infer_mode_from_message(request.mensagem)
+                or _infer_mode_from_context(request.contexto)
+            )
+
+            session_id = await resolve_chat_session(
+                db=db,
+                user_id=current_user.id,
+                requested_session_id=request.session_id,
+                modo=modo,
+            )
+
+            # Persistir mensagem do usuário
+            await append_chat_message(
+                db=db,
+                session_id=session_id,
+                user_id=current_user.id,
+                tipo="usuario",
+                conteudo=request.mensagem,
+                modo=modo,
+                meta={"contexto_len": len(request.contexto or [])},
+            )
+
+            if bool(getattr(settings, "VIVA_MEMORY_ENABLED", False)):
+                await viva_memory_service.append_memory(
+                    db=db,
+                    user_id=current_user.id,
+                    session_id=session_id,
+                    tipo="usuario",
+                    conteudo=request.mensagem,
+                    modo=modo,
+                    meta={"source": "viva_chat_stream_input"},
+                )
+
+            # Carregar snapshot (limite reduzido para streaming - Gate 2)
+            MAX_CONTEXT_MESSAGES = 10
+            snapshot = await load_chat_snapshot(
+                db=db,
+                user_id=current_user.id,
+                session_id=session_id,
+                limit=MAX_CONTEXT_MESSAGES * 2,  # Considerando user+ia alternados
+            )
+            contexto_efetivo = context_from_snapshot(snapshot)
+
+            if not modo:
+                modo = _normalize_mode(snapshot.modo) or _infer_mode_from_context(contexto_efetivo)
+
+            # Memória opcional
+            memory_context = None
+            if bool(getattr(settings, "VIVA_MEMORY_ENABLED", False)):
+                memory_context = await viva_memory_service.build_chat_memory_context(
+                    db=db,
+                    user_id=current_user.id,
+                    session_id=session_id,
+                    query=request.mensagem,
+                    modo=modo,
+                )
+
+            # Preparar mensagens para o modelo
+            if not settings.OPENAI_API_KEY:
+                yield {"error": "OPENAI_API_KEY não configurada para streaming"}
+                return
+
+            messages = _build_viva_concierge_messages(
+                mensagem=request.mensagem,
+                contexto=contexto_efetivo,
+                modo=modo,
+                memory_context=memory_context,
+            )
+
+            # Stream da resposta
+            full_response = ""
+            async for chunk in openai_service.chat_stream(
+                messages=messages,
+                temperature=0.45,
+                max_tokens=220,
+            ):
+                full_response += chunk
+                yield {"content": chunk}
+
+            # Sinalizar fim do streaming
+            yield {"done": True, "session_id": str(session_id)}
+
+            # Persistir resposta completa
+            await append_chat_message(
+                db=db,
+                session_id=session_id,
+                user_id=current_user.id,
+                tipo="ia",
+                conteudo=full_response,
+                modo=modo,
+                anexos=None,
+                meta={"stream": True},
+            )
+
+            if bool(getattr(settings, "VIVA_MEMORY_ENABLED", False)):
+                await viva_memory_service.append_memory(
+                    db=db,
+                    user_id=current_user.id,
+                    session_id=session_id,
+                    tipo="ia",
+                    conteudo=full_response,
+                    modo=modo,
+                    meta={"source": "viva_chat_stream_finalize"},
+                )
+
+        except Exception as e:
+            logger.error(f"Erro no streaming VIVA: {str(e)}")
+            yield {"error": f"Erro: {str(e)}"}
 
 
 viva_chat_orchestrator_service = VivaChatOrchestratorService()
