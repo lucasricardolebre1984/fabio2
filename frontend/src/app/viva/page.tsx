@@ -1850,9 +1850,9 @@ export default function VivaChatPage() {
           </div>
         ) : (
         <>
-        {/* Ãrea de mensagens */}
+        {/* Área de mensagens */}
         <ScrollArea className="flex-1 px-4" ref={scrollAreaRef}>
-          <div className="max-w-4xl mx-auto py-6 space-y-6">
+          <div className="max-w-3xl mx-auto py-6 space-y-6">
 
             {mensagens.map((msg) => (
               <div
@@ -2016,7 +2016,7 @@ export default function VivaChatPage() {
 
         {/* Input area */}
         <div className="p-4 border-t bg-white">
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-3xl mx-auto">
             <div className="flex gap-2 items-end">
               {/* BotÃµes de anexo */}
               <div className="flex gap-1">
@@ -2136,7 +2136,7 @@ export default function VivaChatPage() {
         >
           <div className="min-h-full flex items-start justify-center">
             <div
-              className="relative my-4 w-full max-w-4xl rounded-lg bg-white p-4 sm:p-6 shadow-xl"
+              className="relative my-4 w-full max-w-3xl rounded-lg bg-white p-4 sm:p-6 shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="mb-4 flex items-center justify-between gap-2">
@@ -2164,7 +2164,7 @@ export default function VivaChatPage() {
 
                 return (
                   <div
-                    className={`relative mx-auto w-full max-w-[680px] ${resolveArteAspectClass(arteAtiva.overlay.formato || '')} overflow-hidden rounded-lg border bg-gray-100`}
+                    className={`relative mx-auto w-full max-w-[540px] ${resolveArteAspectClass(formatoPreview)} overflow-hidden rounded-lg border bg-gray-100`}
                   >
                     <Image
                       src={arteAtiva.url}
@@ -2176,7 +2176,7 @@ export default function VivaChatPage() {
                       }}
                       unoptimized
                     />
-                    <div className="absolute inset-x-0 top-0 h-[30%] overflow-y-auto bg-white/90 px-5 py-4">
+                    <div className="absolute inset-x-0 top-0 h-[20%] max-h-[200px] overflow-y-auto bg-white/90 px-5 py-4">
                       <p className="text-xs uppercase tracking-widest" style={{ color: theme.accent }}>
                         {theme.label}
                       </p>
@@ -2190,7 +2190,7 @@ export default function VivaChatPage() {
                       )}
                     </div>
                     <div
-                      className="absolute inset-x-0 bottom-0 h-[38%] overflow-y-auto px-5 py-4 text-white"
+                      className="absolute inset-x-0 bottom-0 h-[25%] max-h-[300px] overflow-y-auto px-5 py-4 text-white"
                       style={{
                         background: `linear-gradient(90deg, ${theme.dark}e6, ${theme.accent}e6)`
                       }}
