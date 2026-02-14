@@ -2,6 +2,7 @@
 import contextlib
 from contextlib import asynccontextmanager
 import asyncio
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,8 +22,9 @@ async def lifespan(app: FastAPI):
     setup_logging()
     
     # Create storage directory if not exists
-    import os
     os.makedirs(settings.STORAGE_LOCAL_PATH, exist_ok=True)
+
+    is_vercel = os.getenv("VERCEL") == "1"
 
     # Pre-flight memory backends (pgvector + redis) without crashing startup.
     try:
@@ -32,29 +34,32 @@ async def lifespan(app: FastAPI):
         pass
 
     stop_event = asyncio.Event()
+    worker_task = None
 
-    async def handoff_worker() -> None:
-        while not stop_event.is_set():
-            try:
-                async with AsyncSessionLocal() as db:
-                    await viva_handoff_service.process_due_tasks(db=db, limit=20)
-            except Exception:
-                # Keep server up even if handoff has a transient failure.
-                pass
-            try:
-                await asyncio.wait_for(stop_event.wait(), timeout=30)
-            except asyncio.TimeoutError:
-                continue
+    if not is_vercel:
+        async def handoff_worker() -> None:
+            while not stop_event.is_set():
+                try:
+                    async with AsyncSessionLocal() as db:
+                        await viva_handoff_service.process_due_tasks(db=db, limit=20)
+                except Exception:
+                    # Keep server up even if handoff has a transient failure.
+                    pass
+                try:
+                    await asyncio.wait_for(stop_event.wait(), timeout=30)
+                except asyncio.TimeoutError:
+                    continue
 
-    worker_task = asyncio.create_task(handoff_worker())
+        worker_task = asyncio.create_task(handoff_worker())
     
     yield
     
     # Shutdown
     stop_event.set()
-    worker_task.cancel()
-    with contextlib.suppress(Exception):
-        await worker_task
+    if worker_task is not None:
+        worker_task.cancel()
+        with contextlib.suppress(Exception):
+            await worker_task
 
 
 def create_app() -> FastAPI:
