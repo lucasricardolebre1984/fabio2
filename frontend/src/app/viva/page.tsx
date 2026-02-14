@@ -219,6 +219,7 @@ const extractOverlayFromAnexos = (anexos?: Mensagem['anexos']): Mensagem['overla
 
   return {
     brand: overlayMeta.brand as 'FC' | 'REZETA',
+    formato: overlayMeta.formato,
     copy: {
       headline: overlayMeta.headline,
       subheadline: overlayMeta.subheadline,
@@ -250,6 +251,7 @@ const mapSnapshotMessages = (messages: SnapshotMessage[] = []): Mensagem[] => {
       item.meta?.overlay && (item.meta.overlay.brand === 'FC' || item.meta.overlay.brand === 'REZETA')
         ? {
             brand: item.meta.overlay.brand as 'FC' | 'REZETA',
+            formato: item.meta.overlay.formato,
             copy: {
               headline: item.meta.overlay.headline,
               subheadline: item.meta.overlay.subheadline,
@@ -1189,6 +1191,7 @@ export default function VivaChatPage() {
         const overlayFromBackend = overlayMeta && (overlayMeta.brand === 'FC' || overlayMeta.brand === 'REZETA')
           ? {
               brand: overlayMeta.brand as 'FC' | 'REZETA',
+              formato: overlayMeta.formato,
               copy: {
                 headline: overlayMeta.headline,
                 subheadline: overlayMeta.subheadline,
@@ -2216,4 +2219,3 @@ export default function VivaChatPage() {
     </>
   )
 }
-
