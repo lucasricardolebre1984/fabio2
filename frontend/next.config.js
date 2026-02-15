@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
+const isVercel = Boolean(process.env.VERCEL)
+
 const nextConfig = {
-  output: 'standalone',
+  // Vercel já controla o empacotamento; manter standalone lá pode quebrar trace files no App Router.
+  output: isVercel ? undefined : 'standalone',
   images: {
     unoptimized: true,
   },
