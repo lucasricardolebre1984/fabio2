@@ -1,9 +1,9 @@
 /** @type {import('next').NextConfig} */
-const isVercel = Boolean(process.env.VERCEL)
+const useStandalone = process.env.NEXT_OUTPUT_STANDALONE === '1'
 
 const nextConfig = {
-  // Vercel já controla o empacotamento; manter standalone lá pode quebrar trace files no App Router.
-  output: isVercel ? undefined : 'standalone',
+  // Usa standalone somente quando explicitamente solicitado (ex.: build de container).
+  output: useStandalone ? 'standalone' : undefined,
   images: {
     unoptimized: true,
   },

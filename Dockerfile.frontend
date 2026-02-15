@@ -11,7 +11,7 @@ RUN npm ci
 COPY frontend/ .
 
 # Build do Next.js
-RUN npm run build
+RUN NEXT_OUTPUT_STANDALONE=1 npm run build
 
 # Produção
 FROM node:20-alpine AS runner
