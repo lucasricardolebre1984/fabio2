@@ -1,4 +1,4 @@
-﻿# Domain Identification and Grouping - SaaS FC Solucoes Financeiras
+# Domain Identification and Grouping - SaaS FC Solucoes Financeiras
 
 Data: 2026-02-16
 Metodo: skill `domain-identification-grouping`
@@ -6,188 +6,214 @@ Escopo analisado: `backend/app`, `frontend/src/app`, `backend/COFRE`
 
 ## Resultado executivo
 
-A base atual se organiza em 9 dominios logicos claros para evolucao service-based:
+Mapeamento completo atualizado da stack:
+
+- API backend: 16 arquivos de rota com 79 endpoints.
+- Frontend App Router: 14 paginas.
+- Modelos principais: 7 tabelas ORM.
+- Tabelas runtime (servicos): chat, campanhas, handoff, google calendar, memoria vetorial e registros COFRE.
+- COFRE: fonte canonica de persona/skills/memoria com ancora strict ativa.
+
+Dominios logicos consolidados (9):
 
 1. Identidade e Acesso
 2. Contratos
 3. Clientes (CRM)
-4. Agenda e Calendar Sync
-5. Campanhas e Midia
-6. VIVA Core (orquestracao conversacional)
+4. Agenda e Google Calendar
+5. Campanhas e Midia IA
+6. VIVA Core (chat/orquestracao)
 7. WhatsApp Operacional
 8. COFRE (persona/skills/memoria)
-9. Plataforma Compartilhada (infra/providers)
+9. Plataforma Compartilhada (config/db/providers)
 
-## Mapa de dominios -> componentes
+## Inventario de dominios por camada
 
 ### 1) Identidade e Acesso
 
-- Backend:
-  - `backend/app/api/v1/auth.py`
-  - `backend/app/models/user.py`
-  - `backend/app/core/security_stub.py` (dev-only workaround)
 - Frontend:
-  - login em `frontend/src/app/page.tsx`
-  - auth client em `frontend/src/lib/api.ts`
-
-Responsabilidade:
-- autenticacao JWT, sessao de operador e protecao de rotas.
+  - `/` (login): `frontend/src/app/page.tsx`
+- Backend:
+  - prefixo: `/api/v1/auth/*`
+  - arquivo: `backend/app/api/v1/auth.py`
+  - model: `backend/app/models/user.py` (`users`)
 
 ### 2) Contratos
 
-- Backend:
-  - `backend/app/api/v1/contratos.py`
-  - `backend/app/services/contrato_service.py`
-  - `backend/app/services/contrato_template_loader.py`
-  - `backend/app/services/pdf_service_playwright.py`
-  - `backend/app/models/contrato.py`
-  - `backend/app/models/contrato_template.py`
 - Frontend:
-  - `frontend/src/app/(dashboard)/contratos/*`
-
-Responsabilidade:
-- templates, criacao, listagem, edicao, PDF e ciclo de contrato emitido.
+  - `/contratos`
+  - `/contratos/lista`
+  - `/contratos/novo`
+  - `/contratos/[id]`
+  - `/contratos/[id]/editar`
+- Backend:
+  - prefixo: `/api/v1/contratos/*`
+  - arquivo: `backend/app/api/v1/contratos.py`
+  - servicos: `contrato_service.py`, `contrato_template_loader.py`, `pdf_service_playwright.py`
+  - models: `contratos`, `contrato_templates`
 
 ### 3) Clientes (CRM)
 
-- Backend:
-  - `backend/app/api/v1/clientes.py`
-  - `backend/app/services/cliente_service.py`
-  - `backend/app/models/cliente.py`
 - Frontend:
-  - `frontend/src/app/(dashboard)/clientes/page.tsx`
-
-Responsabilidade:
-- cadastro de clientes, deduplicacao e relacionamento cliente<->contrato.
-
-### 4) Agenda e Calendar Sync
-
+  - `/clientes`
 - Backend:
-  - `backend/app/api/v1/agenda.py`
-  - `backend/app/api/v1/google_calendar.py`
-  - `backend/app/services/agenda_service.py`
-  - `backend/app/services/google_calendar_service.py`
-  - `backend/app/models/agenda.py`
+  - prefixo: `/api/v1/clientes/*`
+  - arquivo: `backend/app/api/v1/clientes.py`
+  - servico: `cliente_service.py`
+  - model: `clientes`
+
+### 4) Agenda e Google Calendar
+
 - Frontend:
-  - `frontend/src/app/(dashboard)/agenda/page.tsx`
-
-Responsabilidade:
-- compromissos internos do SaaS e sincronizacao opcional com Google Calendar.
-
-### 5) Campanhas e Midia
-
+  - `/agenda`
 - Backend:
-  - `backend/app/api/v1/viva_campaign_routes.py`
-  - `backend/app/services/viva_campaign_repository_service.py`
-  - `backend/app/services/openai_service.py` (image)
+  - prefixos: `/api/v1/agenda/*`, `/api/v1/google-calendar/*`
+  - arquivos: `agenda.py`, `google_calendar.py`
+  - servicos: `agenda_service.py`, `google_calendar_service.py`
+  - model: `agenda`
+  - tabelas runtime: `google_calendar_connections`, `google_calendar_event_links`
+
+### 5) Campanhas e Midia IA
+
 - Frontend:
-  - `frontend/src/app/(dashboard)/campanhas/page.tsx`
-
-Responsabilidade:
-- geracao/listagem/exclusao de campanhas e ativos de midia.
-
-### 6) VIVA Core (orquestracao conversacional)
-
+  - `/campanhas`
 - Backend:
-  - `backend/app/api/v1/viva.py`
-  - `backend/app/services/viva_chat_orchestrator_service.py`
-  - `backend/app/services/viva_chat_session_service.py`
-  - `backend/app/services/viva_agenda_nlu_service.py`
-  - `backend/app/services/viva_concierge_service.py`
-  - `backend/app/services/viva_agent_profile_service.py`
-- Frontend:
-  - `frontend/src/app/viva/page.tsx`
+  - prefixos: `/api/v1/viva/campanhas*`, `/api/v1/viva/image/*`, `/api/v1/viva/vision*`, `/api/v1/viva/video/*`
+  - arquivos: `viva_campaign_routes.py`, `viva_media_routes.py`
+  - servicos: `viva_campaign_repository_service.py`, `openai_service.py`
+  - tabela runtime: `viva_campanhas`
 
-Responsabilidade:
-- roteamento de intencao, execucao por skill/rota real e resposta da assistente.
+### 6) VIVA Core (chat/orquestracao)
+
+- Frontend:
+  - `/viva`
+- Backend:
+  - prefixos: `/api/v1/viva/chat*`, `/api/v1/viva/modules/status`, `/api/v1/viva/persona/status`, `/api/v1/viva/capabilities`
+  - arquivos: `viva.py`, `viva_core.py`, `viva_chat_session_routes.py`, `viva_modules_routes.py`, `viva_capabilities_routes.py`
+  - servicos: `viva_chat_orchestrator_service.py`, `viva_domain_query_router_service.py`, `viva_agenda_nlu_service.py`, `viva_agent_profile_service.py`, `viva_concierge_service.py`
+  - tabelas runtime: `viva_chat_sessions`, `viva_chat_messages`
 
 ### 7) WhatsApp Operacional
 
+- Frontend:
+  - `/whatsapp`
+  - `/whatsapp/conversas`
 - Backend:
-  - `backend/app/api/v1/whatsapp.py`
-  - `backend/app/api/v1/whatsapp_chat.py`
-  - `backend/app/api/v1/webhook.py`
-  - `backend/app/services/whatsapp_service.py`
-  - `backend/app/services/evolution_webhook_service.py`
-  - `backend/app/models/whatsapp_conversa.py`
-
-Responsabilidade:
-- conexao Evolution, webhooks, historico e operacao de atendimento externo.
+  - prefixos: `/api/v1/whatsapp/*`, `/api/v1/whatsapp-chat/*`, `/api/v1/webhook/evolution`
+  - arquivos: `whatsapp.py`, `whatsapp_chat.py`, `webhook.py`
+  - servicos: `whatsapp_service.py`, `evolution_webhook_service.py`, `viva_ia_service.py`
+  - models: `whatsapp_conversas`, `whatsapp_mensagens`
 
 ### 8) COFRE (persona/skills/memoria)
 
-- Backend:
-  - `backend/app/api/v1/cofre_memory_routes.py`
-  - `backend/app/services/cofre_memory_service.py`
-  - `backend/app/services/cofre_manifest_service.py`
-  - `backend/app/services/cofre_schema_service.py`
-  - `backend/app/services/viva_memory_service.py`
-- Artefatos:
-  - `backend/COFRE/persona-skills/*`
+- Estrutura:
+  - `backend/COFRE/persona-skills/AGENT.md`
+  - `backend/COFRE/persona-skills/*.md|*.txt`
   - `backend/COFRE/memories/*`
-
-Responsabilidade:
-- fonte de verdade de persona, skills e memoria auditavel.
-
-### 9) Plataforma Compartilhada (infra/providers)
-
+  - `backend/COFRE/system/endpoints_manifest.json`
 - Backend:
-  - `backend/app/config.py`
-  - `backend/app/db/*`
-  - `backend/app/services/viva_model_service.py`
-  - `backend/app/services/openai_service.py`
-  - `backend/app/services/minimax_tts_service.py`
+  - prefixo: `/api/v1/cofre/*`
+  - arquivo: `cofre_memory_routes.py`
+  - servicos: `cofre_memory_service.py`, `cofre_manifest_service.py`, `cofre_schema_service.py`, `viva_memory_service.py`
+  - tabelas runtime: `cofre_persona_registry`, `cofre_skill_registry`, `cofre_memory_registry`, `cofre_manifest_registry`, `viva_memory_vectors`
 
-Responsabilidade:
-- configuracao, persistencia, provedores e suporte transversal.
+### 9) Plataforma Compartilhada
 
-## Fronteiras recomendadas (DDD-lite)
+- `backend/app/config.py`
+- `backend/app/db/*`
+- provedores: `openai_service.py`, `minimax_tts_service.py`, `deepseek_service.py`, `viva_local_service.py`
+- bootstrap: `backend/app/main.py` (cofre bootstrap + memory storage check + worker handoff)
 
-- `contracts-domain`: Contratos + templates + PDF
-- `crm-domain`: Clientes
-- `agenda-domain`: Agenda + Google Sync
-- `campaign-domain`: Campanhas/midia
-- `assistant-domain`: VIVA orquestrador/NLU/chat
-- `messaging-domain`: WhatsApp externo
-- `knowledge-domain`: COFRE/memoria/persona
-- `platform-domain`: auth/infra/providers
+## Mapa Menu -> Front -> API -> Dados -> COFRE
 
-## Inconsistencias detectadas
+| Menu SaaS | Front route | API principal | Tabelas | Espelho COFRE |
+|---|---|---|---|---|
+| Login | `/` | `/api/v1/auth/*` | `users` | n/a |
+| Contratos | `/contratos*` | `/api/v1/contratos/*` | `contratos`, `contrato_templates` | indireto por memoria/chat |
+| Clientes | `/clientes` | `/api/v1/clientes/*` | `clientes` | indireto por memoria/chat |
+| Agenda | `/agenda` | `/api/v1/agenda/*`, `/api/v1/google-calendar/*` | `agenda`, `google_calendar_*` | indireto por memoria/chat |
+| Campanhas | `/campanhas` | `/api/v1/viva/campanhas*` | `viva_campanhas` | `memories/viva_campanhas/*` |
+| VIVA | `/viva` | `/api/v1/viva/chat*` | `viva_chat_*`, `viva_memory_vectors` | `memories/viva_chat_*`, `redis_viva_memory_medium` |
+| WhatsApp | `/whatsapp*` | `/api/v1/whatsapp*`, `/api/v1/webhook/evolution` | `whatsapp_conversas`, `whatsapp_mensagens`, `viva_handoff_tasks` | `memories/viva_handoff_tasks/*` |
 
-1. VIVA Core ainda concentra logica de varios dominios no mesmo orquestrador.
-2. Agenda depende de NLU textual com alto custo de variação linguistica.
-3. Contratos (modelos vs emitidos) ainda exigem padronizacao semantica adicional em prompts para evitar ambiguidade.
+## Inconsistencias detectadas (estado atual)
 
-## Plano de refatoracao por namespace (incremental)
+1. `assistant-domain` ainda e chamado a partir do `viva_chat_orchestrator_service.py`, mas o roteamento semantico principal ja foi extraido para `viva_domain_query_router_service.py`.
+2. Consultas de cliente em linguagem natural estao cobertas por handler dedicado com match aproximado (nome parcial/ruidoso).
+3. Pedidos de "prova por print/OCR" agora passam por guarda anti-alucinacao e nao caem mais em resposta inventada de anexo.
+4. Dominio de contratos agora separa melhor modelos vs emitidos e usa `cliente_id` para contratos por cliente; risco residual e apenas variacao extrema de texto.
 
-### Estado atual (exemplo)
-- `app/services/viva_chat_orchestrator_service.py` mistura agenda, contratos, clientes, campanhas.
+## Plano de alinhamento de dominio (incremental)
 
-### Estado alvo
-- `app/domains/assistant/orchestrator.py`
-- `app/domains/agenda/application/query_service.py`
-- `app/domains/contracts/application/query_service.py`
-- `app/domains/campaigns/application/query_service.py`
-- `app/domains/crm/application/query_service.py`
-
-## Prioridade sugerida
-
-1. Extrair query handlers de Agenda/Contratos do orquestrador VIVA.
-2. Consolidar contrato semantico de intents por dominio (agenda, contratos, clientes, campanhas).
-3. Publicar suite de testes por dominio (assistant-domain first).
+1. Criar handler de cliente detalhe no `viva_domain_query_router_service.py`.
+2. Criar guarda de nao alucinacao visual para pedidos sobre print/OCR sem pipeline oficial.
+3. Extrair intents por pacote de dominio:
+   - `assistant/intents/clientes.py`
+   - `assistant/intents/contratos.py`
+   - `assistant/intents/agenda.py`
+   - `assistant/intents/campanhas.py`
+4. Adicionar testes de regressao por intent critica (chat -> dominio -> resposta).
 
 ## Veredito
 
-O sistema ja possui fronteiras de negocio suficientes para operar com arquitetura por dominios.
-A principal melhoria restante e reduzir o acoplamento da VIVA Core para cada dominio responder por suas proprias regras e consultas.
+Arquitetura por dominios esta bem definida e operavel.
+O principal risco residual deixou de ser estrutural e passou a ser apenas ajuste fino de linguagem natural em casos muito ambiguos.
 
-## Progresso aplicado na rodada
+## Progresso aplicado ate esta rodada
 
-- Extraido primeiro bloco de dominio do orquestrador VIVA:
-  - novo arquivo `backend/app/services/viva_domain_query_router_service.py`
-  - responsabilidades movidas: consultas de contratos, clientes, campanhas e catalogo de servicos.
-- `backend/app/services/viva_chat_orchestrator_service.py` agora delega esse conjunto para o router de dominio.
-- Governanca de persona/COFRE reforcada:
-  - ancora strict da persona no runtime (`VIVA_AGENT_STRICT=true`);
-  - status de ancora exposto em `GET /api/v1/viva/persona/status`;
-  - hash SHA256 da persona incorporado em `GET /api/v1/viva/modules/status`.
+- Domain router ja separa consultas de contratos, clientes, campanhas e servicos.
+- Ancora de persona/COFRE hardenizada:
+  - `VIVA_AGENT_STRICT=true`;
+  - `GET /api/v1/viva/persona/status`;
+  - hash da persona em `GET /api/v1/viva/modules/status`.
+- COFRE consolidado como fonte unica:
+  - `backend/COFRE/persona-skills/*`
+  - `backend/COFRE/memories/*`
+  - `backend/COFRE/system/endpoints_manifest.json`.
+
+## Atualizacao aplicada (rodada coding-guidelines)
+
+Itens executados em sequencia conforme plano:
+
+1. Handler de cliente detalhe implementado:
+   - arquivo: `backend/app/services/viva_domain_query_router_service.py`
+   - comandos naturais cobertos:
+     - `entre no cadastro do cliente <nome>`
+     - `abrir cadastro do cliente <nome>`
+     - `dados do cliente <nome>`
+   - retorno agora usa dados reais de `clientes` (nome, documento, telefone, email, cidade/UF, endereco, observacoes, contratos vinculados).
+
+2. Guarda anti-alucinacao para print/OCR sem pipeline oficial:
+   - arquivo: `backend/app/services/viva_domain_query_router_service.py`
+   - quando houver pedido de "prova por print/anexo", resposta curta orienta a consultar fonte de verdade no cadastro do sistema.
+
+3. Intents extraidas por pacote de dominio:
+   - `backend/app/services/assistant/intents/clientes.py`
+   - `backend/app/services/assistant/intents/contratos.py`
+   - `backend/app/services/assistant/intents/agenda.py`
+   - `backend/app/services/assistant/intents/campanhas.py`
+   - router passou a importar e usar os intents desses modulos.
+
+4. Testes de regressao por intent critica:
+   - novo arquivo: `backend/tests/test_viva_domain_intents.py`
+   - cobertura:
+     - detalhe de cliente por linguagem natural;
+     - typo de modelos de contrato (`modolos`);
+     - listagem de campanhas nao acionando geracao;
+     - guarda visual anti-alucinacao;
+     - resposta de detalhe de cliente com campos reais via router.
+
+Validacao tecnica:
+- `python -m py_compile` dos modulos alterados: OK.
+- `python -m pytest tests/test_viva_domain_intents.py -q` (em `backend/`): `13 passed`.
+
+## Atualizacao final da rodada (agenda + consistencia runtime)
+
+- Ajuste aplicado em janela de agenda para reduzir inconsistencia de dia/horario:
+  - `backend/app/services/viva_agenda_nlu_service.py`
+    - parser e janela usando horario de Brasilia como base (`America/Sao_Paulo`).
+  - `backend/app/services/agenda_service.py`
+    - filtro de fim ajustado para `< fim` (evita incluir borda do dia seguinte).
+- Rebuild do backend Docker executado para garantir runtime com o codigo novo.
+- Integridade COFRE validada:
+  - todas as tabelas `public` possuem pasta correspondente em `backend/COFRE/memories`;
+  - extra esperado: `redis_viva_memory_medium` (cache/memoria curta).

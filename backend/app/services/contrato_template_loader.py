@@ -139,3 +139,36 @@ def load_contract_template(template_id: str) -> Optional[Dict[str, Any]]:
             continue
 
     return None
+
+
+def list_contract_templates_from_files() -> List[Dict[str, Any]]:
+    templates: Dict[str, Dict[str, Any]] = {}
+    for templates_dir in _candidate_template_dirs():
+        if not templates_dir.exists() or not templates_dir.is_dir():
+            continue
+        for template_path in templates_dir.glob("*.json"):
+            try:
+                with open(template_path, "r", encoding="utf-8") as file:
+                    payload = json.load(file)
+                if not isinstance(payload, dict):
+                    continue
+                normalized = normalize_template_payload(payload)
+                template_id = str(normalized.get("id") or template_path.stem).strip().lower()
+                if not template_id:
+                    continue
+                if template_id in templates:
+                    continue
+                templates[template_id] = {
+                    "id": template_id,
+                    "nome": str(normalized.get("nome") or template_id).strip(),
+                    "tipo": str(normalized.get("tipo") or template_id).strip() or template_id,
+                    "descricao": str(normalized.get("descricao") or "").strip(),
+                    "versao": str(normalized.get("versao") or "1.0.0").strip(),
+                    "ativo": bool(normalized.get("ativo", True)),
+                    "campos": normalized.get("campos", []),
+                    "secoes": normalized.get("secoes", []),
+                }
+            except Exception:
+                continue
+
+    return [tpl for tpl in templates.values() if bool(tpl.get("ativo", True))]

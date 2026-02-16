@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select, desc, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -52,7 +53,7 @@ class AgendaService:
         if inicio:
             query = query.where(Agenda.data_inicio >= inicio)
         if fim:
-            query = query.where(Agenda.data_inicio <= fim)
+            query = query.where(Agenda.data_inicio < fim)
         if cliente_id:
             query = query.where(Agenda.cliente_id == cliente_id)
         if concluido is not None:
@@ -129,7 +130,7 @@ class AgendaService:
     
     async def get_hoje(self, user_id: Optional[UUID] = None) -> Dict[str, Any]:
         """Get today's events."""
-        hoje = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None, hour=0, minute=0, second=0, microsecond=0)
         amanha = hoje + timedelta(days=1)
         
         return await self.list(

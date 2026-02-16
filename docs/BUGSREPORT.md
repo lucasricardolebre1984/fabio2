@@ -93,6 +93,10 @@
 | BUG-105 | Alta | VIVA/SaaS Access | Assistente nao consulta dados reais de contratos/modulos do SaaS quando solicitado, apesar de contexto institucional do proprio sistema | Em validacao (roteamento contratos: modelos vs emitidos por cliente) |
 | BUG-106 | Media | VIVA/Orquestracao UX | Excesso de confirmacoes redundantes e quebra de ordem direta do usuario, contrariando regra de resposta objetiva da persona | Em validacao (confirmacoes curtas `listar`/`nomes`) |
 | BUG-107 | Alta | VIVA/Memoria Persona | Conhecimento da empresa nao esta ancorado de forma consistente no prompt mestre `agents/AGENT.md` + memoria operacional, gerando drift de comportamento | Em validacao (ancora strict COFRE + hash runtime + endpoint de auditoria) |
+| BUG-112 | Alta | VIVA/Contratos Cliente | Consulta "quantos contratos tem no cliente Fabio" falha por busca textual fraca em `contratante_nome`, sem resolver cliente real por cadastro | Em validacao (resolver cliente por melhor match + contratos por `cliente_id`) |
+| BUG-113 | Alta | VIVA/Campanhas Consulta | Pedido de contagem geral de campanhas ("campanhas feitas"/"quantas temos") cai em pergunta de marca FC/Rezeta e confirmacoes redundantes | Em validacao (intent de contagem geral no domain router) |
+| BUG-114 | Alta | VIVA/Agenda NLU | Comando natural "marca pra mim ... daqui uma hora" nao era reconhecido como criacao de compromisso (somente `marcar/marque`) | Em validacao (suporte a variante `marca`) |
+| BUG-115 | Alta | Contratos/Templates | Listagem de modulos de contrato retornava fallback de contratos emitidos quando tabela `contrato_templates` estava vazia, ignorando `contratos/templates/*.json` | Em validacao (listagem hibrida por arquivos + banco) |
 
 ---
 
@@ -189,6 +193,19 @@
   - tolerancia a variacao de texto para "modelos" (`modolos`/`modolo`).
 - validacao tecnica:
   - `python -m py_compile backend/app/services/viva_chat_orchestrator_service.py` => OK
+
+### Atualizacao 2026-02-16 (BUG-105/BUG-106 - cadastro + contratos por cliente em uma resposta)
+- backend:
+  - `backend/app/services/assistant/intents/clientes.py`
+  - `backend/app/services/viva_domain_query_router_service.py`
+  - `backend/tests/test_viva_domain_intents.py`
+- ajustes aplicados:
+  - nova intent combinada para pedidos do tipo "cadastro + contratos" no mesmo comando;
+  - tolerancia a nome aproximado em texto ruidoso (ex.: `Lucas Leiva` -> melhor match cadastrado);
+  - resposta direta em uma unica etapa, sem cadeia de confirmacoes redundantes;
+  - resumo agora retorna cadastro real + contratos ativos (cancelados excluidos da lista ativa).
+- validacao tecnica:
+  - `python -m pytest tests/test_viva_domain_intents.py -q` (em `backend/`) => OK
 
 ### BUG-107: Drift de memoria/persona fora da fonte canonica
 **Data:** 2026-02-16  
@@ -2134,3 +2151,101 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
 **Correcao aplicada:** intent dedicado de hora atual + resposta deterministica em BRT no orquestrador (`backend/app/services/viva_chat_orchestrator_service.py`).
 **Validacao:** "mostre a hora atual no horario de brasilia" retorna horario BRT diretamente.
 **Status:** Resolvido
+
+### BUG-112: Contratos por cliente falham com nome parcial/acento
+**Data:** 2026-02-16
+**Severidade:** Alta
+**Descricao:** Perguntas como "Quantos contratos tem no cliente Fábio?" retornavam "não encontrei", mesmo com contratos no cliente.
+**Causa raiz:** Consulta usava filtro textual em `contratante_nome` e não resolvia cliente real por cadastro (`clientes`), falhando com variação de grafia/acento.
+**Correcao aplicada:**
+- resolução de cliente por melhor correspondência no domain router;
+- consulta de contratos via `cliente_id` (`ClienteService.get_contratos`) em vez de depender só de busca textual;
+- resposta de contagem de contratos ativos x total emitido para comandos de "quantos contratos".
+**Arquivos:**
+- `backend/app/services/viva_domain_query_router_service.py`
+- `backend/tests/test_viva_domain_intents.py`
+**Status:** Em validacao
+
+### BUG-113: Contagem geral de campanhas cai em pergunta de marca
+**Data:** 2026-02-16
+**Severidade:** Alta
+**Descricao:** Pedidos de contagem geral ("campanhas feitas", "quantas temos feitas") caíam em pergunta "FC ou Rezeta?" e loops de confirmação.
+**Causa raiz:** Faltava intent de contagem no domínio de campanhas; o fluxo de geração assumia marca para mensagens curtas com "campanha".
+**Correcao aplicada:**
+- nova intent `is_campaign_count_intent` para contagem direta;
+- resposta objetiva de total geral ou por marca sem pergunta de confirmação/seleção quando o pedido for geral.
+**Arquivos:**
+- `backend/app/services/assistant/intents/campanhas.py`
+- `backend/app/services/viva_domain_query_router_service.py`
+- `backend/tests/test_viva_domain_intents.py`
+**Status:** Em validacao
+
+### Atualizacao 2026-02-16 (BUG-106/112/113 - ordem direta sem loop)
+- backend:
+  - `backend/app/services/viva_agenda_nlu_service.py`
+  - `backend/COFRE/persona-skills/AGENT.md`
+- ajustes aplicados:
+  - parser de concluir compromisso agora exige contexto de agenda (`agenda|compromisso|evento`), evitando disparo indevido por frases fora do domínio;
+  - prompt mestre no COFRE reforçado para:
+    - executar consulta de sistema sem "posso prosseguir?";
+    - aceitar nome parcial/aproximado em cliente;
+    - responder contagem/listagem de campanhas gerais sem exigir FC/Rezeta.
+**Status:** Em validacao
+
+### BUG-114: Comando "marca pra mim" nao criava compromisso
+**Data:** 2026-02-16
+**Severidade:** Alta
+**Descricao:** Frases naturais de criacao com verbo "marca" (sem "r") caiam fora do parser de agenda e o fluxo seguia para dominio errado.
+**Causa raiz:** NLU de agenda aceitava apenas `marcar/marque`.
+**Correcao aplicada:**
+- parser de criacao passou a aceitar `marca` em:
+  - `_has_create_imperative`
+  - `parse_agenda_command`
+  - `parse_agenda_natural_create`
+**Arquivos:**
+- `backend/app/services/viva_agenda_nlu_service.py`
+- `backend/tests/test_viva_domain_intents.py`
+**Status:** Em validacao
+
+### BUG-115: Modulos de contrato nao listavam os templates reais do sistema
+**Data:** 2026-02-16
+**Severidade:** Alta
+**Descricao:** Ao pedir "todos os modulos/templates", o retorno podia ficar limitado a contratos emitidos quando a tabela `contrato_templates` estava vazia.
+**Causa raiz:** `ContratoService.list_templates()` dependia apenas do banco.
+**Correcao aplicada:**
+- novo loader de listagem de templates por arquivo JSON:
+  - `list_contract_templates_from_files()` em `contrato_template_loader.py`;
+- `ContratoService.list_templates()` passou a retornar lista hibrida:
+  - primeiro templates de `contratos/templates/*.json`;
+  - depois templates do banco nao duplicados.
+- intent de templates ampliada para reconhecer `modulo/modulos`.
+**Arquivos:**
+- `backend/app/services/contrato_template_loader.py`
+- `backend/app/services/contrato_service.py`
+- `backend/app/services/assistant/intents/contratos.py`
+- `backend/tests/test_viva_domain_intents.py`
+**Status:** Em validacao
+
+### Atualizacao 2026-02-16 (BUG-112/115 - reforco final de rota cliente+templates)
+- backend:
+  - `backend/app/services/viva_domain_query_router_service.py`
+  - `backend/app/services/contrato_template_loader.py`
+  - `backend/app/services/contrato_service.py`
+  - `backend/tests/test_viva_domain_intents.py`
+- ajustes aplicados:
+  - consulta de detalhe de cliente agora usa resolvedor fuzzy global (nome parcial/aproximado + fallback seguro);
+  - listagem de templates passou a carregar os 15 modelos de `contratos/templates/*.json` mesmo com tabela `contrato_templates` vazia.
+- validacao tecnica:
+  - `python -m pytest tests/test_viva_domain_intents.py -q` => OK
+
+### Atualizacao 2026-02-16 (BUG-104/114 - consistencia de agenda em BRT)
+- backend:
+  - `backend/app/services/viva_agenda_nlu_service.py`
+  - `backend/app/services/agenda_service.py`
+- ajustes aplicados:
+  - parser natural e janela de consulta passaram a usar base de horario de Brasilia (`America/Sao_Paulo`);
+  - filtro de listagem de agenda ajustado para `data_inicio < fim` (evita vazamento na borda do dia seguinte);
+  - suporte ao verbo `marca` mantido no parser natural e validado em teste.
+- validacao tecnica:
+  - `python -m pytest tests/test_viva_domain_intents.py -q` => `13 passed`;
+  - rebuild do backend docker executado para garantir runtime atualizado.

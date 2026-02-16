@@ -18,6 +18,42 @@ from app.api.v1.viva_schemas import CampanhaItem, HandoffItem
 from app.services.viva_campaign_repository_service import viva_campaign_repository_service
 
 
+def _mojibake_score(text: str) -> int:
+    markers = ("Ãƒ", "Ã‚", "Ã¢", "\ufffd")
+    return sum(text.count(marker) for marker in markers)
+
+
+def _decode_mojibake_once(text: str, source_encoding: str) -> str:
+    try:
+        return text.encode(source_encoding).decode("utf-8")
+    except UnicodeError:
+        return text
+
+
+def _normalize_mojibake_text(value: Any) -> str:
+    text = str(value or "")
+    if not text:
+        return ""
+    if _mojibake_score(text) == 0:
+        return text
+
+    normalized = text
+    for _ in range(2):
+        best = normalized
+        best_score = _mojibake_score(normalized)
+        for encoding in ("cp1252", "latin-1"):
+            candidate = _decode_mojibake_once(normalized, encoding)
+            candidate_score = _mojibake_score(candidate)
+            if candidate_score < best_score:
+                best = candidate
+                best_score = candidate_score
+        if best == normalized:
+            break
+        normalized = best
+
+    return normalized
+
+
 def _normalize_key(texto: str) -> str:
     base = unicodedata.normalize("NFKD", texto or "")
     without_accents = "".join(ch for ch in base if not unicodedata.combining(ch))

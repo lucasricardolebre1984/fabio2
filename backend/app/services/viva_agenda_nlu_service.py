@@ -4,11 +4,20 @@ NLU helpers for VIVA agenda flows.
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 import re
 import unicodedata
 
 from app.models.agenda import EventoTipo
+
+
+BRT_TZ = ZoneInfo("America/Sao_Paulo")
+
+
+def _now_brt_naive() -> datetime:
+    """Retorna datetime naive no fuso de Brasilia para consistencia em toda agenda."""
+    return datetime.now(BRT_TZ).replace(tzinfo=None)
 
 
 def _normalize_key(texto: str) -> str:
@@ -32,6 +41,7 @@ def _has_create_imperative(normalized: str) -> bool:
         "agendar",
         "agende",
         "marcar",
+        "marca",
         "marque",
         "criar compromisso",
         "crie compromisso",
@@ -122,12 +132,13 @@ def parse_agenda_command(message: str) -> Optional[Dict[str, Any]]:
         or lower.startswith("agende")
         or lower.startswith("agenda")
         or lower.startswith("marcar")
+        or lower.startswith("marca")
         or lower.startswith("marque")
     ):
         return None
 
     payload = re.sub(
-        r"^(agendar|agende|agenda|marcar|marque)\s*:?\s*",
+        r"^(agendar|agende|agenda|marcar|marca|marque)\s*:?\s*",
         "",
         text,
         flags=re.IGNORECASE,
@@ -304,7 +315,7 @@ def is_agenda_query_intent(message: str, contexto: List[Dict[str, Any]]) -> bool
 
 def agenda_window_from_text(message: str) -> Tuple[datetime, datetime, str]:
     normalized = _normalize_key(message)
-    now = datetime.now()
+    now = _now_brt_naive()
 
     if "amanha" in normalized:
         start = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -435,12 +446,12 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
             except ValueError:
                 continue
     elif has_tomorrow_hint:
-        date_value = datetime.now() + timedelta(days=1)
+        date_value = _now_brt_naive() + timedelta(days=1)
     elif has_today_hint:
-        date_value = datetime.now()
+        date_value = _now_brt_naive()
 
     if relative_delta is not None:
-        date_time = datetime.now() + relative_delta
+        date_time = _now_brt_naive() + relative_delta
         date_time = date_time.replace(second=0, microsecond=0)
     else:
         if not date_value:
@@ -449,7 +460,7 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
 
     title = raw
     verb_match = re.search(
-        r"(?i)\b(agendar|agende|agenda|marcar|marque|novo compromisso|criar compromisso|crie compromisso|adicionar compromisso|adicione compromisso)\b",
+        r"(?i)\b(agendar|agende|agenda|marcar|marca|marque|novo compromisso|criar compromisso|crie compromisso|adicionar compromisso|adicione compromisso)\b",
         title,
     )
     if verb_match:
@@ -494,6 +505,8 @@ def parse_agenda_conclude_command(message: str) -> Optional[Dict[str, Any]]:
 
     normalized = _normalize_key(raw)
     if not any(term in normalized for term in ("concluir", "confirmar", "finalizar")):
+        return None
+    if not any(term in normalized for term in ("agenda", "compromisso", "evento")):
         return None
 
     uuid_match = re.search(

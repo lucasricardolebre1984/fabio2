@@ -14,8 +14,13 @@ from app.models.cliente import Cliente
 from app.models.contrato_template import ContratoTemplate
 from app.schemas.contrato import ContratoCreate, ContratoUpdate
 from app.services.cliente_service import ClienteService
-from app.services.contrato_template_loader import load_contract_template, normalize_template_payload
+from app.services.contrato_template_loader import (
+    list_contract_templates_from_files,
+    load_contract_template,
+    normalize_template_payload,
+)
 from app.services.extenso_service import ExtensoService
+from app.services.viva_shared_service import _normalize_mojibake_text
 
 
 FALLBACK_TEMPLATES: Dict[str, Dict[str, Any]] = {
@@ -203,17 +208,20 @@ class ContratoService:
     
     async def list_templates(self) -> List[Dict[str, Any]]:
         """List available contract templates."""
+        file_templates = list_contract_templates_from_files()
+        file_ids = {str(item.get("id") or "").strip().lower() for item in file_templates}
+
         result = await self.db.execute(
             select(ContratoTemplate).where(ContratoTemplate.ativo == True)
         )
         templates = result.scalars().all()
-        return [
+        db_templates = [
             {
-                "id": t.id,
-                "nome": t.nome,
-                "tipo": t.tipo,
-                "descricao": t.descricao,
-                "versao": t.versao,
+                "id": str(t.id),
+                "nome": _normalize_mojibake_text(t.nome),
+                "tipo": _normalize_mojibake_text(t.tipo),
+                "descricao": _normalize_mojibake_text(t.descricao),
+                "versao": _normalize_mojibake_text(t.versao),
                 "ativo": t.ativo,
                 "campos": t.campos,
                 "secoes": t.secoes,
@@ -221,7 +229,9 @@ class ContratoService:
                 "updated_at": t.updated_at
             }
             for t in templates
+            if str(t.tipo or "").strip().lower() not in file_ids
         ]
+        return file_templates + db_templates
     
     async def get_template(self, template_id: str) -> Optional[Dict[str, Any]]:
         """Get template by ID."""
