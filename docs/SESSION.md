@@ -25,6 +25,9 @@ Status: consolidacao de arquitetura COFRE + correcao institucional da documentac
   - filtro por cliente em consulta de contratos emitidos.
 - Correcao no NLU de agenda:
   - consulta passou a aceitar variacoes `liste agenda` e `lite agenda` na rota de agenda real.
+- Refatoracao de estrutura por dominio:
+  - criado `backend/app/services/viva_domain_query_router_service.py`;
+  - orquestrador VIVA passou a delegar consultas de contratos/clientes/campanhas/servicos para esse router.
 
 ## Regra de historico
 

@@ -43,6 +43,9 @@ Status geral: operacional em ambiente local, com pendencias criticas abertas na 
 
 - Matriz menu -> API -> banco -> COFRE: `docs/AUDIT/menu-endpoint-matrix.md`
 - Auditoria documental: `docs/AUDIT/DOCS_AUDIT_2026-02-16.md`
+- Refatoracao de dominio aplicada no orquestrador:
+  - `backend/app/services/viva_domain_query_router_service.py`
+  - consultas de contratos/clientes/campanhas/servicos extraidas do `viva_chat_orchestrator_service.py`
 
 ## Diretriz de deploy institucional
 

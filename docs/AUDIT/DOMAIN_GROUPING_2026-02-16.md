@@ -180,3 +180,10 @@ Responsabilidade:
 
 O sistema ja possui fronteiras de negocio suficientes para operar com arquitetura por dominios.
 A principal melhoria restante e reduzir o acoplamento da VIVA Core para cada dominio responder por suas proprias regras e consultas.
+
+## Progresso aplicado na rodada
+
+- Extraido primeiro bloco de dominio do orquestrador VIVA:
+  - novo arquivo `backend/app/services/viva_domain_query_router_service.py`
+  - responsabilidades movidas: consultas de contratos, clientes, campanhas e catalogo de servicos.
+- `backend/app/services/viva_chat_orchestrator_service.py` agora delega esse conjunto para o router de dominio.
