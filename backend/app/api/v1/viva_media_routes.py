@@ -40,14 +40,25 @@ async def tts_status(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        status = minimax_tts_service.get_status()
+        status = {
+            "configured": bool(settings.OPENAI_API_KEY),
+            "provider": "openai",
+            "model": getattr(settings, "OPENAI_TTS_MODEL", "tts-1"),
+            "voice": getattr(settings, "OPENAI_TTS_VOICE", "alloy"),
+        }
+
         if status.get("configured"):
             try:
-                ok = await minimax_tts_service.test_connection()
-                status["test"] = "success" if ok else "failed"
+                audio_bytes, _ = await openai_service.text_to_speech_bytes("ok")
+                status["test"] = "success" if audio_bytes else "failed"
             except Exception as exc:
                 status["test"] = "failed"
                 status["error"] = str(exc)[:220]
+        else:
+            status["test"] = "failed"
+            status["missing_env"] = ["OPENAI_API_KEY"]
+
+        status["minimax"] = minimax_tts_service.get_status()
         return status
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Erro status TTS: {str(exc)}")
@@ -108,7 +119,7 @@ async def speak_text(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        audio_bytes, media_type = await minimax_tts_service.synthesize(payload.text)
+        audio_bytes, media_type = await openai_service.text_to_speech_bytes(payload.text)
         return Response(content=audio_bytes, media_type=media_type)
     except Exception as exc:
         logger.warning("viva_tts_failed: %s", str(exc)[:220])

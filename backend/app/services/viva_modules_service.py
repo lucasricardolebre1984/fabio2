@@ -93,7 +93,11 @@ class VivaModulesService:
                 "status": "assisted",
                 "descricao": "Memoria curta/media/longa com pgvector e fallback local de embeddings.",
                 "dependencias": ["openai", "postgres_pgvector", "redis"],
-                "endpoints": ["/api/v1/viva/memory/status", "/api/v1/viva/memory/search", "/api/v1/viva/memory/reindex"],
+                "endpoints": [
+                    "/api/v1/cofre/memories/status",
+                    "/api/v1/cofre/memories/tables",
+                    "/api/v1/cofre/memories/{table_name}/tail",
+                ],
                 "notes": [
                     "Operacional para continuidade.",
                     "Homologacao semantica premium pendente (BUG-094).",
@@ -112,4 +116,3 @@ class VivaModulesService:
 
 
 viva_modules_service = VivaModulesService()
-

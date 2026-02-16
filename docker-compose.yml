@@ -117,6 +117,8 @@ services:
       - STORAGE_LOCAL_PATH=/app/storage
       - VIVA_RULES_DIR=/app/viva_rules
       - CONTRATOS_TEMPLATES_DIR=/app/contratos/templates
+      - VIVA_BRAIN_ROOT=/app/COFRE
+      - VIVA_MEMORY_FILE_LOG_ENABLED=true
     volumes:
       - ./backend:/app
       - ./agents:/app/agents:ro

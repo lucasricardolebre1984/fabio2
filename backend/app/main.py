@@ -12,6 +12,7 @@ from app.api.router import api_router
 from app.core.logging import setup_logging
 from app.db.session import AsyncSessionLocal
 from app.services.viva_handoff_service import viva_handoff_service
+from app.services.viva_brain_paths_service import viva_brain_paths_service
 from app.services.viva_memory_service import viva_memory_service
 
 
@@ -23,6 +24,7 @@ async def lifespan(app: FastAPI):
     
     # Create storage directory if not exists
     os.makedirs(settings.STORAGE_LOCAL_PATH, exist_ok=True)
+    viva_brain_paths_service.ensure_runtime_dirs()
 
     is_vercel = os.getenv("VERCEL") == "1"
 

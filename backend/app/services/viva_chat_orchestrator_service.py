@@ -67,8 +67,6 @@ from app.services.viva_chat_runtime_helpers_service import (
     _is_viviane_handoff_query_intent,
     _normalize_any_datetime,
     _sanitize_fake_asset_delivery_reply,
-    _sanitize_idle_confirmations,
-    _sanitize_unsolicited_capability_menu,
 )
 from app.services.viva_shared_service import (
     _clear_campaign_history,
@@ -77,7 +75,6 @@ from app.services.viva_shared_service import (
     _normalize_mode,
     _save_campaign_record,
 )
-from app.services.viva_skill_router_service import viva_skill_router_service
 
 logger = logging.getLogger(__name__)
 
@@ -100,14 +97,13 @@ class VivaChatOrchestratorService:
                 requested_session_id=request.session_id,
                 modo=modo,
             )
-            active_skill_meta: Dict[str, Any] = {}
 
             async def finalize(
                 resposta: str,
                 midia: Optional[List[MediaItem]] = None,
                 meta: Optional[Dict[str, Any]] = None,
             ) -> ChatResponse:
-                final_meta = {**active_skill_meta, **(meta or {})}
+                final_meta = {**(meta or {})}
                 await append_chat_message(
                     db=db,
                     session_id=session_id,
@@ -206,18 +202,6 @@ class VivaChatOrchestratorService:
                     agenda_errors.append(str(agenda_natural_command["error"]))
                 else:
                     agenda_create_payload = agenda_natural_command
-
-            active_skill_meta = viva_skill_router_service.resolve_skill(
-                mensagem=request.mensagem,
-                modo=modo,
-                agenda_query_intent=agenda_query_intent,
-                has_agenda_create_payload=bool(agenda_create_payload),
-                handoff_intent=handoff_intent,
-                viviane_handoff_query_intent=viviane_handoff_query_intent,
-                campaign_flow_requested=False,
-                should_generate_image=False,
-                logo_request=logo_request,
-            )
 
             if agenda_create_payload:
                 evento = await service.create(
@@ -458,7 +442,7 @@ class VivaChatOrchestratorService:
                     meta={"campaign_history_cleared": deleted},
                 )
 
-            if modo in ("FC", "REZETA") and not logo_request:
+            if not logo_request:
                 pending_campaign = _has_pending_campaign_brief(contexto_efetivo)
                 campaign_fields = _collect_campaign_fields_from_context(contexto_efetivo)
                 has_campaign_signal = _has_campaign_signal(request.mensagem)
@@ -477,8 +461,7 @@ class VivaChatOrchestratorService:
                     campaign_prompt_source = request.mensagem
 
             if (
-                modo in ("FC", "REZETA")
-                and campaign_flow_requested
+                campaign_flow_requested
                 and not logo_request
                 and suggestion_first_intent
                 and not _is_image_request(request.mensagem)
@@ -494,60 +477,65 @@ class VivaChatOrchestratorService:
                 and not suggestion_first_intent
                 and not _is_greeting(request.mensagem)
             )
-            active_skill_meta = viva_skill_router_service.resolve_skill(
-                mensagem=request.mensagem,
-                modo=modo,
-                agenda_query_intent=agenda_query_intent,
-                has_agenda_create_payload=bool(agenda_create_payload),
-                handoff_intent=handoff_intent,
-                viviane_handoff_query_intent=viviane_handoff_query_intent,
-                campaign_flow_requested=campaign_flow_requested,
-                should_generate_image=should_generate_image,
-                logo_request=logo_request,
-            )
 
             if should_generate_image:
                 if not settings.OPENAI_API_KEY:
                     return await finalize(resposta="A geracao de imagens esta indisponivel no momento.")
 
-                if not logo_request and modo not in ("FC", "REZETA"):
-                    # Fluxo a prova de erro: para campanhas/imagens de marca, exige FC/Rezeta explicito.
-                    return await finalize(resposta="Para essa campanha/imagem, voce quer FC ou Rezeta?")
-
                 effective_mode = "LOGO" if logo_request else modo
+                campaign_mode = (
+                    effective_mode
+                    if effective_mode in ("FC", "REZETA")
+                    else ("NEUTRO" if campaign_flow_requested else effective_mode)
+                )
                 hint = _mode_hint(effective_mode)
                 campaign_copy: Optional[Dict[str, Any]] = None
                 image_size = "1024x1024"
                 variation_id = uuid4().hex[:10]
+                use_campaign_skill = bool(campaign_flow_requested and not logo_request)
 
-                if effective_mode in ("FC", "REZETA"):
+                if use_campaign_skill:
                     campaign_copy = await _generate_campaign_copy(
                         campaign_prompt_source,
                         None,
-                        effective_mode,
+                        campaign_mode,
+                        variation_id=variation_id,
                     )
                     cast_preference = _extract_cast_preference(campaign_prompt_source)
                     campaign_copy["cast_user_preference"] = cast_preference or str(
                         campaign_copy.get("cast_user_preference") or ""
                     )
                     image_size = _resolve_image_size_from_format(str(campaign_copy.get("formato") or "4:5"))
-                    prompt = _build_branded_background_prompt(
-                        effective_mode,
-                        campaign_copy,
-                        variation_id=variation_id,
-                    )
+                    if campaign_mode in ("FC", "REZETA"):
+                        prompt = _build_branded_background_prompt(
+                            campaign_mode,
+                            campaign_copy,
+                            variation_id=variation_id,
+                        )
+                    else:
+                        prompt = (
+                            "Crie uma imagem de campanha publicitaria neutra, sem marca fixa, "
+                            "com composicao original e sem repetir personagem/cena de pecas anteriores. "
+                            "Nao renderize texto na imagem.\n"
+                            f"Tema: {campaign_copy.get('tema') or ''}\n"
+                            f"Publico: {campaign_copy.get('publico') or ''}\n"
+                            f"Objetivo: {campaign_copy.get('objetivo') or ''}\n"
+                            f"Oferta: {campaign_copy.get('oferta') or ''}\n"
+                            f"Cena: {campaign_copy.get('scene') or ''}\n"
+                            f"Variacao: {variation_id}"
+                        )
                 else:
                     prompt = _build_image_prompt(None, hint, request.mensagem)
                     prompt = f"{prompt}\n{BACKGROUND_ONLY_SUFFIX}"
 
-                image_quality = "high" if effective_mode in ("FC", "REZETA") else None
+                image_quality = "high" if campaign_mode in ("FC", "REZETA") else None
                 resultado = await openai_service.generate_image(prompt=prompt, size=image_size, quality=image_quality)
                 if not resultado.get("success"):
                     erro = resultado.get("error")
                     if _is_stackoverflow_error(erro):
-                        if effective_mode in ("FC", "REZETA") and campaign_copy:
+                        if campaign_mode in ("FC", "REZETA") and campaign_copy:
                             fallback_prompt = _build_branded_background_prompt_compact(
-                                effective_mode,
+                                campaign_mode,
                                 campaign_copy,
                                 variation_id=f"{variation_id}-compact",
                             )
@@ -564,13 +552,14 @@ class VivaChatOrchestratorService:
                             if url:
                                 media_meta = {"overlay": campaign_copy} if campaign_copy else {}
                                 resposta_texto = "Imagem gerada com sucesso."
-                                if effective_mode in ("FC", "REZETA"):
+                                if campaign_copy:
+                                    save_mode = campaign_mode if campaign_mode in ("FC", "REZETA") else "NEUTRO"
                                     saved_id = await _save_campaign_record(
                                         db=db,
                                         user_id=current_user.id,
-                                        modo=effective_mode,
+                                        modo=save_mode,
                                         image_url=url,
-                                        titulo=_derive_campaign_title(effective_mode, campaign_copy, request.mensagem),
+                                        titulo=_derive_campaign_title(save_mode, campaign_copy, request.mensagem),
                                         briefing=campaign_prompt_source,
                                         mensagem_original=request.mensagem,
                                         overlay=campaign_copy or {},
@@ -598,13 +587,14 @@ class VivaChatOrchestratorService:
                 if url:
                     media_meta = {"overlay": campaign_copy} if campaign_copy else {}
                     resposta_texto = "Imagem gerada com sucesso."
-                    if effective_mode in ("FC", "REZETA"):
+                    if campaign_copy:
+                        save_mode = campaign_mode if campaign_mode in ("FC", "REZETA") else "NEUTRO"
                         saved_id = await _save_campaign_record(
                             db=db,
                             user_id=current_user.id,
-                            modo=effective_mode,
+                            modo=save_mode,
                             image_url=url,
-                            titulo=_derive_campaign_title(effective_mode, campaign_copy, request.mensagem),
+                            titulo=_derive_campaign_title(save_mode, campaign_copy, request.mensagem),
                             briefing=campaign_prompt_source,
                             mensagem_original=request.mensagem,
                             overlay=campaign_copy or {},
@@ -644,8 +634,6 @@ class VivaChatOrchestratorService:
                     messages_local = viva_local_service.build_messages(request.mensagem, contexto_efetivo)
                     resposta = await viva_local_service.chat(messages_local, modo)
 
-            resposta = _sanitize_idle_confirmations(resposta)
-            resposta = _sanitize_unsolicited_capability_menu(request.mensagem, resposta)
             resposta = _sanitize_fake_asset_delivery_reply(resposta, modo)
             return await finalize(resposta=resposta)
         except Exception as e:

@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.cofre_memory_service import cofre_memory_service
 from app.services.whatsapp_service import WhatsAppService
 
 
@@ -92,6 +93,19 @@ class VivaHandoffService:
             payload,
         )
         await db.commit()
+        cofre_memory_service.log_event(
+            table_name="viva_handoff_tasks",
+            action="insert",
+            payload={
+                "id": str(task_id),
+                "user_id": str(user_id),
+                "agenda_event_id": str(agenda_event_id) if agenda_event_id else None,
+                "cliente_nome": cliente_nome,
+                "cliente_numero": cliente_numero,
+                "scheduled_for": str(scheduled_for),
+                "status": "pending",
+            },
+        )
         return task_id
 
     async def list_tasks(
@@ -196,6 +210,15 @@ class VivaHandoffService:
                 )
 
         await db.commit()
+        cofre_memory_service.log_event(
+            table_name="viva_handoff_tasks",
+            action="process_due_tasks",
+            payload={
+                "processed": len(due),
+                "sent": sent,
+                "failed": failed,
+            },
+        )
         return {"processed": len(due), "sent": sent, "failed": failed}
 
 

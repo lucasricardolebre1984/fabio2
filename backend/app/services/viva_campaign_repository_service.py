@@ -10,6 +10,8 @@ from uuid import UUID, uuid4
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.cofre_memory_service import cofre_memory_service
+
 
 class VivaCampaignRepositoryService:
     """Encapsulates SQL operations for campaign history."""
@@ -96,6 +98,35 @@ class VivaCampaignRepositoryService:
                 "updated_at": now,
             },
         )
+        cofre_memory_service.log_event(
+            table_name="viva_campanhas",
+            action="insert",
+            payload={
+                "id": str(campaign_id),
+                "user_id": str(user_id) if user_id else None,
+                "modo": modo,
+                "titulo": titulo,
+                "briefing": briefing,
+                "mensagem_original": mensagem_original,
+                "image_url": image_url,
+                "overlay": overlay or {},
+                "meta": meta or {},
+            },
+        )
+        cofre_memory_service.save_campaign_snapshot(
+            campaign_id=str(campaign_id),
+            payload={
+                "id": str(campaign_id),
+                "user_id": str(user_id) if user_id else None,
+                "modo": modo,
+                "titulo": titulo,
+                "briefing": briefing,
+                "mensagem_original": mensagem_original,
+                "image_url": image_url,
+                "overlay": overlay or {},
+                "meta": meta or {},
+            },
+        )
         return campaign_id
 
     async def get_campaign_row(self, db: AsyncSession, campaign_id: UUID) -> Optional[Any]:
@@ -127,7 +158,7 @@ class VivaCampaignRepositoryService:
         }
 
         where_clause = "WHERE user_id = :user_id"
-        if modo in ("FC", "REZETA"):
+        if modo in ("FC", "REZETA", "NEUTRO"):
             where_clause += " AND modo = :modo"
             params["modo"] = modo
 
@@ -260,9 +291,21 @@ class VivaCampaignRepositoryService:
         await self.ensure_table(db)
         params: Dict[str, Any] = {"user_id": str(user_id)}
         where = "WHERE user_id = :user_id"
-        if modo in ("FC", "REZETA"):
+        if modo in ("FC", "REZETA", "NEUTRO"):
             where += " AND modo = :modo"
             params["modo"] = modo
+
+        candidates = await db.execute(
+            text(
+                f"""
+                SELECT id, image_url
+                FROM viva_campanhas
+                {where}
+                """
+            ),
+            params,
+        )
+        candidate_rows = list(candidates.fetchall())
 
         result = await db.execute(
             text(
@@ -274,7 +317,74 @@ class VivaCampaignRepositoryService:
             params,
         )
         await db.commit()
+        removed_snapshots = 0
+        removed_assets = 0
+        for row in candidate_rows:
+            if cofre_memory_service.delete_campaign_snapshot(str(row.id)):
+                removed_snapshots += 1
+            if cofre_memory_service.delete_campaign_asset_from_url(str(getattr(row, "image_url", "") or "")):
+                removed_assets += 1
+        cofre_memory_service.log_event(
+            table_name="viva_campanhas",
+            action="delete",
+            payload={
+                "user_id": str(user_id),
+                "modo": modo,
+                "deleted": int(result.rowcount or 0),
+                "removed_snapshots": removed_snapshots,
+                "removed_assets": removed_assets,
+            },
+        )
         return int(result.rowcount or 0)
+
+    async def delete_campaign_by_id(
+        self,
+        db: AsyncSession,
+        campaign_id: UUID,
+        user_id: UUID,
+    ) -> bool:
+        await self.ensure_table(db)
+        current_row = await db.execute(
+            text(
+                """
+                SELECT id, image_url
+                FROM viva_campanhas
+                WHERE id = :id AND user_id = :user_id
+                """
+            ),
+            {"id": str(campaign_id), "user_id": str(user_id)},
+        )
+        row = current_row.first()
+        if not row:
+            return False
+
+        result = await db.execute(
+            text(
+                """
+                DELETE FROM viva_campanhas
+                WHERE id = :id AND user_id = :user_id
+                """
+            ),
+            {"id": str(campaign_id), "user_id": str(user_id)},
+        )
+        await db.commit()
+        deleted = int(result.rowcount or 0) > 0
+        if deleted:
+            removed_snapshot = cofre_memory_service.delete_campaign_snapshot(str(campaign_id))
+            removed_asset = cofre_memory_service.delete_campaign_asset_from_url(
+                str(getattr(row, "image_url", "") or "")
+            )
+            cofre_memory_service.log_event(
+                table_name="viva_campanhas",
+                action="delete_by_id",
+                payload={
+                    "id": str(campaign_id),
+                    "user_id": str(user_id),
+                    "removed_snapshot": bool(removed_snapshot),
+                    "removed_asset": bool(removed_asset),
+                },
+            )
+        return deleted
 
     @staticmethod
     def _safe_json(value: Any, fallback: Any) -> Any:

@@ -19,6 +19,8 @@ class OpenAIService:
         self.base_url = settings.OPENAI_BASE_URL.rstrip("/")
         self.model_chat = settings.OPENAI_API_MODEL
         self.model_audio = settings.OPENAI_AUDIO_MODEL
+        self.model_tts = getattr(settings, "OPENAI_TTS_MODEL", "tts-1")
+        self.voice_tts = getattr(settings, "OPENAI_TTS_VOICE", "alloy")
         self.model_image = settings.OPENAI_IMAGE_MODEL
         self.model_vision = settings.OPENAI_VISION_MODEL
         self.model_embedding = settings.OPENAI_EMBEDDING_MODEL
@@ -305,6 +307,52 @@ class OpenAIService:
             return "Erro OpenAI audio: resposta vazia"
 
         return f"Erro OpenAI audio ({response.status_code}): {response.text[:300]}"
+
+    async def text_to_speech_bytes(
+        self,
+        text: str,
+        *,
+        voice: str | None = None,
+        fmt: str = "mp3",
+    ) -> tuple[bytes, str]:
+        clean = str(text or "").strip()
+        if not clean:
+            raise ValueError("Texto vazio para TTS")
+        if not self.api_key:
+            raise ValueError("OPENAI_API_KEY nao configurada")
+
+        resolved_voice = str((voice or self.voice_tts) or "alloy").strip() or "alloy"
+        resolved_format = str(fmt or "mp3").strip().lower() or "mp3"
+        if resolved_format not in {"mp3", "wav"}:
+            resolved_format = "mp3"
+
+        payload: Dict[str, Any] = {
+            "model": self.model_tts,
+            "input": clean,
+            "voice": resolved_voice,
+            "format": resolved_format,
+        }
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.post(
+                f"{self.base_url}/audio/speech",
+                headers=headers,
+                json=payload,
+            )
+
+        if response.status_code != 200:
+            raise ValueError(f"Erro OpenAI TTS ({response.status_code}): {response.text[:300]}")
+
+        audio_bytes = bytes(response.content or b"")
+        if not audio_bytes:
+            raise ValueError("OpenAI TTS retornou audio vazio")
+
+        media_type = "audio/mpeg" if resolved_format == "mp3" else "audio/wav"
+        return audio_bytes, media_type
 
     async def generate_image(
         self,

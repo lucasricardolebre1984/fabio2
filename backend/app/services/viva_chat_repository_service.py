@@ -10,6 +10,8 @@ from uuid import UUID, uuid4
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.cofre_memory_service import cofre_memory_service
+
 
 class VivaChatRepositoryService:
     """Encapsulates SQL operations for VIVA chat persistence."""
@@ -80,6 +82,15 @@ class VivaChatRepositoryService:
                 "created_at": now,
                 "updated_at": now,
                 "last_message_at": now,
+            },
+        )
+        cofre_memory_service.log_event(
+            table_name="viva_chat_sessions",
+            action="insert",
+            payload={
+                "id": str(session_id),
+                "user_id": str(user_id),
+                "modo": modo,
             },
         )
         return session_id
@@ -182,6 +193,19 @@ class VivaChatRepositoryService:
                 "modo": modo,
                 "anexos_json": json.dumps(anexos or [], ensure_ascii=False),
                 "meta_json": json.dumps(meta or {}, ensure_ascii=False),
+            },
+        )
+        cofre_memory_service.log_event(
+            table_name="viva_chat_messages",
+            action="insert",
+            payload={
+                "session_id": str(session_id),
+                "user_id": str(user_id),
+                "tipo": tipo,
+                "modo": modo,
+                "conteudo": conteudo,
+                "anexos": anexos or [],
+                "meta": meta or {},
             },
         )
         await db.execute(

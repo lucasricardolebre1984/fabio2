@@ -1,0 +1,7 @@
+﻿# Legacy compat file
+
+Este arquivo foi mantido apenas para retrocompatibilidade.
+A skill canonica esta em:
+- COFRE/persona-skills/skill-generate-campanha-neutra.md
+
+Use sempre a versao .md.

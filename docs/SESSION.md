@@ -1429,3 +1429,94 @@ Rodada BUG-048..053 concluida com validacao tecnica e documentacao atualizada.
   - logs de falha TTS adicionados no backend para auditoria rapida.
 - governanca:
   - bugs novos registrados: `BUG-096` a `BUG-099` (UI/Arte final/Voz/Performance).
+
+## Atualizacao Operacional (2026-02-14 - Gate 4 UX VIVA: fix de formato no overlay)
+- contexto:
+  - `BUG-097` ainda apresentava risco de preview/export cair no formato padrao (`4:5`) porque o frontend descartava `overlay.formato` em partes do fluxo.
+- execucao:
+  - arquivo alterado: `frontend/src/app/viva/page.tsx`.
+  - ajustes aplicados em 3 pontos:
+    - `extractOverlayFromAnexos` preservando `overlayMeta.formato`;
+    - `mapSnapshotMessages` preservando `item.meta.overlay.formato`;
+    - `overlayFromBackend` preservando `overlayMeta.formato`.
+- validacao:
+  - `frontend npm run type-check` => OK;
+  - `frontend npm run lint` => OK (1 warning pre-existente fora do escopo em `contratos/[id]/editar/page.tsx`);
+  - `frontend npm run build` => bloqueado por `spawn EPERM` no ambiente atual.
+- status institucional:
+  - `BUG-097` mantido em **Em validacao** ate prova visual final no `/viva` com formatos `1:1`, `4:5`, `16:9`, `9:16`.
+
+## Atualizacao Operacional (2026-02-16 - auditoria gate 1-9 + memoria/persona institucional)
+- contexto da solicitacao:
+  - Lucas reportou que o sistema local esta funcional, mas a VIVA nao sustenta comportamento institucional em memoria/persona e acesso confiavel aos modulos do SaaS (agenda/contratos);
+  - diretriz oficial: prompt mestre unico em `agents/AGENT.md`, skills imparciais e aprendizado por memoria operacional real (campanhas, agenda, contratos, contexto corporativo).
+- evidencias coletadas na auditoria:
+  - `git status -sb` => `main...origin/main [behind 11]` e working tree sujo;
+  - `backend pytest` => `12 failed, 2 passed`;
+  - `frontend npm run type-check` => OK;
+  - `frontend npm run lint` => OK com 1 warning (`react-hooks/exhaustive-deps`);
+  - `frontend npm run build` => OK;
+  - `docker build -f Dockerfile.backend` => OK;
+  - `docker build -f Dockerfile.frontend` => OK, com warning de standalone trace (`page_client-reference-manifest`);
+  - `docker run` frontend => HTTP 200 em `/`, `/contratos`, `/viva`.
+- veredito consolidado gate a gate:
+  - Gate 1: Parcial
+  - Gate 2: Parcial
+  - Gate 3: Parcial
+  - Gate 4: Parcial
+  - Gate 5: Parcial
+  - Gate 6: Parcial
+  - Gate 7: Nao concluido
+  - Gate 8: Parcial
+  - Gate 9: Nao concluido
+- evidencia funcional da dor de negocio (conversa real):
+  - arquivo: `C:\Users\Lucas\Desktop\conversa.txt`;
+  - sintomas:
+    - assistente confirmou agendamento e depois nao listou o compromisso;
+    - assistente nao listou opcoes de contratos do proprio SaaS;
+    - repeticao de confirmacoes e quebra de ordem direta.
+- governanca aplicada nesta rodada:
+  - bugs novos abertos em `docs/BUGSREPORT.md`:
+    - `BUG-104` (agenda inconsistente criar/consultar)
+    - `BUG-105` (nao consulta contratos reais)
+    - `BUG-106` (confirmacao redundante / obediencia)
+    - `BUG-107` (drift de memoria/persona fora da fonte canonica)
+- direcionamento de infraestrutura confirmado pelo cliente:
+  - remover Vercel do escopo institucional;
+  - backend alvo: Ubuntu AWS virgem;
+  - frontend alvo: `fabio.automaniaai.com.br`;
+  - institucional: `www.automaniaai.com.br`.
+- proximo passo aprovado para execucao tecnica:
+  1. fechar bugs 104-107 com foco em orquestracao/memoria/persona;
+  2. ajustar testes e reduzir delta de repositorio (reconciliar com `origin/main`);
+  3. preparar baseline limpo para deploy institucional AWS + front espelhado.
+
+## Atualizacao Operacional (2026-02-16 - migracao estrutural para COFRE unico)
+- objetivo:
+  - eliminar fragmentacao de persona/skills/memoria e centralizar em rota/pasta canonica unica.
+- mudancas implementadas:
+  - raiz canonica definida em `backend/COFRE` com subpastas:
+    - `persona-skills/AGENT.md`
+    - `persona-skills/skillconteudo.txt`
+    - `memories/` (journal por tabela/dominio)
+  - backend passou a priorizar `COFRE/persona-skills` como fonte de prompt/skills (fallback legado `agents/` mantido so para compatibilidade);
+  - novo endpoint institucional:
+    - `GET /api/v1/cofre/memories/status`
+    - `GET /api/v1/cofre/memories/tables`
+    - `GET /api/v1/cofre/memories/{table_name}/tail`
+  - espelhamento de escrita por subpasta de tabela no COFRE:
+    - `viva_chat_sessions`
+    - `viva_chat_messages`
+    - `viva_campanhas`
+    - `viva_handoff_tasks`
+    - `viva_memory_vectors`
+    - `redis_viva_memory_medium`
+- ajuste de comportamento solicitado:
+  - skill de campanha neutra nao depende mais de bloqueio estrito por modo `FC/REZETA`;
+  - fluxo de campanha com `should_generate_image` e sinal de campanha agora pode operar em modo neutro (`NEUTRO`), reduzindo acoplamento fixo de marca.
+- validacao tecnica:
+  - `py_compile` dos modulos alterados => OK;
+  - escrita e leitura de teste no COFRE (`viva_chat_messages`) => OK.
+- enforcement aplicado:
+  - rota agregada `viva_memory_routes` removida de `backend/app/api/v1/viva.py`;
+  - endpoint canonico de memoria passa a ser `COFRE` (`/api/v1/cofre/memories/*`).

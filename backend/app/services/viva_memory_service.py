@@ -17,7 +17,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.services.cofre_memory_service import cofre_memory_service
 from app.services.openai_service import openai_service
+from app.services.viva_brain_paths_service import viva_brain_paths_service
 
 
 class VivaMemoryService:
@@ -29,6 +31,9 @@ class VivaMemoryService:
         self.medium_max_items = 40
         self.vector_enabled = False
         self._storage_checked = False
+        self.file_log_enabled = bool(getattr(settings, "VIVA_MEMORY_FILE_LOG_ENABLED", True))
+        self._brain_paths = viva_brain_paths_service
+        self._brain_paths.ensure_runtime_dirs()
         self._stopwords = {
             "de", "da", "do", "das", "dos", "e", "em", "no", "na", "nos", "nas", "um", "uma",
             "para", "com", "que", "por", "se", "ao", "aos", "as", "o", "os", "eu", "voce",
@@ -282,6 +287,18 @@ class VivaMemoryService:
                         "embedding": self._vector_literal(embedding),
                     },
                 )
+            self._append_memory_file_log(
+                table_name="viva_memory_vectors",
+                action="insert",
+                user_id=user_id,
+                session_id=session_id,
+                tipo=tipo,
+                conteudo=clean,
+                modo=normalized_mode,
+                meta=meta or {},
+                medium_ok=False,
+                long_ok=True,
+            )
             return True
         except Exception:
             return False
@@ -324,7 +341,57 @@ class VivaMemoryService:
                 meta=meta,
             )
 
+        self._append_memory_file_log(
+            table_name="redis_viva_memory_medium",
+            action="append_memory",
+            user_id=user_id,
+            session_id=session_id,
+            tipo=tipo,
+            conteudo=conteudo,
+            modo=modo,
+            meta=meta,
+            medium_ok=medium_ok,
+            long_ok=long_ok,
+        )
+
         return {"medium": medium_ok, "long": long_ok}
+
+    def _append_memory_file_log(
+        self,
+        *,
+        table_name: str,
+        action: str,
+        user_id: UUID,
+        session_id: UUID,
+        tipo: str,
+        conteudo: str,
+        modo: Optional[str],
+        meta: Dict[str, Any],
+        medium_ok: bool,
+        long_ok: bool,
+    ) -> None:
+        if not self.file_log_enabled:
+            return
+        try:
+            clean = self._clean_text(conteudo)
+            payload = {
+                "ts": datetime.utcnow().isoformat(),
+                "user_id": str(user_id),
+                "session_id": str(session_id),
+                "tipo": str(tipo or "").strip(),
+                "modo": self._normalize_mode(modo),
+                "conteudo": clean,
+                "meta": meta,
+                "stored": {"medium": bool(medium_ok), "long": bool(long_ok)},
+            }
+            cofre_memory_service.log_event(
+                table_name=table_name,
+                action=action,
+                payload=payload,
+            )
+        except Exception:
+            # File log is observability-only and must never break chat flow.
+            return
 
     async def list_pinned_long_memory(
         self,

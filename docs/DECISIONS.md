@@ -1152,3 +1152,27 @@ Com a evolucao da VIVA, foi solicitado padronizar o fluxo em um unico orquestrad
 
 ### Data
 2026-02-13
+
+## DECISAO-035: preservar `overlay.formato` no frontend da VIVA (Gate 4 UX)
+
+### Contexto
+O backend ja entregava `overlay.formato` no metadata da imagem de campanha, mas o frontend descartava esse campo em partes do fluxo de mapeamento, fazendo o preview/export da "Arte final" cair em fallback visual `4:5` em cenarios indevidos.
+
+### Decisao
+- Preservar `formato` em todos os pontos de reconstrucao de overlay no frontend:
+  - `extractOverlayFromAnexos`;
+  - `mapSnapshotMessages`;
+  - montagem de `overlayFromBackend` no fluxo de resposta do chat.
+- Arquivo alterado:
+  - `frontend/src/app/viva/page.tsx`.
+
+### Impacto
+- O preview/export da arte final passa a respeitar o formato efetivo vindo do backend (`1:1`, `4:5`, `16:9`, `9:16`) sem depender de fallback padrao.
+- Reduz divergencia visual no `/viva` e melhora aderencia aos criterios do Gate 4 (UX VIVA).
+
+### Trade-off
+- A validacao final de UX ainda depende de prova visual no navegador com uso real (zoom 100% e viewport mobile), alem da validacao estatica.
+- No ambiente atual, `next build` foi bloqueado por `spawn EPERM`, entao a comprovacao tecnica desta rodada ficou em `type-check + lint`.
+
+### Data
+2026-02-14

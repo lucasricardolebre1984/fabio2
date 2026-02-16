@@ -31,7 +31,7 @@ def _normalize_mode(modo: Optional[str]) -> Optional[str]:
         return None
     normalized = str(modo).strip().upper()
     # Modos da VIVA (chat continuo) - removemos modos laterais/menus.
-    allowed = {"LOGO", "FC", "REZETA"}
+    allowed = {"LOGO", "FC", "REZETA", "NEUTRO"}
     return normalized if normalized in allowed else None
 
 
@@ -75,7 +75,12 @@ def _derive_campaign_title(
         return _sanitize_prompt(str(campaign_copy.get("headline")), 120)
 
     subject = _extract_subject(fallback_message or "")
-    brand = "FC" if modo == "FC" else "Rezeta"
+    if modo == "FC":
+        brand = "FC"
+    elif modo == "REZETA":
+        brand = "Rezeta"
+    else:
+        brand = "Campanha"
     if subject and subject.lower() != "imagem promocional institucional":
         return _sanitize_prompt(f"{brand} - {subject}", 120)
     return f"Campanha {brand}"

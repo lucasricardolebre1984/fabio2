@@ -62,14 +62,14 @@ class VivaCapabilitiesService:
             {
                 "dominio": "memoria",
                 "acoes": [
+                    "gravar espelho canonico em COFRE por tabela/subpasta",
                     "manter memoria media da sessao em Redis",
                     "indexar memoria longa vetorial em pgvector",
-                    "buscar contexto historico por similaridade",
                 ],
                 "rotas": [
-                    "/api/v1/viva/memory/status",
-                    "/api/v1/viva/memory/search",
-                    "/api/v1/viva/memory/reindex",
+                    "/api/v1/cofre/memories/status",
+                    "/api/v1/cofre/memories/tables",
+                    "/api/v1/cofre/memories/{table_name}/tail",
                     "/api/v1/viva/chat/sessions",
                     "/api/v1/viva/chat/snapshot",
                 ],

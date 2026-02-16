@@ -1,19 +1,23 @@
-"""Loads the single agent profile and campaign skill from /agents."""
+"""Loads the single agent profile and campaign skill from canonical folders."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Optional
 
+from app.services.viva_brain_paths_service import viva_brain_paths_service
+
 
 class VivaAgentProfileService:
     def __init__(self) -> None:
-        # Look for /agents relative to this file to work in:
-        # - local repo layout: <repo>/backend/app/services/...
-        # - dev container layout: /app/app/services/... with /app/agents mounted
-        self._agents_dir = self._discover_agents_dir()
-        self._agent_file = self._agents_dir / "AGENT.md"
-        self._campaign_skill_file = self._agents_dir / "skillconteudo.txt"
+        # Canonical source (single folder): COFRE/persona-skills
+        self._brain_paths = viva_brain_paths_service
+        self._brain_paths.ensure_runtime_dirs()
+        self._agent_file = self._brain_paths.persona_skills_dir / "AGENT.md"
+        self._campaign_skill_files = [
+            self._brain_paths.persona_skills_dir / "skill-generate-campanha-neutra.md",
+            self._brain_paths.persona_skills_dir / "skillconteudo.txt",
+        ]
 
         self._fallback_agent = (
             "Voce e VIVA, assistente principal do Fabio no SaaS. "
@@ -39,21 +43,20 @@ class VivaAgentProfileService:
                 continue
         return fallback
 
-    @staticmethod
-    def _discover_agents_dir() -> Path:
-        here = Path(__file__).resolve()
-        for parent in (here.parent,) + tuple(here.parents):
-            candidate = parent / "agents"
-            if (candidate / "AGENT.md").exists():
-                return candidate
-        # Last resort: assume repo root relative layout from current file.
-        return here.parents[3] / "agents"
-
     def get_agent_prompt(self) -> str:
-        return self._safe_read_text(self._agent_file, self._fallback_agent)
+        content = self._safe_read_text(self._agent_file, "")
+        if content:
+            return content
+        return self._fallback_agent
 
     def get_campaign_skill_prompt(self, max_chars: int = 2400) -> str:
-        content = self._safe_read_text(self._campaign_skill_file, self._fallback_campaign_skill)
+        content = ""
+        for path in self._campaign_skill_files:
+            content = self._safe_read_text(path, "")
+            if content:
+                break
+        if not content:
+            content = self._fallback_campaign_skill
         if max_chars <= 0:
             return content
         if len(content) <= max_chars:

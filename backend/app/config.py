@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     
     # ==================================================================
+    # Logging
+    # ==================================================================
+    LOG_LEVEL: str = "INFO"
+    LOG_FORMAT: str = "text"  # json | text
+    
+    # ==================================================================
     # Server
     # ==================================================================
     HOST: str = "0.0.0.0"
@@ -96,6 +102,8 @@ class Settings(BaseSettings):
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
     OPENAI_API_MODEL: str = "gpt-5-mini"
     OPENAI_AUDIO_MODEL: str = "gpt-4o-mini-transcribe"
+    OPENAI_TTS_MODEL: str = "tts-1"
+    OPENAI_TTS_VOICE: str = "alloy"
     OPENAI_IMAGE_MODEL: str = "gpt-image-1"
     OPENAI_VISION_MODEL: str = "gpt-4o-mini"
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
@@ -109,13 +117,22 @@ class Settings(BaseSettings):
     # VIVA Memory (RAG/Redis/pgvector) - disabled by default (clean agent)
     # ==================================================================
     VIVA_MEMORY_ENABLED: bool = False
+    VIVA_BRAIN_ROOT: str = "COFRE"
+    VIVA_MEMORY_FILE_LOG_ENABLED: bool = True
 
     # ==================================================================
     # Google Calendar (agenda bridge)
     # ==================================================================
     FRONTEND_BASE_URL: str = "http://localhost:3000"
+    GOOGLE_API_KEY: Optional[str] = None
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None
+    GOOGLE_CALENDAR_CLIENT_ID: Optional[str] = None
+    GOOGLE_CALENDAR_CLIENT_SECRET: Optional[str] = None
+    GOOGLE_GMAIL_CLIENT_ID: Optional[str] = None
+    GOOGLE_GMAIL_CLIENT_SECRET: Optional[str] = None
+    GOOGLE_SERVICE_ACCOUNT_ID: Optional[str] = None
+    GOOGLE_SERVICE_ACCOUNT_EMAIL: Optional[str] = None
     GOOGLE_REDIRECT_URI: str = "http://localhost:8000/api/v1/google-calendar/callback"
     GOOGLE_CALENDAR_DEFAULT_ID: str = "primary"
     GOOGLE_CALENDAR_SCOPE: str = "https://www.googleapis.com/auth/calendar"
@@ -151,12 +168,6 @@ class Settings(BaseSettings):
     # Cost tracking
     CUSTO_POR_IMAGEM_USD: float = 0.015
     TAXA_CAMBIO_BRL: float = 5.0
-    
-    # ==================================================================
-    # Logging
-    # ==================================================================
-    LOG_LEVEL: str = "INFO"
-    LOG_FORMAT: str = "text"  # json | text
     
     class Config:
         env_file = ".env"

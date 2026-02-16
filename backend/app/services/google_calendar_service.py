@@ -24,6 +24,14 @@ class GoogleCalendarService:
     _token_url = "https://oauth2.googleapis.com/token"
     _api_base = "https://www.googleapis.com/calendar/v3"
 
+    @staticmethod
+    def _calendar_client_id() -> Optional[str]:
+        return settings.GOOGLE_CALENDAR_CLIENT_ID or settings.GOOGLE_CLIENT_ID
+
+    @staticmethod
+    def _calendar_client_secret() -> Optional[str]:
+        return settings.GOOGLE_CALENDAR_CLIENT_SECRET or settings.GOOGLE_CLIENT_SECRET
+
     async def ensure_tables(self, db: AsyncSession) -> None:
         await db.execute(
             text(
@@ -67,7 +75,7 @@ class GoogleCalendarService:
         )
 
     def _is_configured(self) -> bool:
-        return bool(settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET and settings.GOOGLE_REDIRECT_URI)
+        return bool(self._calendar_client_id() and self._calendar_client_secret() and settings.GOOGLE_REDIRECT_URI)
 
     def _sign_state(self, payload_b64: str) -> str:
         digest = hmac.new(
@@ -105,20 +113,30 @@ class GoogleCalendarService:
             raise ValueError("state sem user_id")
         return payload
 
-    async def build_connect_url(self, user_id: UUID) -> str:
+    async def build_connect_url(
+        self,
+        db: AsyncSession,
+        user_id: UUID,
+        force_consent: bool = False,
+    ) -> str:
         if not self._is_configured():
             raise ValueError("Google Calendar nao configurado")
+        await self.ensure_tables(db)
+        existing = await self._get_connection(db, user_id)
+        has_refresh_token = bool(str((existing or {}).get("refresh_token") or "").strip())
+        should_force_consent = bool(force_consent or not has_refresh_token)
         state = self._encode_state(user_id)
         params = {
-            "client_id": settings.GOOGLE_CLIENT_ID,
+            "client_id": self._calendar_client_id(),
             "redirect_uri": settings.GOOGLE_REDIRECT_URI,
             "response_type": "code",
             "scope": settings.GOOGLE_CALENDAR_SCOPE,
             "access_type": "offline",
-            "prompt": "consent",
             "include_granted_scopes": "true",
             "state": state,
         }
+        if should_force_consent:
+            params["prompt"] = "consent"
         return f"{self._auth_base_url}?{urlencode(params)}"
 
     async def _exchange_code(self, code: str) -> Dict[str, Any]:
@@ -127,8 +145,8 @@ class GoogleCalendarService:
                 self._token_url,
                 data={
                     "code": code,
-                    "client_id": settings.GOOGLE_CLIENT_ID,
-                    "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                    "client_id": self._calendar_client_id(),
+                    "client_secret": self._calendar_client_secret(),
                     "redirect_uri": settings.GOOGLE_REDIRECT_URI,
                     "grant_type": "authorization_code",
                 },
@@ -144,8 +162,8 @@ class GoogleCalendarService:
                 self._token_url,
                 data={
                     "refresh_token": refresh_token,
-                    "client_id": settings.GOOGLE_CLIENT_ID,
-                    "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                    "client_id": self._calendar_client_id(),
+                    "client_secret": self._calendar_client_secret(),
                     "grant_type": "refresh_token",
                 },
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
@@ -254,17 +272,36 @@ class GoogleCalendarService:
         return new_access
 
     async def get_status(self, db: AsyncSession, user_id: UUID) -> Dict[str, Any]:
+        configured = self._is_configured()
+        missing_config = []
+        if not self._calendar_client_id():
+            missing_config.append("GOOGLE_CALENDAR_CLIENT_ID")
+        if not self._calendar_client_secret():
+            missing_config.append("GOOGLE_CALENDAR_CLIENT_SECRET")
+        if not settings.GOOGLE_REDIRECT_URI:
+            missing_config.append("GOOGLE_REDIRECT_URI")
+        if not settings.GOOGLE_GMAIL_CLIENT_ID:
+            missing_config.append("GOOGLE_GMAIL_CLIENT_ID")
+        if not settings.GOOGLE_GMAIL_CLIENT_SECRET:
+            missing_config.append("GOOGLE_GMAIL_CLIENT_SECRET")
         conn = await self._get_connection(db, user_id)
+        status_common = {
+            "configured": configured,
+            "gmail_configured": bool(settings.GOOGLE_GMAIL_CLIENT_ID and settings.GOOGLE_GMAIL_CLIENT_SECRET),
+            "service_account_configured": bool(settings.GOOGLE_SERVICE_ACCOUNT_EMAIL),
+            "api_key_configured": bool(settings.GOOGLE_API_KEY),
+            "missing_config": missing_config,
+        }
         if not conn:
             return {
-                "configured": self._is_configured(),
+                **status_common,
                 "connected": False,
                 "calendar_id": None,
                 "scope": None,
                 "expires_at": None,
             }
         return {
-            "configured": self._is_configured(),
+            **status_common,
             "connected": True,
             "calendar_id": conn.get("calendar_id") or settings.GOOGLE_CALENDAR_DEFAULT_ID,
             "scope": conn.get("scope"),
@@ -437,4 +474,3 @@ class GoogleCalendarService:
 
 
 google_calendar_service = GoogleCalendarService()
-

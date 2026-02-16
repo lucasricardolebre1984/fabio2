@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
-import { CalendarDays, Download, Megaphone, RefreshCw, X } from 'lucide-react'
+import { CalendarDays, Download, Megaphone, RefreshCw, Trash2, X } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 
@@ -46,6 +46,8 @@ function CampanhasPageContent() {
   const [items, setItems] = useState<CampanhaItem[]>([])
   const [total, setTotal] = useState(0)
   const [imagemAtiva, setImagemAtiva] = useState<CampanhaItem | null>(null)
+  const [deletingIds, setDeletingIds] = useState<Record<string, boolean>>({})
+  const [clearingAll, setClearingAll] = useState(false)
 
   const baixarImagem = (item: CampanhaItem) => {
     const link = document.createElement('a')
@@ -75,6 +77,49 @@ function CampanhasPageContent() {
     }
   }, [params])
 
+  const handleDeleteCampanha = useCallback(
+    async (id: string) => {
+      const ok = window.confirm('Apagar esta campanha? Isso remove do banco e da memoria do COFRE.')
+      if (!ok) return
+      setDeletingIds((prev) => ({ ...prev, [id]: true }))
+      try {
+        await api.delete(`/viva/campanhas/${id}`)
+        setItems((prev) => prev.filter((item) => item.id !== id))
+        setTotal((prev) => Math.max(0, prev - 1))
+        if (imagemAtiva?.id === id) {
+          setImagemAtiva(null)
+        }
+      } catch (err: any) {
+        setError(err?.response?.data?.detail || 'Falha ao apagar campanha.')
+      } finally {
+        setDeletingIds((prev) => {
+          const next = { ...prev }
+          delete next[id]
+          return next
+        })
+      }
+    },
+    [imagemAtiva],
+  )
+
+  const handleResetAll = useCallback(async () => {
+    const ok = window.confirm(
+      'Apagar TODAS as campanhas? Isso limpa banco e memoria COFRE de campanhas.',
+    )
+    if (!ok) return
+    setClearingAll(true)
+    try {
+      await api.post('/viva/campanhas/reset-all')
+      setItems([])
+      setTotal(0)
+      setImagemAtiva(null)
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || 'Falha ao limpar campanhas.')
+    } finally {
+      setClearingAll(false)
+    }
+  }, [])
+
   useEffect(() => {
     loadCampanhas()
   }, [loadCampanhas])
@@ -88,10 +133,20 @@ function CampanhasPageContent() {
             Historico de criativos gerados pela VIVA e salvos automaticamente.
           </p>
         </div>
-        <Button variant="outline" onClick={loadCampanhas} disabled={loading}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="destructive"
+            onClick={handleResetAll}
+            disabled={loading || clearingAll || total === 0}
+          >
+            <Trash2 className={`mr-2 h-4 w-4 ${clearingAll ? 'animate-pulse' : ''}`} />
+            Limpar tudo
+          </Button>
+          <Button variant="outline" onClick={loadCampanhas} disabled={loading || clearingAll}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
@@ -154,10 +209,14 @@ function CampanhasPageContent() {
                   <div className="flex items-center justify-between gap-2">
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        item.modo === 'FC' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                        item.modo === 'FC'
+                          ? 'bg-blue-100 text-blue-700'
+                          : item.modo === 'REZETA'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-700'
                       }`}
                     >
-                      {modoLabel[item.modo]}
+                      {modoLabel[item.modo as CampanhaModo] || 'Campanha'}
                     </span>
                     <span className="flex items-center gap-1 text-xs text-gray-500">
                       <CalendarDays className="h-3 w-3" />
@@ -180,9 +239,19 @@ function CampanhasPageContent() {
                       variant="outline"
                       size="sm"
                       onClick={() => setImagemAtiva(item)}
+                      disabled={Boolean(deletingIds[item.id])}
                     >
                       <Download className="mr-1 h-3 w-3" />
                       Abrir imagem
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDeleteCampanha(item.id)}
+                      disabled={Boolean(deletingIds[item.id]) || clearingAll}
+                    >
+                      <Trash2 className="mr-1 h-3 w-3" />
+                      {deletingIds[item.id] ? 'Apagando...' : 'Apagar'}
                     </Button>
                   </div>
                 </div>

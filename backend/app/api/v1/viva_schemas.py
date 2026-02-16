@@ -97,6 +97,19 @@ class CampanhaResetResponse(BaseModel):
     message: str
 
 
+class CampanhaDeleteResponse(BaseModel):
+    deleted: bool
+    id: UUID
+    message: str
+
+
+class CampanhaResetAllResponse(BaseModel):
+    deleted_db: int
+    cofre_cleared_files: Dict[str, int]
+    cofre_assets_removed: int
+    message: str
+
+
 class VivaCapabilitiesResponse(BaseModel):
     items: List[Dict[str, Any]]
 

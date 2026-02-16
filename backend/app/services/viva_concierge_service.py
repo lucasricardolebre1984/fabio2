@@ -1,6 +1,6 @@
 """Facade para o prompt principal da VIVA.
 
-Fonte canonica de persona: agents/AGENT.md
+Fonte canonica de persona: backend/COFRE/persona-skills/AGENT.md
 """
 
 from typing import Optional

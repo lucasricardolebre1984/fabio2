@@ -995,7 +995,7 @@ def _resolve_image_size_from_format(formato: str) -> str:
     return "1024x1024"
 
 
-def _build_scene_seed(fields: Dict[str, str], modo: str) -> str:
+def _build_scene_seed(fields: Dict[str, str], modo: str, variation_id: str = "") -> str:
     tema = str(fields.get("tema") or "").strip()
     objetivo = str(fields.get("objetivo") or "gerar leads").strip()
     publico = str(fields.get("publico") or "publico geral").strip()
@@ -1008,7 +1008,8 @@ def _build_scene_seed(fields: Dict[str, str], modo: str) -> str:
 
     theme_hint = _theme_scene_hint(tema, objetivo, oferta)
     audience_hint = _audience_scene_hint(publico)
-    seed = f"{modo}|{tema}|{objetivo}|{publico}|{oferta}"
+    salt = str(variation_id or "").strip()
+    seed = f"{modo}|{tema}|{objetivo}|{publico}|{oferta}|{salt}" if salt else f"{modo}|{tema}|{objetivo}|{publico}|{oferta}"
     persona_variant = _persona_scene_variant(seed, publico)
     composition_variant = _composition_variant(seed)
     scene_parts: List[str] = [
@@ -1016,6 +1017,7 @@ def _build_scene_seed(fields: Dict[str, str], modo: str) -> str:
         f"foco em {objetivo}",
         f"publico {publico}",
     ]
+
     if tema:
         scene_parts.append(f"tema central obrigatorio {tema}")
     if oferta:
@@ -1072,7 +1074,7 @@ def _extract_json_block(raw: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _fallback_copy(texto: str, modo: str) -> Dict[str, Any]:
+def _fallback_copy(texto: str, modo: Optional[str]) -> Dict[str, Any]:
     lines = [ln.strip() for ln in texto.splitlines() if ln.strip()]
     bullet_lines = [ln for ln in lines if re.match(r"^([*+-]|[0-9]+\.)\s", ln)]
     explicit = _extract_campaign_brief_fields(texto)
@@ -1090,9 +1092,13 @@ def _fallback_copy(texto: str, modo: str) -> Dict[str, Any]:
         or "Plano objetivo para organizar seu credito com seguranca"
     )
     offer = str(fields.get("oferta") or "").strip()
-    cta = str(fields.get("cta") or "").strip() or (
-        "CHAMAR NO WHATSAPP" if modo == "REZETA" else "VER COMO FUNCIONA"
-    )
+    if modo == "REZETA":
+        default_cta = "CHAMAR NO WHATSAPP"
+    elif modo == "FC":
+        default_cta = "VER COMO FUNCIONA"
+    else:
+        default_cta = "SAIBA MAIS"
+    cta = str(fields.get("cta") or "").strip() or default_cta
 
     default_bullets = [
         "Diagnostico rapido e objetivo",
@@ -1126,7 +1132,8 @@ def _fallback_copy(texto: str, modo: str) -> Dict[str, Any]:
 async def _generate_campaign_copy(
     mensagem: str,
     prompt_extra_image: Optional[str],
-    modo: str,
+    modo: Optional[str],
+    variation_id: str = "",
 ) -> Dict[str, Any]:
     fonte = _sanitize_prompt(_extract_overlay_source(mensagem), 5000)
     baseline = _fallback_copy(fonte, modo)
@@ -1134,7 +1141,7 @@ async def _generate_campaign_copy(
     explicit = _extract_campaign_brief_fields(fonte)
     inferred = _infer_campaign_fields_from_free_text(fonte)
     fields = _apply_campaign_defaults({**explicit, **inferred})
-    scene_seed = _build_scene_seed(fields, modo)
+    scene_seed = _build_scene_seed(fields, modo, variation_id=variation_id)
     human_seed = _persona_scene_variant(f"{modo}|{fonte}", str(fields.get("publico") or ""))
     cast_preference = _extract_cast_preference(fonte)
     campaign_skill_prompt = viva_agent_profile_service.get_campaign_skill_prompt(max_chars=2200)
@@ -1144,10 +1151,15 @@ async def _generate_campaign_copy(
             "Marca RezetaBrasil. Paleta obrigatoria: #1E3A5F, #3DAA7F, #2A8B68, #FFFFFF. "
             "Tom humano e acessivel."
         )
-    else:
+    elif modo == "FC":
         guardrail = (
             "Marca FC Solucoes Financeiras. Paleta obrigatoria: #071c4a, #00a3ff, #010a1c, #f9feff. "
             "Tom premium e consultivo."
+        )
+    else:
+        guardrail = (
+            "Campanha neutra (sem marca fixa). "
+            "Use tom claro, direto e objetivo, alinhado ao pedido atual do usuario."
         )
 
     system = (

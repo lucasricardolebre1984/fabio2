@@ -18,6 +18,7 @@ COPY backend/app ./app
 
 # Copiar persona/skills do agente único (usado pelo backend em runtime)
 COPY agents ./agents
+COPY backend/COFRE ./COFRE
 
 # Variáveis de ambiente
 ENV PYTHONPATH=/app

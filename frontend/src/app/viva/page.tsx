@@ -2223,6 +2223,7 @@ export default function VivaChatPage() {
               {(() => {
                 const theme = BRAND_THEMES[arteAtiva.overlay.brand]
                 const parsed = parseOverlayText(arteAtiva.overlay)
+                const formatoPreview = arteAtiva.overlay.formato || ''
 
                 return (
                   <div

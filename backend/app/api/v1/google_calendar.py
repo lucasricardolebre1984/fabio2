@@ -16,12 +16,17 @@ router = APIRouter()
 
 @router.get("/connect-url")
 async def google_calendar_connect_url(
+    force_consent: bool = Query(False, description="Forca reconsentimento Google"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operador),
 ):
     try:
         await google_calendar_service.ensure_tables(db)
-        url = await google_calendar_service.build_connect_url(current_user.id)
+        url = await google_calendar_service.build_connect_url(
+            db=db,
+            user_id=current_user.id,
+            force_consent=force_consent,
+        )
         return {"url": url}
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Erro Google Calendar: {str(exc)}")
@@ -60,21 +65,3 @@ async def google_calendar_disconnect(
 ):
     await google_calendar_service.disconnect(db, current_user.id)
     return {"ok": True, "connected": False}
-
-
-@router.post("/sync/agenda/{evento_id}")
-async def google_calendar_sync_event(
-    evento_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operador),
-):
-    agenda_service = AgendaService(db)
-    evento = await agenda_service.get_by_id(evento_id, user_id=current_user.id)
-    if not evento:
-        raise HTTPException(status_code=404, detail="Evento nao encontrado")
-    result = await google_calendar_service.sync_agenda_event(
-        db,
-        user_id=current_user.id,
-        evento=evento,
-    )
-    return result

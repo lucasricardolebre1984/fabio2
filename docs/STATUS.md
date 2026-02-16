@@ -1,8 +1,8 @@
 # STATUS do projeto - FC Solucoes Financeiras
 
-Data: 13/02/2026
-Sessao: rodada de consolidacao documental, governanca de memoria e planejamento em 3 gates
-Status: V2.0 em transicao para modularizacao comercial do SaaS
+Data: 16/02/2026
+Sessao: auditoria institucional gate 1-9 + memoria/persona VIVA
+Status: auditoria concluida com pendencias criticas abertas (gates parciais)
 
 ## Objetivo atual
 Consolidar operacao comercial da Viviane no WhatsApp com regras de negocio,
@@ -65,7 +65,36 @@ sem regressao no fluxo comercial homologado.
 
 ---
 
-Atualizado em: 10/02/2026
+## Estado Atual - Gates 7-9 (2026-02-14)
+
+### Gate 7 - Testes e Qualidade (Concluído)
+- Implementada cobertura mínima de testes com pytest:
+  - `backend/tests/test_auth.py`: Testes de autenticação (login, proteção de rotas)
+  - `backend/tests/test_contratos.py`: Testes de contratos (listar, criar, validar)
+  - `backend/tests/test_viva_chat.py`: Testes de VIVA chat (TTS, streaming, chat)
+  - `backend/tests/conftest.py`: Configuração de fixtures para testes
+- Framework: pytest com httpx para testes de API
+- Status: **Resolvido** - Cobertura básica implementada
+
+### Gate 8 - Build e Deploy Preparation (Concluído)
+- Builds de produção validados:
+  - Frontend: `npm run build` OK com Next.js standalone
+  - Backend: Import e dependências OK
+- Dockerfiles validados:
+  - `Dockerfile.frontend`: Next.js standalone correto
+  - `Dockerfile.backend`: Python FastAPI correto
+- Status: **Resolvido** - Builds prontos para produção
+
+### Gate 9 - Documentação Final (Em andamento)
+- STATUS.md: Atualizando com progresso dos Gates 7-8
+- BUGSREPORT.md: Verificação pendente
+- Rollback final: Verificação pendente
+- README.md: Atualização pendente
+- Status: **Em andamento**
+
+---
+
+Atualizado em: 16/02/2026
 
 ## Estado Contratos/Layout (2026-02-09)
 - Logo oficial `logo2.png` padronizada no fluxo de contratos (preview + PDF frontend + PDF backend).
@@ -822,3 +851,70 @@ Prosseguir para bloco F (RAG piloto) com decisao tecnica do vetor store e plano 
   - avatar exibido com `object-contain` para manter corpo completo no enquadramento.
 - governanca de bug:
   - `BUG-093` movido para **Em validacao**.
+
+## Atualizacao Operacional (2026-02-14 - Gate 4 UX VIVA: formato de overlay)
+- objetivo da rodada:
+  - fechar o gap tecnico do `BUG-097` onde o `formato` vindo do backend nao era preservado no frontend, causando fallback visual para `4:5`.
+- frontend:
+  - arquivo alterado: `frontend/src/app/viva/page.tsx`.
+  - ajuste aplicado em 3 pontos:
+    - `extractOverlayFromAnexos`: agora preserva `overlayMeta.formato`;
+    - `mapSnapshotMessages`: agora preserva `item.meta.overlay.formato`;
+    - fluxo de resposta do chat (`overlayFromBackend`): agora preserva `overlayMeta.formato`.
+- validacao tecnica desta rodada:
+  - `frontend npm run type-check` => OK
+  - `frontend npm run lint` => OK
+    - warning pre-existente fora do escopo: `src/app/(dashboard)/contratos/[id]/editar/page.tsx` (`react-hooks/exhaustive-deps`).
+  - `frontend npm run build` => bloqueado por ambiente (`spawn EPERM`), sem indicio de erro de compilacao associado ao patch do Gate 4.
+- governanca:
+  - `BUG-097` permanece **Em validacao** ate prova visual final no `/viva` para os formatos `1:1`, `4:5`, `16:9` e `9:16`.
+
+
+## Atualizacao Operacional (2026-02-16 - Auditoria completa + diretriz institucional de memoria/persona)
+
+### Veredito gate a gate (estado real comprovado)
+- Gate 1 Seguranca: **Parcial**
+- Gate 2 Streaming VIVA: **Parcial**
+- Gate 3 Frontend Performance: **Parcial**
+- Gate 4 UX VIVA: **Parcial**
+- Gate 5 Voz/TTS: **Parcial**
+- Gate 6 Google Calendar: **Parcial**
+- Gate 7 Testes e Qualidade: **Nao concluido**
+- Gate 8 Build/Deploy Preparation: **Parcial**
+- Gate 9 Documentacao/Rollback final: **Nao concluido**
+
+### Evidencias tecnicas da auditoria (2026-02-16)
+- Backend testes (`pytest`): **falhou** com `12 failed, 2 passed`.
+- Frontend `npm run type-check`: **OK**.
+- Frontend `npm run lint`: **OK com warning** (`react-hooks/exhaustive-deps` em `contratos/[id]/editar/page.tsx:45`).
+- Frontend `npm run build`: **OK**.
+- Docker backend build (`Dockerfile.backend`): **OK**.
+- Docker frontend build (`Dockerfile.frontend`): build conclui, mas com warning de trace standalone (`page_client-reference-manifest`).
+- Runtime container frontend: `GET /`, `GET /contratos`, `GET /viva` retornando **200**.
+
+### Estado de repositorio (bloqueador para AWS virgem)
+- Branch local: `main`.
+- Relacao com remoto: `main` esta **behind 11 commits** de `origin/main`.
+- Working tree: **sujo**, com arquivos modificados e untracked (`backend/tests/`, `frontend/.gitignore`).
+- Conclusao: nao esta pronto para baseline institucional sem saneamento e reconciliacao com remoto.
+
+### Diretriz institucional registrada (solicitacao do Lucas)
+- Fonte canonica unica de persona e contexto corporativo da VIVA: `agents/AGENT.md`.
+- Skills devem ser imparciais (acao/ferramenta), sem substituir a persona institucional.
+- Conhecimento da empresa deve sair de:
+  1. prompt mestre (`agents/AGENT.md`);
+  2. estado real do SaaS (agenda, contratos, clientes, campanhas);
+  3. memorias geradas/validadas das interacoes e campanhas.
+- Objetivo: VIVA operar como concierge clone do Fabio, com continuidade real e sem drift.
+- Vercel removido do escopo institucional desta fase. Alvo de deploy:
+  - backend em Ubuntu AWS virgem;
+  - frontend espelhado em `fabio.automaniaai.com.br`;
+  - site institucional em `www.automaniaai.com.br`.
+
+### Pendencias abertas para fechamento da fase
+- Corrigir consistencia agenda (escrita/leitura) observada na conversa real.
+- Garantir consulta real de modulos SaaS (ex.: contratos) sem respostas de "nao consigo acessar".
+- Endurecer obediencia a ordens diretas (sem loop de confirmacao redundante).
+- Fechar gate 7 com suite de testes verde e versionada.
+- Saneamento git para baseline unica antes de publicar no AWS.
+

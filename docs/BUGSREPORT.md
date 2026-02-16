@@ -1,7 +1,7 @@
 ﻿# BUGSREPORT - Registro de Bugs
 
 > **Projeto:** FC SoluÃ§Ãµes Financeiras SaaS  
-> **Ãšltima AtualizaÃ§Ã£o:** 2026-02-14 (rodada VIVA clean agent + ajustes de campanhas/voz/UI)
+> **Ãšltima AtualizaÃ§Ã£o:** 2026-02-16 (auditoria gate 1-9 + memoria/persona + conversa real)
 
 ---
 
@@ -56,7 +56,7 @@
 | BUG-058 | Alta | VIVA/RAG | Ausencia de camada vetorial moderna (RAG) para memoria/conhecimento evolutivo de longo prazo no piloto | Resolvido |
 | BUG-059 | Alta | Frontend/NextDev | `next dev` pode quebrar com `MODULE_NOT_FOUND` apontando para rota removida (`/api/viva/prompts/[promptId]/route`) por cache `.next` stale | Resolvido |
 | BUG-060 | Alta | Frontend/Auth+Docs | Login no front exibe erro generico para qualquer falha e README publica senha de teste divergente do runtime local | Resolvido |
-| BUG-061 | Alta | VIVA/Campanhas | Geracao de imagem pode ignorar tema do brief (ex.: Carnaval sem dividas) e cair em cena corporativa generica (senhor de terno em escritorio) | Em validacao (rodada 8 - anti-repeticao real + preferencia de elenco obrigatoria) |
+| BUG-061 | Alta | VIVA/Campanhas | Geracao de imagem pode ignorar tema do brief (ex.: Carnaval sem dividas) e cair em cena corporativa generica (senhor de terno em escritorio) | Resolvido (variation_id salt no seed para diversidade) |
 | BUG-062 | Alta | VIVA/Arquitetura | Router VIVA ainda concentra muita responsabilidade de dominio (chat+agenda+campanhas+midia) e exige fatiamento progressivo para manutencao segura | Resolvido |
 | BUG-063 | Alta | VIVA/Agenda UX | Fallback rigido de agenda exige formato textual prescritivo, reduz fluidez conversacional e gera efeito de "bot travado" | Resolvido |
 | BUG-064 | Alta | VIVA->Viviane Orquestracao | Nao existe handoff operacional completo para aviso programado no WhatsApp (agenda da VIVA disparando persona Viviane no horario) | Resolvido |
@@ -86,9 +86,13 @@
 | BUG-094 | Alta | VIVA/RAG Qualidade | RAG roda com fallback local sem embeddings OpenAI, mas ainda sem homologacao semantica premium para operacao comercial | Em validacao (rodada hybrid rerank + telemetria de tier semantico) |
 | BUG-095 | Alta | Agenda/Google Calendar | Agenda interna do SaaS sem sincronizacao oficial com Google Calendar para operacao compartilhada VIVA/Viviane | Em validacao (rodada bridge OAuth + sync auto) |
 | BUG-096 | Media | VIVA/UI | Tela `/viva` e previews exigem zoom < 100% para uso confortavel (escala/layout grandes demais) | Em validacao (ajuste de tamanhos/limites no /viva) |
-| BUG-097 | Media | VIVA/Arte Final | Overlay "Arte final" cobre/recorta foto e nao respeita bem formatos (4:5, 1:1), causando texto "comendo" a imagem | Em validacao (overlay menor + preview por formato) |
+| BUG-097 | Media | VIVA/Arte Final | Overlay "Arte final" cobre/recorta foto e nao respeita bem formatos (4:5, 1:1), causando texto "comendo" a imagem | Em validacao (formato propagado end-to-end no frontend; pendente prova visual final) |
 | BUG-098 | Alta | VIVA/Voz | Modo "Conversa VIVA" com MiniMax: voz institucional indisponivel e falta diagnostico claro (status/env/erro) | Em validacao (status missing_env + logs) |
 | BUG-099 | Alta | VIVA/Performance | Tempo de resposta alto no chat (sem streaming + contexto grande); precisa otimizar janela e/ou streaming | Aberto |
+| BUG-104 | Alta | VIVA/Agenda | Inconsistencia de agenda: assistente confirma agendamento, mas na consulta seguinte retorna sem compromissos no mesmo dia | Aberto |
+| BUG-105 | Alta | VIVA/SaaS Access | Assistente nao consulta dados reais de contratos/modulos do SaaS quando solicitado, apesar de contexto institucional do proprio sistema | Aberto |
+| BUG-106 | Media | VIVA/Orquestracao UX | Excesso de confirmacoes redundantes e quebra de ordem direta do usuario, contrariando regra de resposta objetiva da persona | Aberto |
+| BUG-107 | Alta | VIVA/Memoria Persona | Conhecimento da empresa nao esta ancorado de forma consistente no prompt mestre `agents/AGENT.md` + memoria operacional, gerando drift de comportamento | Aberto |
 
 ---
 
@@ -107,8 +111,8 @@
 **Descricao:** O preview/export do "Arte final" usa overlays altos (topo/rodapÃ©) e pode "comer" a foto; preview tambÃ©m precisa respeitar o `formato` (ex.: 4:5).  
 **Passos:** 1. Gerar campanha (4:5) 2. Clicar "Ver arte final" 3. Comparar foto x overlay.  
 **Esperado:** Overlay proporcional, texto legÃ­vel sem esconder demais a foto e preview no formato correto.  
-**Atual:** Overlay ocupa Ã¡rea demais e o preview pode recortar a foto.  
-**Status:** Em validacao  
+**Atual:** `overlay.formato` agora Ã© propagado do backend para os estados do frontend (`overlayFromBackend`, `extractOverlayFromAnexos`, `mapSnapshotMessages`), evitando fallback indevido para `4:5` no preview/export.  
+**Status:** Em validacao (pendente prova visual final no navegador)  
 
 ### BUG-098: Voz MiniMax indisponÃ­vel / diagnÃ³stico insuficiente
 **Data:** 2026-02-14  
@@ -127,6 +131,48 @@
 **Esperado:** Resposta mais rÃ¡pida e/ou streaming.  
 **Atual:** Espera longa ("lento demais").  
 **Status:** Aberto  
+
+### BUG-104: Agenda confirma criacao mas nao retorna na consulta
+**Data:** 2026-02-16  
+**Severidade:** Alta  
+**Descricao:** Em conversa real (`C:\Users\Lucas\Desktop\conversa.txt`), a VIVA respondeu "Feito - telefonema para Fabio agendado para daqui 1 hora", mas ao consultar "quais compromissos tenho hoje" informou "Voce nao tem compromissos de hoje".
+**Esperado:** Operacao de criar e operacao de consultar agenda devem ser consistentes na mesma sessao e janela temporal.
+**Status:** Aberto  
+
+### BUG-105: Nao consulta contratos reais do SaaS quando solicitado
+**Data:** 2026-02-16  
+**Severidade:** Alta  
+**Descricao:** Ao pedir lista de opcoes/modelos de contratos, o assistente entrou em fluxo de "autorizar token" e "nao consigo acessar", apesar do contexto institucional de operar dentro do proprio SaaS.
+**Esperado:** Consultar backend do proprio sistema e retornar lista objetiva sem burocracia artificial.
+**Status:** Aberto  
+
+### BUG-106: Confirmacoes redundantes e baixa obediencia a ordem direta
+**Data:** 2026-02-16  
+**Severidade:** Media  
+**Descricao:** Fluxo conversacional repete confirmacoes desnecessarias e volta a perguntar mesmo apos comando direto do usuario.
+**Esperado:** Resposta curta, execucao direta e no maximo 1 pergunta objetiva quando faltar dado real.
+**Status:** Aberto  
+
+### BUG-107: Drift de memoria/persona fora da fonte canonica
+**Data:** 2026-02-16  
+**Severidade:** Alta  
+**Descricao:** Comportamento atual nao demonstra ancoragem consistente no prompt mestre `agents/AGENT.md` e nem em memoria operacional do SaaS (agenda/contratos/campanhas), afetando papel de concierge clone do Fabio.
+**Esperado:** Persona e contexto corporativo derivados prioritariamente de `agents/AGENT.md`, com skills imparciais e memoria evolutiva baseada em fatos reais do sistema.
+**Status:** Aberto  
+
+### Atualizacao 2026-02-14 (Gate 4 - BUG-097 formato end-to-end)
+- frontend:
+  - `frontend/src/app/viva/page.tsx`
+  - ajuste aplicado para preservar `formato` em:
+    - `extractOverlayFromAnexos`
+    - `mapSnapshotMessages`
+    - `overlayFromBackend` no fluxo de resposta do chat
+- validacao tecnica:
+  - `frontend npm run type-check` => OK
+  - `frontend npm run lint` => OK (1 warning pre-existente em `src/app/(dashboard)/contratos/[id]/editar/page.tsx`, fora do escopo desta entrega)
+  - `frontend npm run build` => bloqueado por ambiente com `spawn EPERM` (sem evidencia de regressao funcional do patch)
+- governanca:
+  - `BUG-097` mantido em **Em validacao** ate prova visual final de formatos (`1:1`, `4:5`, `16:9`, `9:16`) no `/viva`.
 
 ## Atualizacao 2026-02-11 (triagem geral de status)
 
