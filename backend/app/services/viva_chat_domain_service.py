@@ -139,12 +139,14 @@ def _has_campaign_signal(texto: str) -> bool:
 
 def _is_greeting(texto: str) -> bool:
     normalized = _normalize_key(texto or "")
+    normalized = re.sub(r"^\s*viva\s+", "", normalized).strip()
     termos = ("oi", "ola", "bom dia", "boa tarde", "boa noite")
     return any(normalized.startswith(t) for t in termos)
 
 
 def _preferred_greeting(texto: str) -> str:
     normalized = _normalize_key(texto or "")
+    normalized = re.sub(r"^\s*viva\s+", "", normalized).strip()
     if normalized.startswith("boa noite"):
         return "Boa noite Fabio!"
     if normalized.startswith("boa tarde"):

@@ -89,7 +89,7 @@
 | BUG-097 | Media | VIVA/Arte Final | Overlay "Arte final" cobre/recorta foto e nao respeita bem formatos (4:5, 1:1), causando texto "comendo" a imagem | Em validacao (formato propagado end-to-end no frontend; pendente prova visual final) |
 | BUG-098 | Alta | VIVA/Voz | Modo "Conversa VIVA" com MiniMax: voz institucional indisponivel e falta diagnostico claro (status/env/erro) | Em validacao (status missing_env + logs) |
 | BUG-099 | Alta | VIVA/Performance | Tempo de resposta alto no chat (sem streaming + contexto grande); precisa otimizar janela e/ou streaming | Aberto |
-| BUG-104 | Alta | VIVA/Agenda | Inconsistencia de agenda: assistente confirma agendamento, mas na consulta seguinte retorna sem compromissos no mesmo dia | Aberto |
+| BUG-104 | Alta | VIVA/Agenda | Inconsistencia de agenda: assistente confirma agendamento, mas na consulta seguinte retorna sem compromissos no mesmo dia | Em validacao (saudacao `viva bom dia` estabilizada para nao desviar para contexto antigo) |
 | BUG-105 | Alta | VIVA/SaaS Access | Assistente nao consulta dados reais de contratos/modulos do SaaS quando solicitado, apesar de contexto institucional do proprio sistema | Em validacao (roteamento contratos: modelos vs emitidos por cliente) |
 | BUG-106 | Media | VIVA/Orquestracao UX | Excesso de confirmacoes redundantes e quebra de ordem direta do usuario, contrariando regra de resposta objetiva da persona | Em validacao (confirmacoes curtas `listar`/`nomes`) |
 | BUG-107 | Alta | VIVA/Memoria Persona | Conhecimento da empresa nao esta ancorado de forma consistente no prompt mestre `agents/AGENT.md` + memoria operacional, gerando drift de comportamento | Aberto |
@@ -137,7 +137,27 @@
 **Severidade:** Alta  
 **Descricao:** Em conversa real (`C:\Users\Lucas\Desktop\conversa.txt`), a VIVA respondeu "Feito - telefonema para Fabio agendado para daqui 1 hora", mas ao consultar "quais compromissos tenho hoje" informou "Voce nao tem compromissos de hoje".
 **Esperado:** Operacao de criar e operacao de consultar agenda devem ser consistentes na mesma sessao e janela temporal.
-**Status:** Aberto  
+**Status:** Em validacao  
+
+### Atualizacao 2026-02-16 (BUG-104 - saudacao nao deve puxar agenda antiga)
+- backend:
+  - `backend/app/services/viva_chat_domain_service.py`
+- ajuste aplicado:
+  - detector de saudacao agora remove prefixo `viva` antes de classificar (`viva bom dia`, `viva boa tarde`, etc.).
+  - isso evita queda indevida no fluxo do modelo com contexto antigo de agenda em mensagens de cumprimento.
+- validacao tecnica:
+  - `python -m py_compile backend/app/services/viva_chat_domain_service.py backend/app/services/viva_chat_orchestrator_service.py` => OK
+
+### Atualizacao 2026-02-16 (BUG-104 - rota de consulta agenda com variacao textual)
+- backend:
+  - `backend/app/services/viva_agenda_nlu_service.py`
+- ajuste aplicado:
+  - consulta de agenda agora reconhece variacoes de comando:
+    - `liste agenda`
+    - `lite agenda`
+  - tokens de consulta foram ampliados para reduzir fuga para fluxo generico.
+- validacao tecnica:
+  - `python -m py_compile backend/app/services/viva_agenda_nlu_service.py` => OK
 
 ### BUG-105: Nao consulta contratos reais do SaaS quando solicitado
 **Data:** 2026-02-16  

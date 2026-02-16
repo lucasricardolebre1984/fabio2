@@ -23,6 +23,8 @@ Status: consolidacao de arquitetura COFRE + correcao institucional da documentac
   - modelos de contrato separados de contratos emitidos por cliente;
   - suporte a comando direto de continuidade (`listar`, `nomes`);
   - filtro por cliente em consulta de contratos emitidos.
+- Correcao no NLU de agenda:
+  - consulta passou a aceitar variacoes `liste agenda` e `lite agenda` na rota de agenda real.
 
 ## Regra de historico
 

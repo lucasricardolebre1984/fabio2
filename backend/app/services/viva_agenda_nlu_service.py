@@ -64,7 +64,21 @@ def _has_query_existence_intent(normalized: str) -> bool:
         return True
 
     agenda_tokens = ("agenda", "agendamento", "agendamentos", "compromisso", "compromissos", "obrigacao", "obrigacoes")
-    query_tokens = ("tenho", "tem", "ha", "havera", "existe", "quais", "listar", "lista", "mostrar", "mostra", "consultar")
+    query_tokens = (
+        "tenho",
+        "tem",
+        "ha",
+        "havera",
+        "existe",
+        "quais",
+        "listar",
+        "liste",
+        "lite",
+        "lista",
+        "mostrar",
+        "mostra",
+        "consultar",
+    )
     has_agenda_token = any(_has_phrase(normalized, token) for token in agenda_tokens)
     has_query_token = any(_has_phrase(normalized, token) for token in query_tokens)
     return has_agenda_token and has_query_token
@@ -232,6 +246,8 @@ def is_agenda_query_intent(message: str, contexto: List[Dict[str, Any]]) -> bool
         "o que tenho",
         "quais compromissos",
         "listar agenda",
+        "liste agenda",
+        "lite agenda",
         "lista da agenda",
         "agendamentos de hoje",
         "agenda de hoje",
@@ -249,6 +265,8 @@ def is_agenda_query_intent(message: str, contexto: List[Dict[str, Any]]) -> bool
         for term in (
             "quais",
             "listar",
+            "liste",
+            "lite",
             "lista",
             "mostrar",
             "mostra",
