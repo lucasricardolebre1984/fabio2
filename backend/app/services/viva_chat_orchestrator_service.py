@@ -6,8 +6,10 @@ Extrai a orquestracao pesada do endpoint /chat para reduzir acoplamento em rota.
 import logging
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
+from datetime import datetime
 
 from fastapi import HTTPException
+from zoneinfo import ZoneInfo
 
 from app.config import settings
 from app.services.viva_chat_domain_service import (
@@ -29,6 +31,7 @@ from app.services.viva_chat_domain_service import (
     _infer_mode_from_context,
     _infer_mode_from_message,
     _is_campaign_reset_intent,
+    _is_direct_generation_intent,
     _is_image_request,
     _is_logo_request,
     _mode_hint,
@@ -52,6 +55,9 @@ from app.services.viva_handoff_service import viva_handoff_service
 from app.services.viva_local_service import viva_local_service
 from app.services.viva_memory_service import viva_memory_service
 from app.services.viva_model_service import viva_model_service
+from app.services.contrato_service import ContratoService
+from app.services.cliente_service import ClienteService
+from app.services.viva_campaign_repository_service import viva_campaign_repository_service
 from app.services.viva_chat_runtime_helpers_service import (
     _build_fallback_image_prompt,
     _build_image_prompt,
@@ -77,6 +83,109 @@ from app.services.viva_shared_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _is_contract_list_intent(message: str) -> bool:
+    normalized = _normalize_key(message or "")
+    if not normalized:
+        return False
+    contract_tokens = ("contrato", "contratos")
+    list_tokens = ("listar", "liste", "lista", "quais", "titulos", "todos", "registrados", "executamos", "mostre")
+    has_contract = any(token in normalized for token in contract_tokens)
+    has_list_signal = any(token in normalized for token in list_tokens)
+    return has_contract and has_list_signal
+
+
+def _is_contract_templates_intent(message: str) -> bool:
+    normalized = _normalize_key(message or "")
+    if not normalized:
+        return False
+    has_contract = ("contrato" in normalized) or ("contratos" in normalized)
+    has_template_signal = any(
+        token in normalized
+        for token in ("executamos", "tipos", "modelos", "templates", "titulo dos contratos")
+    )
+    return has_contract and has_template_signal
+
+
+def _is_client_list_intent(message: str) -> bool:
+    normalized = _normalize_key(message or "")
+    if not normalized:
+        return False
+    has_client = ("cliente" in normalized) or ("clientes" in normalized)
+    has_list_signal = any(token in normalized for token in ("listar", "liste", "lista", "quais", "todos", "registrados", "mostre"))
+    return has_client and has_list_signal
+
+
+def _is_services_intent(message: str) -> bool:
+    normalized = _normalize_key(message or "")
+    if not normalized:
+        return False
+    return (
+        ("servico" in normalized or "servicos" in normalized)
+        and any(token in normalized for token in ("nossos", "empresa", "saas", "quais"))
+    )
+
+
+def _is_time_query_intent(message: str) -> bool:
+    normalized = _normalize_key(message or "")
+    if not normalized:
+        return False
+    has_time_word = any(token in normalized for token in ("hora", "horario", "horarios", "que horas"))
+    has_now_word = any(token in normalized for token in ("agora", "atual", "neste momento", "nosso horario", "horario de brasilia", "brasilia"))
+    return has_time_word and has_now_word
+
+
+def _format_brt_now() -> str:
+    now_brt = datetime.now(ZoneInfo("America/Sao_Paulo"))
+    return now_brt.strftime("%d/%m/%Y %H:%M")
+
+
+def _is_campaign_list_intent(message: str) -> bool:
+    normalized = _normalize_key(message or "")
+    if not normalized:
+        return False
+    has_campaign = "campanha" in normalized or "campanhas" in normalized
+    has_list_signal = any(
+        token in normalized
+        for token in ("listar", "liste", "lista", "quais", "historico", "criadas", "criados", "mostre")
+    )
+    has_generate_signal = bool(
+        _is_image_request(message) or _is_direct_generation_intent(message)
+    )
+    return has_campaign and has_list_signal and not has_generate_signal
+
+
+def _extract_campaign_mode_filter(message: str) -> Optional[str]:
+    normalized = _normalize_key(message or "")
+    if "rezeta" in normalized:
+        return "REZETA"
+    if " fc " in f" {normalized} " or "fc solucoes" in normalized:
+        return "FC"
+    return None
+
+
+def _is_direct_confirmation(message: str) -> bool:
+    normalized = _normalize_key(message or "")
+    return normalized in {"sim", "todos", "todos registrados", "aqui no chat", "listar todos"}
+
+
+def _last_pending_list_domain(contexto: List[Dict[str, Any]]) -> Optional[str]:
+    """Resolve pending confirmation target from recent assistant prompt."""
+    for msg in reversed(contexto[-10:]):
+        if str(msg.get("tipo") or "") != "ia":
+            continue
+        normalized = _normalize_key(str(msg.get("conteudo") or ""))
+        if not normalized:
+            continue
+        if ("deseja" in normalized or "quer" in normalized or "confirmo" in normalized) and (
+            "listar" in normalized or "liste" in normalized or "lista" in normalized or "exiba" in normalized
+        ):
+            if "cliente" in normalized or "clientes" in normalized:
+                return "clientes"
+            if "contrato" in normalized or "contratos" in normalized:
+                return "contratos"
+    return None
 
 
 class VivaChatOrchestratorService:
@@ -190,6 +299,11 @@ class VivaChatOrchestratorService:
             handoff_intent = _is_handoff_whatsapp_intent(request.mensagem)
             viviane_handoff_query_intent = _is_viviane_handoff_query_intent(request.mensagem)
             logo_request = _is_logo_request(request.mensagem)
+
+            if _is_time_query_intent(request.mensagem):
+                return await finalize(
+                    resposta=f"Horario de Brasilia (BRT) agora: {_format_brt_now()}."
+                )
 
             if agenda_command is not None:
                 if agenda_command.get("error"):
@@ -360,6 +474,122 @@ class VivaChatOrchestratorService:
                     )
                 )
 
+            pending_list_domain = _last_pending_list_domain(contexto_efetivo)
+            contract_templates_intent = _is_contract_templates_intent(request.mensagem)
+            contract_list_intent = _is_contract_list_intent(request.mensagem) or (
+                _is_direct_confirmation(request.mensagem) and pending_list_domain == "contratos"
+            )
+            if contract_list_intent or contract_templates_intent:
+                contrato_service = ContratoService(db)
+                if contract_templates_intent:
+                    templates = await contrato_service.list_templates()
+                    titles = [
+                        str(item.get("nome") or "").strip()
+                        for item in templates
+                        if str(item.get("nome") or "").strip()
+                    ]
+                    lines = ["Titulos dos modelos de contrato ativos:"]
+                    if not titles:
+                        contratos_data = await contrato_service.list(
+                            status=None,
+                            search=None,
+                            page=1,
+                            page_size=500,
+                        )
+                        contratos_items = list(contratos_data.get("items", []))
+                        if not contratos_items:
+                            return await finalize(
+                                resposta="Nao ha modelos ativos nem contratos registrados no sistema."
+                            )
+
+                        seen_templates: set[str] = set()
+                        for item in contratos_items:
+                            title = str(getattr(item, "template_nome", "") or "").strip()
+                            if not title:
+                                title = str(getattr(item, "template_id", "") or "").strip()
+                            if title and title not in seen_templates:
+                                seen_templates.add(title)
+                                titles.append(title)
+                        lines = [
+                            "Nao encontrei modelos formais ativos. "
+                            "Como referencia, estes sao os titulos de contratos ja registrados:"
+                        ]
+                else:
+                    contratos_data = await contrato_service.list(
+                        status=None,
+                        search=None,
+                        page=1,
+                        page_size=500,
+                    )
+                    contratos_items = list(contratos_data.get("items", []))
+                    if not contratos_items:
+                        return await finalize(resposta="Nao ha contratos registrados no sistema.")
+
+                    seen: set[str] = set()
+                    titles: List[str] = []
+                    for item in contratos_items:
+                        title = str(getattr(item, "template_nome", "") or "").strip()
+                        if not title:
+                            title = str(getattr(item, "template_id", "") or "").strip() or "Contrato sem titulo"
+                        if title not in seen:
+                            seen.add(title)
+                            titles.append(title)
+
+                    lines = ["Titulos dos contratos registrados:"]
+                lines.extend(f"- {title}" for title in titles)
+                return await finalize(resposta="\n".join(lines))
+
+            client_list_intent = _is_client_list_intent(request.mensagem) or (
+                _is_direct_confirmation(request.mensagem) and pending_list_domain == "clientes"
+            )
+            if client_list_intent:
+                cliente_service = ClienteService(db)
+                payload = await cliente_service.list(search=None, page=1, page_size=200)
+                clients = list(payload.get("items", []))
+                if not clients:
+                    return await finalize(resposta="Nao ha clientes registrados no sistema.")
+                lines = ["Clientes registrados:"]
+                for item in clients:
+                    if isinstance(item, dict):
+                        nome = str(item.get("nome") or "").strip()
+                    else:
+                        nome = str(getattr(item, "nome", "") or "").strip()
+                    lines.append(f"- {nome or 'Cliente sem nome'}")
+                return await finalize(resposta="\n".join(lines))
+
+            if _is_services_intent(request.mensagem):
+                lines = [
+                    "Servicos do SaaS:",
+                    "- gestao de contratos",
+                    "- gestao de clientes",
+                    "- agenda operacional com sync Google Calendar",
+                    "- campanhas e criativos IA",
+                    "- handoff para WhatsApp",
+                    "- memoria operacional da VIVA no COFRE",
+                ]
+                return await finalize(resposta="\n".join(lines))
+
+            if _is_campaign_list_intent(request.mensagem):
+                mode_filter = _extract_campaign_mode_filter(request.mensagem)
+                rows, total = await viva_campaign_repository_service.list_campaign_rows(
+                    db=db,
+                    user_id=current_user.id,
+                    modo=mode_filter,
+                    limit=30,
+                    offset=0,
+                )
+                if total <= 0:
+                    return await finalize(resposta="Nao ha campanhas registradas no sistema.")
+                lines = ["Campanhas registradas:"]
+                for row in rows:
+                    created_label = (
+                        row.created_at.strftime("%d/%m/%Y %H:%M")
+                        if getattr(row, "created_at", None)
+                        else "sem data"
+                    )
+                    lines.append(f"- {row.titulo} ({row.modo}) - {created_label}")
+                return await finalize(resposta="\n".join(lines))
+
             # Cumprimento simples: resposta curta e sem acionar fluxo de campanha/imagem.
             if (
                 _is_greeting(request.mensagem)
@@ -473,7 +703,7 @@ class VivaChatOrchestratorService:
 
             should_generate_image = _is_image_request(request.mensagem) or (
                 campaign_flow_requested
-                and _has_campaign_signal(request.mensagem)
+                and _is_direct_generation_intent(request.mensagem)
                 and not suggestion_first_intent
                 and not _is_greeting(request.mensagem)
             )

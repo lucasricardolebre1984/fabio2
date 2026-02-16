@@ -7,6 +7,7 @@ Objetivo: expor status tecnico para modularizacao comercial do SaaS.
 from typing import Any, Dict, List
 
 from app.config import settings
+from app.services.cofre_manifest_service import cofre_manifest_service
 
 
 class VivaModulesService:
@@ -50,60 +51,7 @@ class VivaModulesService:
             },
         ]
 
-        modules: List[Dict[str, Any]] = [
-            {
-                "module_id": "core_saas",
-                "nome": "Core SaaS",
-                "status": "ready",
-                "descricao": "Autenticacao, contratos, clientes, agenda e base operacional.",
-                "dependencias": ["postgres", "redis"],
-                "endpoints": ["/api/v1/auth/*", "/api/v1/contratos/*", "/api/v1/clientes/*", "/api/v1/agenda/*"],
-                "notes": ["Apto para base de novos projetos com personalizacao de marca."],
-            },
-            {
-                "module_id": "modulo_viva",
-                "nome": "VIVA Interna",
-                "status": "hardening",
-                "descricao": "Chat interno com orquestracao, sessoes e memoria contextual.",
-                "dependencias": ["openai", "postgres", "redis"],
-                "endpoints": ["/api/v1/viva/chat", "/api/v1/viva/chat/sessions", "/api/v1/viva/chat/snapshot"],
-                "notes": ["Prompt principal unico ativo em viva_concierge_service."],
-            },
-            {
-                "module_id": "modulo_viviane",
-                "nome": "Viviane Externa",
-                "status": "ready",
-                "descricao": "Atendimento comercial em WhatsApp com handoff agendado.",
-                "dependencias": ["evolution_api", "postgres"],
-                "endpoints": ["/api/v1/whatsapp/*", "/api/v1/whatsapp-chat/*", "/api/v1/viva/handoff/*"],
-                "notes": ["Separado por dominio da VIVA interna."],
-            },
-            {
-                "module_id": "modulo_campanhas",
-                "nome": "Campanhas e Criativos",
-                "status": "hardening",
-                "descricao": "Planejamento criativo, geracao de imagem e historico de campanhas.",
-                "dependencias": ["openai", "postgres"],
-                "endpoints": ["/api/v1/viva/campanhas", "/api/v1/viva/image/generate", "/api/v1/viva/chat"],
-                "notes": ["Skill generate_campanha definida para roteamento automatico."],
-            },
-            {
-                "module_id": "modulo_memoria",
-                "nome": "Memoria e RAG",
-                "status": "assisted",
-                "descricao": "Memoria curta/media/longa com pgvector e fallback local de embeddings.",
-                "dependencias": ["openai", "postgres_pgvector", "redis"],
-                "endpoints": [
-                    "/api/v1/cofre/memories/status",
-                    "/api/v1/cofre/memories/tables",
-                    "/api/v1/cofre/memories/{table_name}/tail",
-                ],
-                "notes": [
-                    "Operacional para continuidade.",
-                    "Homologacao semantica premium pendente (BUG-094).",
-                ],
-            },
-        ]
+        modules: List[Dict[str, Any]] = cofre_manifest_service.modules()
 
         runtime = {
             "openai_api_key_configured": has_openai_key,

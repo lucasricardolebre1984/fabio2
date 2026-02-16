@@ -40,6 +40,9 @@ class CofreMemoryService:
         path.mkdir(parents=True, exist_ok=True)
         return path
 
+    def ensure_table_dir(self, table_name: str) -> str:
+        return self._table_dir(table_name).name
+
     def _daily_log_file(self, table_name: str) -> Path:
         day = datetime.utcnow().strftime("%Y-%m-%d")
         return self._table_dir(table_name) / f"{day}.jsonl"

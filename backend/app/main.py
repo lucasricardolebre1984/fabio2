@@ -14,6 +14,7 @@ from app.db.session import AsyncSessionLocal
 from app.services.viva_handoff_service import viva_handoff_service
 from app.services.viva_brain_paths_service import viva_brain_paths_service
 from app.services.viva_memory_service import viva_memory_service
+from app.services.cofre_schema_service import cofre_schema_service
 
 
 @asynccontextmanager
@@ -32,6 +33,8 @@ async def lifespan(app: FastAPI):
     try:
         async with AsyncSessionLocal() as db:
             await viva_memory_service.ensure_storage(db)
+            await cofre_schema_service.bootstrap(db)
+            await db.commit()
     except Exception:
         pass
 

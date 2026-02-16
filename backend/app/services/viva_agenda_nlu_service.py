@@ -39,10 +39,7 @@ def _has_create_imperative(normalized: str) -> bool:
         "adicionar compromisso",
         "adicione compromisso",
     )
-    if _has_any_phrase(normalized, imperative_phrases):
-        return True
-    # compatibilidade com formato antigo iniciado por "agenda ..."
-    return normalized.startswith("agenda ")
+    return _has_any_phrase(normalized, imperative_phrases)
 
 
 def _has_query_existence_intent(normalized: str) -> bool:
@@ -187,18 +184,27 @@ def _is_simple_confirmation(text: str) -> bool:
         "pode",
         "sim ja",
         "ja",
-        "todos",
-        "todos sem mais perguntas",
-        "todos sem mais pergintas",
     }
 
 
 def _has_recent_agenda_prompt(contexto: List[Dict[str, Any]]) -> bool:
-    for msg in reversed(contexto[-8:]):
+    for msg in reversed(contexto[-2:]):
         if msg.get("tipo") != "ia":
             continue
         normalized = _normalize_key(str(msg.get("conteudo") or ""))
-        if "agenda" in normalized or "compromiss" in normalized:
+        has_agenda_token = ("agenda" in normalized) or ("compromiss" in normalized)
+        has_question_prompt = any(
+            phrase in normalized
+            for phrase in (
+                "quer que eu liste",
+                "deseja que eu liste",
+                "posso listar",
+                "me confirme se quer",
+                "sim ou nao",
+                "de hoje ou amanha",
+            )
+        )
+        if has_agenda_token and has_question_prompt:
             return True
     return False
 
@@ -314,8 +320,45 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
     time_token = ""
     hour = 0
     minute = 0
+    relative_delta: Optional[timedelta] = None
     has_tomorrow_hint = bool(re.search(r"\bamanh\w*\b", normalized))
     has_today_hint = bool(re.search(r"\bhoj\w*\b", normalized))
+
+    # Suporta linguagem natural relativa: "daqui duas horas", "daqui 2h", "daqui 30 minutos".
+    word_to_number = {
+        "um": 1,
+        "uma": 1,
+        "dois": 2,
+        "duas": 2,
+        "tres": 3,
+        "quatro": 4,
+        "cinco": 5,
+        "seis": 6,
+        "sete": 7,
+        "oito": 8,
+        "nove": 9,
+        "dez": 10,
+        "onze": 11,
+        "doze": 12,
+    }
+    relative_match = re.search(
+        r"\bdaqui\s+(?:(\d+)|(um|uma|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez|onze|doze))\s*"
+        r"(hora|horas|h|minuto|minutos|min)\b",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if relative_match:
+        amount = 0
+        if relative_match.group(1):
+            amount = int(relative_match.group(1))
+        elif relative_match.group(2):
+            amount = int(word_to_number.get(str(relative_match.group(2)).lower(), 0))
+        unit = str(relative_match.group(3) or "").lower()
+        if amount > 0:
+            if unit in ("hora", "horas", "h"):
+                relative_delta = timedelta(hours=amount)
+            else:
+                relative_delta = timedelta(minutes=amount)
 
     hh_mm_match = re.search(r"\b(\d{1,2}):(\d{2})\b", raw)
     if hh_mm_match:
@@ -341,7 +384,8 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
                     minute = int(fallback_hour_match.group(2)) if fallback_hour_match.group(2) else 0
                     time_token = ""
                 else:
-                    return {"error": "Data/hora invalida"}
+                    if relative_delta is None:
+                        return {"error": "Data/hora invalida"}
 
     if hour > 23 or minute > 59:
         return {"error": "Data/hora invalida"}
@@ -362,10 +406,13 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
     elif has_today_hint:
         date_value = datetime.now()
 
-    if not date_value:
-        return {"error": "Data/hora invalida"}
-
-    date_time = date_value.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if relative_delta is not None:
+        date_time = datetime.now() + relative_delta
+        date_time = date_time.replace(second=0, microsecond=0)
+    else:
+        if not date_value:
+            return {"error": "Data/hora invalida"}
+        date_time = date_value.replace(hour=hour, minute=minute, second=0, microsecond=0)
 
     title = raw
     verb_match = re.search(
@@ -385,7 +432,11 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
     title = re.sub(r"\b\d{1,2}(?::\d{2})?\b", " ", title)
     if date_match:
         title = title.replace(date_match.group(1), "")
-    title = re.sub(r"(?i)\b(hoje|hoj\w*|amanha|amanhã|amanh\w*|as|às|s|para|pra|dia|de|do|da|no|na|mim|comigo)\b", " ", title)
+    title = re.sub(
+        r"(?i)\b(hoje|hoj\w*|amanha|amanhã|amanh\w*|as|às|s|para|pra|dia|de|do|da|no|na|mim|comigo|daqui|hora|horas|minuto|minutos|um|uma|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez)\b",
+        " ",
+        title,
+    )
     title = re.sub(r"[^0-9A-Za-zÀ-ÿ\s-]+", " ", title)
     title = re.sub(r"(?i)\b(o|a|os|as|um|uma)\b", " ", title)
     title = re.sub(r"\s+", " ", title).strip(" -,:;.")

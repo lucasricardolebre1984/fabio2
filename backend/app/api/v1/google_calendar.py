@@ -65,3 +65,21 @@ async def google_calendar_disconnect(
 ):
     await google_calendar_service.disconnect(db, current_user.id)
     return {"ok": True, "connected": False}
+
+
+@router.post("/sync/agenda/{evento_id}")
+async def google_calendar_sync_agenda_event(
+    evento_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operador),
+):
+    agenda_service = AgendaService(db)
+    evento = await agenda_service.get_by_id(evento_id, user_id=current_user.id)
+    if not evento:
+        raise HTTPException(status_code=404, detail="Evento nao encontrado")
+    result = await google_calendar_service.sync_agenda_event(
+        db=db,
+        user_id=current_user.id,
+        evento=evento,
+    )
+    return {"ok": True, **result}

@@ -2038,3 +2038,41 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
 **Esperado:** memoria longa ser escrita apenas por comando explicito (memoria eterna/pinned) e por eventos realmente relevantes.
 **Atual:** append em long memory passou a exigir `meta.pinned=true` ou `meta.force_long=true` (comando `memorizar:`).
 **Status:** Em validacao
+
+### BUG-108: VIVA lista clientes como "Cliente sem nome" apesar de cadastro valido
+**Data:** 2026-02-16
+**Severidade:** Alta
+**Descricao:** Fluxo de listagem de clientes na VIVA retornava "Cliente sem nome" para todos os itens, mesmo com nomes existentes na base.
+**Causa raiz:** No orquestrador, a resposta iterava itens serializados como `dict` usando `getattr(item, 'nome')`, perdendo o campo.
+**Correcao aplicada:** `backend/app/services/viva_chat_orchestrator_service.py` agora resolve `nome` por `item.get('nome')` quando o item e dicionario.
+**Validacao:** `POST /api/v1/viva/chat` com "liste clientes" retornou nomes reais (ex.: "Lucas Ricardo Lebre").
+**Status:** Resolvido
+
+### BUG-109: Pedido de "listar campanhas" disparava geracao de imagem indevida
+**Data:** 2026-02-16
+**Severidade:** Alta
+**Descricao:** Mensagens como "listes campanhas ja criadas" eram roteadas para fluxo de criacao de campanha/imagem, em vez de listar historico.
+**Causa raiz:** Heuristica de `campaign_flow_requested` + `_has_campaign_signal` acionava geracao sem intencao explicita de gerar.
+**Correcao aplicada:**
+- novo intent `_is_campaign_list_intent` no orquestrador;
+- listagem de campanhas via `viva_campaign_repository_service.list_campaign_rows`;
+- gate de geracao alterado para exigir intencao direta (`_is_direct_generation_intent`) quando em fluxo de campanha.
+**Validacao:** `POST /api/v1/viva/chat` com "listes campanhas ja criadas" retornou lista textual de campanhas e `midia_count=0`.
+**Status:** Resolvido
+
+### BUG-110: VIVA confirmava agendamento sem persistir evento real na agenda
+**Data:** 2026-02-16
+**Severidade:** Alta
+**Descricao:** Frases naturais como "agende ... daqui duas horas" podiam cair fora do parser e a conversa seguia com confirmacoes sem evento salvo na base.
+**Causa raiz:** `parse_agenda_natural_create` nao interpretava tempo relativo ("daqui X horas/minutos").
+**Correcao aplicada:** suporte a parser relativo (`daqui 2 horas`, `daqui duas horas`, `daqui 30 minutos`) em `backend/app/services/viva_agenda_nlu_service.py`.
+**Validacao:** API da VIVA retornou "Agendamento criado com sucesso" e `liste minha agenda` passou a listar o compromisso criado na mesma sessao.
+**Status:** Resolvido
+
+### BUG-111: Consulta de hora atual caia em fluxo inadequado de agenda
+**Data:** 2026-02-16
+**Severidade:** Media
+**Descricao:** Perguntas de hora atual (BRT) podiam desviar para resposta de agendamento/recovery.
+**Correcao aplicada:** intent dedicado de hora atual + resposta deterministica em BRT no orquestrador (`backend/app/services/viva_chat_orchestrator_service.py`).
+**Validacao:** "mostre a hora atual no horario de brasilia" retorna horario BRT diretamente.
+**Status:** Resolvido

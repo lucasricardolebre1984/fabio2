@@ -1,0 +1,160 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2026-02-16",
+  "capabilities": [
+    {
+      "dominio": "agenda",
+      "acoes": [
+        "criar compromisso em linguagem natural",
+        "listar compromissos por periodo",
+        "concluir compromisso por id ou titulo"
+      ],
+      "rotas": [
+        "/api/v1/viva/chat",
+        "/api/v1/agenda"
+      ]
+    },
+    {
+      "dominio": "contratos",
+      "acoes": [
+        "listar contratos registrados",
+        "listar titulos de contratos executados",
+        "consultar contrato por id"
+      ],
+      "rotas": [
+        "/api/v1/contratos",
+        "/api/v1/contratos/templates",
+        "/api/v1/viva/chat"
+      ]
+    },
+    {
+      "dominio": "clientes",
+      "acoes": [
+        "listar clientes",
+        "buscar cliente por documento",
+        "consultar historico de cliente"
+      ],
+      "rotas": [
+        "/api/v1/clientes",
+        "/api/v1/clientes/{cliente_id}",
+        "/api/v1/viva/chat"
+      ]
+    },
+    {
+      "dominio": "campanhas",
+      "acoes": [
+        "planejar campanhas com briefing curto",
+        "gerar imagem com identidade FC/Rezeta",
+        "salvar e listar historico de campanhas"
+      ],
+      "rotas": [
+        "/api/v1/viva/chat",
+        "/api/v1/viva/campanhas",
+        "/api/v1/viva/image/generate"
+      ]
+    },
+    {
+      "dominio": "handoff_viviane",
+      "acoes": [
+        "agendar aviso para cliente no WhatsApp",
+        "listar tarefas de handoff",
+        "processar tarefas vencidas"
+      ],
+      "rotas": [
+        "/api/v1/viva/handoff/schedule",
+        "/api/v1/viva/handoff",
+        "/api/v1/viva/handoff/process-due"
+      ]
+    },
+    {
+      "dominio": "memoria",
+      "acoes": [
+        "gravar espelho canonico em COFRE por tabela/subpasta",
+        "manter memoria media da sessao em Redis",
+        "indexar memoria longa vetorial em pgvector"
+      ],
+      "rotas": [
+        "/api/v1/cofre/memories/status",
+        "/api/v1/cofre/memories/tables",
+        "/api/v1/cofre/memories/{table_name}/tail"
+      ]
+    }
+  ],
+  "modules": [
+    {
+      "module_id": "core_saas",
+      "nome": "Core SaaS",
+      "status": "ready",
+      "descricao": "Autenticacao, contratos, clientes, agenda e base operacional.",
+      "dependencias": [
+        "postgres",
+        "redis"
+      ],
+      "endpoints": [
+        "/api/v1/auth/*",
+        "/api/v1/contratos/*",
+        "/api/v1/clientes/*",
+        "/api/v1/agenda/*"
+      ],
+      "notes": [
+        "Apto para base de novos projetos com personalizacao de marca."
+      ]
+    },
+    {
+      "module_id": "modulo_viva",
+      "nome": "VIVA Interna",
+      "status": "hardening",
+      "descricao": "Chat interno com orquestracao, sessoes e memoria contextual.",
+      "dependencias": [
+        "openai",
+        "postgres",
+        "redis"
+      ],
+      "endpoints": [
+        "/api/v1/viva/chat",
+        "/api/v1/viva/chat/sessions",
+        "/api/v1/viva/chat/snapshot"
+      ],
+      "notes": [
+        "Persona, skills e memorias centralizadas no COFRE."
+      ]
+    },
+    {
+      "module_id": "modulo_campanhas",
+      "nome": "Campanhas e Criativos",
+      "status": "hardening",
+      "descricao": "Planejamento criativo, geracao de imagem e historico de campanhas.",
+      "dependencias": [
+        "openai",
+        "postgres"
+      ],
+      "endpoints": [
+        "/api/v1/viva/campanhas",
+        "/api/v1/viva/image/generate",
+        "/api/v1/viva/chat"
+      ],
+      "notes": [
+        "Delete sincronizado banco + COFRE ativo."
+      ]
+    },
+    {
+      "module_id": "modulo_memoria",
+      "nome": "Memoria e COFRE",
+      "status": "ready",
+      "descricao": "Memoria curta/media/longa com trilha auditavel em COFRE.",
+      "dependencias": [
+        "postgres_pgvector",
+        "redis",
+        "openai"
+      ],
+      "endpoints": [
+        "/api/v1/cofre/memories/status",
+        "/api/v1/cofre/memories/tables",
+        "/api/v1/cofre/memories/{table_name}/tail"
+      ],
+      "notes": [
+        "Fonte de verdade unica para memoria de runtime da VIVA."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,257 @@
+{
+  "generated_at": "2026-02-16T05:42:55.224467+00:00",
+  "scope": "menu -> frontend -> backend -> db -> cofre -> semantic",
+  "menu_matrix": [
+    {
+      "menu": "Chat IA VIVA",
+      "href": "/viva",
+      "pages": [
+        "frontend\\src\\app\\viva\\page.tsx"
+      ],
+      "frontend_endpoints": [
+        "/api/v1/viva/audio/speak",
+        "/api/v1/viva/audio/transcribe",
+        "/api/v1/viva/chat",
+        "/api/v1/viva/chat/stream",
+        "/api/v1/viva/status",
+        "/api/v1/viva/tts/status",
+        "/api/v1/viva/vision/upload"
+      ],
+      "missing_backend_endpoints": [],
+      "expected_tables": [
+        "viva_chat_sessions",
+        "viva_chat_messages",
+        "viva_memory_vectors"
+      ],
+      "missing_db_tables": [],
+      "missing_cofre_dirs": [],
+      "status": "ok"
+    },
+    {
+      "menu": "Campanhas",
+      "href": "/campanhas",
+      "pages": [
+        "frontend\\src\\app\\(dashboard)\\campanhas\\page.tsx"
+      ],
+      "frontend_endpoints": [
+        "/api/v1/viva/campanhas/reset-all",
+        "/api/v1/viva/campanhas/{param}"
+      ],
+      "missing_backend_endpoints": [],
+      "expected_tables": [
+        "viva_campanhas"
+      ],
+      "missing_db_tables": [],
+      "missing_cofre_dirs": [],
+      "status": "ok"
+    },
+    {
+      "menu": "Contratos",
+      "href": "/contratos",
+      "pages": [
+        "frontend\\src\\app\\(dashboard)\\contratos\\page.tsx"
+      ],
+      "frontend_endpoints": [],
+      "missing_backend_endpoints": [],
+      "expected_tables": [
+        "contratos",
+        "contrato_templates"
+      ],
+      "missing_db_tables": [],
+      "missing_cofre_dirs": [],
+      "status": "ok"
+    },
+    {
+      "menu": "Clientes",
+      "href": "/clientes",
+      "pages": [
+        "frontend\\src\\app\\(dashboard)\\clientes\\page.tsx"
+      ],
+      "frontend_endpoints": [
+        "/api/v1/clientes",
+        "/api/v1/clientes/deduplicar-documentos",
+        "/api/v1/clientes/sincronizar-contratos",
+        "/api/v1/clientes/{param}",
+        "/api/v1/clientes/{param}/contratos"
+      ],
+      "missing_backend_endpoints": [],
+      "expected_tables": [
+        "clientes"
+      ],
+      "missing_db_tables": [],
+      "missing_cofre_dirs": [],
+      "status": "ok"
+    },
+    {
+      "menu": "Agenda",
+      "href": "/agenda",
+      "pages": [
+        "frontend\\src\\app\\(dashboard)\\agenda\\page.tsx"
+      ],
+      "frontend_endpoints": [
+        "/api/v1/agenda",
+        "/api/v1/agenda/{param}",
+        "/api/v1/agenda/{param}/concluir",
+        "/api/v1/google-calendar/connect-url",
+        "/api/v1/google-calendar/disconnect",
+        "/api/v1/google-calendar/status",
+        "/api/v1/google-calendar/sync/agenda/{param}"
+      ],
+      "missing_backend_endpoints": [],
+      "expected_tables": [
+        "agenda"
+      ],
+      "missing_db_tables": [],
+      "missing_cofre_dirs": [],
+      "status": "ok"
+    },
+    {
+      "menu": "WhatsApp",
+      "href": "/whatsapp",
+      "pages": [
+        "frontend\\src\\app\\(dashboard)\\whatsapp\\page.tsx"
+      ],
+      "frontend_endpoints": [
+        "/api/v1/whatsapp/desconectar",
+        "/api/v1/whatsapp/status"
+      ],
+      "missing_backend_endpoints": [],
+      "expected_tables": [
+        "whatsapp_conversas",
+        "whatsapp_mensagens"
+      ],
+      "missing_db_tables": [],
+      "missing_cofre_dirs": [],
+      "status": "ok"
+    }
+  ],
+  "backend_routes_total": 66,
+  "backend_routes": [
+    "/api/v1/agenda",
+    "/api/v1/agenda/hoje",
+    "/api/v1/agenda/{evento_id}",
+    "/api/v1/agenda/{evento_id}/concluir",
+    "/api/v1/auth/login",
+    "/api/v1/auth/logout",
+    "/api/v1/auth/me",
+    "/api/v1/auth/refresh",
+    "/api/v1/clientes",
+    "/api/v1/clientes/deduplicar-documentos",
+    "/api/v1/clientes/documento/{documento}",
+    "/api/v1/clientes/sincronizar-contratos",
+    "/api/v1/clientes/{cliente_id}",
+    "/api/v1/clientes/{cliente_id}/contratos",
+    "/api/v1/clientes/{cliente_id}/historico",
+    "/api/v1/cofre/memories/status",
+    "/api/v1/cofre/memories/sync-db-tables",
+    "/api/v1/cofre/memories/tables",
+    "/api/v1/cofre/memories/{table_name}/tail",
+    "/api/v1/cofre/system/manifest",
+    "/api/v1/cofre/system/schema-status",
+    "/api/v1/contratos",
+    "/api/v1/contratos/templates",
+    "/api/v1/contratos/templates/{template_id}",
+    "/api/v1/contratos/{contrato_id}",
+    "/api/v1/contratos/{contrato_id}/enviar",
+    "/api/v1/contratos/{contrato_id}/pdf",
+    "/api/v1/google-calendar/callback",
+    "/api/v1/google-calendar/connect-url",
+    "/api/v1/google-calendar/disconnect",
+    "/api/v1/google-calendar/status",
+    "/api/v1/google-calendar/sync/agenda/{evento_id}",
+    "/api/v1/viva/audio/speak",
+    "/api/v1/viva/audio/transcribe",
+    "/api/v1/viva/campanhas",
+    "/api/v1/viva/campanhas/reset-all",
+    "/api/v1/viva/campanhas/reset-patterns",
+    "/api/v1/viva/campanhas/{campanha_id}",
+    "/api/v1/viva/capabilities",
+    "/api/v1/viva/chat",
+    "/api/v1/viva/chat/session/new",
+    "/api/v1/viva/chat/sessions",
+    "/api/v1/viva/chat/snapshot",
+    "/api/v1/viva/chat/stream",
+    "/api/v1/viva/handoff",
+    "/api/v1/viva/handoff/process-due",
+    "/api/v1/viva/handoff/schedule",
+    "/api/v1/viva/image/generate",
+    "/api/v1/viva/modules/status",
+    "/api/v1/viva/status",
+    "/api/v1/viva/tts/status",
+    "/api/v1/viva/video/generate",
+    "/api/v1/viva/video/result/{task_id}",
+    "/api/v1/viva/vision",
+    "/api/v1/viva/vision/upload",
+    "/api/v1/webhook/evolution",
+    "/api/v1/whatsapp-chat/conversas",
+    "/api/v1/whatsapp-chat/conversas/{conversa_id}",
+    "/api/v1/whatsapp-chat/conversas/{conversa_id}/arquivar",
+    "/api/v1/whatsapp-chat/conversas/{conversa_id}/mensagens",
+    "/api/v1/whatsapp-chat/status",
+    "/api/v1/whatsapp/conectar",
+    "/api/v1/whatsapp/desconectar",
+    "/api/v1/whatsapp/enviar-arquivo",
+    "/api/v1/whatsapp/enviar-texto",
+    "/api/v1/whatsapp/status"
+  ],
+  "db_tables_total": 19,
+  "db_tables": [
+    "agenda",
+    "clientes",
+    "cofre_manifest_registry",
+    "cofre_memory_registry",
+    "cofre_persona_registry",
+    "cofre_skill_registry",
+    "contrato_templates",
+    "contratos",
+    "google_calendar_connections",
+    "google_calendar_event_links",
+    "imagens_custos",
+    "users",
+    "viva_campanhas",
+    "viva_chat_messages",
+    "viva_chat_sessions",
+    "viva_handoff_tasks",
+    "viva_memory_vectors",
+    "whatsapp_conversas",
+    "whatsapp_mensagens"
+  ],
+  "cofre_memory_dirs_total": 22,
+  "cofre_memory_dirs": [
+    "agenda",
+    "campanha_imagens",
+    "clientes",
+    "cofre_manifest_registry",
+    "cofre_memory_registry",
+    "cofre_persona_registry",
+    "cofre_skill_registry",
+    "contrato_templates",
+    "contratos",
+    "google_calendar_connections",
+    "google_calendar_event_links",
+    "imagens",
+    "imagens_custos",
+    "redis_viva_memory_medium",
+    "users",
+    "viva_campanhas",
+    "viva_chat_messages",
+    "viva_chat_sessions",
+    "viva_handoff_tasks",
+    "viva_memory_vectors",
+    "whatsapp_conversas",
+    "whatsapp_mensagens"
+  ],
+  "manifest_summary": {
+    "version": "1.0.0",
+    "capabilities": 6,
+    "modules": 4
+  },
+  "semantic_checks": {
+    "contracts_list_intent": true,
+    "contract_templates_intent": true,
+    "clients_list_intent": true,
+    "services_catalog_intent": true,
+    "agenda_guardrail_recent_prompt": true,
+    "agenda_guardrail_simple_confirmation": true
+  }
+}

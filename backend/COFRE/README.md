@@ -20,6 +20,8 @@
   - `viva_memory_vectors/`
   - `redis_viva_memory_medium/`
   - cada pasta recebe arquivos `YYYY-MM-DD.jsonl`
+- `system/`
+  - `endpoints_manifest.json`: catalogo canonico de modulos/capacidades/endpoints.
 
 ## Regra operacional
 
@@ -27,6 +29,7 @@
 2. Nao crie persona paralela em outras pastas de runtime.
 3. Use `backend/COFRE/memories/` para auditoria e tuning da memoria.
 4. Delete funcional no SaaS deve refletir delete no COFRE quando aplicavel.
+5. Catalogos de capacidades/modulos devem sair de `COFRE/system/endpoints_manifest.json`.
 
 ## Compatibilidade
 
