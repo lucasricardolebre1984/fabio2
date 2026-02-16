@@ -1,7 +1,7 @@
 ﻿# STATUS do projeto - FC Solucoes Financeiras
 
 Data: 2026-02-16
-Status geral: operacional em ambiente local, com pendencias criticas abertas na VIVA (agenda, consulta de dados reais e obediencia de comando direto).
+Status geral: operacional em ambiente local, com pendencias criticas abertas em seguranca, dependencia frontend e regressao de testes backend.
 
 ## Fonte de verdade ativa
 
@@ -38,11 +38,17 @@ Status geral: operacional em ambiente local, com pendencias criticas abertas na 
 - BUG-105: em validacao apos ajuste de roteamento de contratos (modelos vs emitidos por cliente)
 - BUG-106: em validacao apos ajuste de confirmacoes curtas
 - BUG-107: drift de memoria/persona fora da ancora canonica
+- BUG-116: vulnerabilidades criticas/altas no frontend (`next`, `axios`)
+- BUG-117: `npm run type-check` quebrando por dependencia de `.next/types`
+- BUG-118: suite backend com falhas em auth/contratos/viva (`pytest`)
+- BUG-119: `security_stub` ainda ativo no fluxo real de autenticacao
+- BUG-120: CORS amplo no backend (`allow_methods=*`, `allow_headers=*`)
 
 ## Evidencias desta rodada
 
 - Matriz menu -> API -> banco -> COFRE: `docs/AUDIT/menu-endpoint-matrix.md`
 - Auditoria documental: `docs/AUDIT/DOCS_AUDIT_2026-02-16.md`
+- Auditoria de qualidade web: `docs/AUDIT/WEB_QUALITY_AUDIT_2026-02-16.md`
 - Refatoracao de dominio aplicada no orquestrador:
   - `backend/app/services/viva_domain_query_router_service.py`
   - consultas de contratos/clientes/campanhas/servicos extraidas do `viva_chat_orchestrator_service.py`

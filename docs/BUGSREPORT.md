@@ -97,6 +97,11 @@
 | BUG-113 | Alta | VIVA/Campanhas Consulta | Pedido de contagem geral de campanhas ("campanhas feitas"/"quantas temos") cai em pergunta de marca FC/Rezeta e confirmacoes redundantes | Em validacao (intent de contagem geral no domain router) |
 | BUG-114 | Alta | VIVA/Agenda NLU | Comando natural "marca pra mim ... daqui uma hora" nao era reconhecido como criacao de compromisso (somente `marcar/marque`) | Em validacao (suporte a variante `marca`) |
 | BUG-115 | Alta | Contratos/Templates | Listagem de modulos de contrato retornava fallback de contratos emitidos quando tabela `contrato_templates` estava vazia, ignorando `contratos/templates/*.json` | Em validacao (listagem hibrida por arquivos + banco) |
+| BUG-116 | Critica | Frontend/Dependencias | `npm audit` aponta vulnerabilidades criticas/altas em `next@14.1.0` e `axios` | Aberto |
+| BUG-117 | Alta | Frontend/TypeCheck | `npm run type-check` falha por `include` fixo em `.next/types/**/*.ts` quando arquivos nao existem | Aberto |
+| BUG-118 | Alta | Backend/Testes | `pytest` com 12 falhas (auth/contratos/viva) por regressao de status HTTP e erros asyncpg/event loop | Aberto |
+| BUG-119 | Alta | Backend/Security | Fluxo real de auth ainda importa `security_stub` com senha dev `1234` | Aberto |
+| BUG-120 | Media | Backend/CORS | CORS excessivamente amplo (`allow_methods=*`, `allow_headers=*`) | Aberto |
 
 ---
 
@@ -2249,3 +2254,53 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
 - validacao tecnica:
   - `python -m pytest tests/test_viva_domain_intents.py -q` => `13 passed`;
   - rebuild do backend docker executado para garantir runtime atualizado.
+
+### BUG-116: Vulnerabilidades criticas/altas em dependencias frontend
+**Data:** 2026-02-16
+**Severidade:** Critica
+**Descricao:** `npm audit --json` reporta vulnerabilidades criticas/altas em dependencias de producao do frontend.
+**Evidencia:**
+- `next@14.1.0` com advisories de `critical/high`;
+- `axios` com advisory `GHSA-43fc-jf86-j433` (DoS).
+**Impacto:** risco de seguranca em runtime web e bloqueio de homologacao.
+**Status:** Aberto
+
+### BUG-117: Type-check do frontend dependente de `.next/types`
+**Data:** 2026-02-16
+**Severidade:** Alta
+**Descricao:** `npm run type-check` falha com `TS6053` quando `.next/types` ainda nao foi gerado.
+**Causa raiz:** `frontend/tsconfig.json` inclui `.next/types/**/*.ts` e `dist/types/**/*.ts` como obrigatorios.
+**Evidencia:** erro reproducivel em ambiente limpo sem artefatos de build.
+**Status:** Aberto
+
+### BUG-118: Suite backend falhando em auth/contratos/viva
+**Data:** 2026-02-16
+**Severidade:** Alta
+**Descricao:** `pytest -q` retorna `12 failed, 15 passed, 1 skipped`.
+**Falhas principais:**
+- expectativas `401` recebendo `307` em rotas protegidas;
+- erros `asyncpg` (`another operation is in progress`);
+- erro de event loop fechado em cenarios async.
+**Impacto:** regressao funcional sem baseline de qualidade para homologacao.
+**Status:** Aberto
+
+### BUG-119: Runtime de autenticacao usando `security_stub`
+**Data:** 2026-02-16
+**Severidade:** Alta
+**Descricao:** fluxo real de login/deps importa `security_stub`.
+**Evidencia:**
+- `backend/app/api/v1/auth.py` importa `app.core.security_stub`;
+- `backend/app/api/deps.py` importa `app.core.security_stub`;
+- `backend/app/core/security_stub.py` aceita senha dev `1234`.
+**Impacto:** risco de seguranca direto no controle de acesso.
+**Status:** Aberto
+
+### BUG-120: CORS aberto alem do necessario
+**Data:** 2026-02-16
+**Severidade:** Media
+**Descricao:** middleware CORS permite todos os metodos e headers.
+**Evidencia:**
+- `backend/app/main.py` -> `allow_methods=["*"]`
+- `backend/app/main.py` -> `allow_headers=["*"]`
+**Impacto:** aumento de superficie para abuso e configuracao pouco restritiva para producao.
+**Status:** Aberto

@@ -26,6 +26,7 @@ Escopo: estrutura ativa de documentacao institucional do SaaS FC Solucoes Financ
 
 - Matriz menu -> API -> banco -> COFRE: `docs/AUDIT/menu-endpoint-matrix.md`
 - Auditoria de documentacao desta rodada: `docs/AUDIT/DOCS_AUDIT_2026-02-16.md`
+- Auditoria de qualidade web (perf/a11y/seo/best-practices + seguranca): `docs/AUDIT/WEB_QUALITY_AUDIT_2026-02-16.md`
 
 ## Regra institucional de manutencao
 
