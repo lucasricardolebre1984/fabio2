@@ -33,12 +33,12 @@ Objetivo: separar documentacao ativa da legada e alinhar fonte de verdade instit
 - `docs/AUDIT/menu-endpoint-matrix.md`
 - `docs/AUDIT/menu-endpoint-matrix.json`
 
-### Arquivar em legado (movido)
+### Removidos da estrutura ativa
 
-- `docs/DEPLOY_VERCEL.md` -> `docs/VAULT/LEGACY/DEPLOY_VERCEL.md`
-- `docs/MUDANCAS_WHATSAPP_VIVA.md` -> `docs/VAULT/LEGACY/MUDANCAS_WHATSAPP_VIVA.md`
+- `docs/DEPLOY_VERCEL.md`
+- `docs/MUDANCAS_WHATSAPP_VIVA.md`
 
-Motivo do arquivamento:
+Motivo da remocao:
 - fluxo fora da estrategia institucional atual
 - conteudo historico de ciclo antigo, sem ser fonte de verdade de runtime
 
@@ -53,6 +53,6 @@ Motivo do arquivamento:
 Documentacao ativa consolidada para o modelo institucional atual:
 - COFRE como fonte semantica unica
 - matriz de integridade menu -> API -> banco -> COFRE mantida
-- legado preservado no VAULT
+- legado removido da trilha operacional ativa
 
 Data: 2026-02-16

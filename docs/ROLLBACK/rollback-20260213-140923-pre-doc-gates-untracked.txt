@@ -1,4 +1,0 @@
-docs/ROLLBACK/rollback-20260213-140923-pre-doc-gates-baseline.txt
-docs/ROLLBACK/rollback-20260213-140923-pre-doc-gates-staged.patch
-docs/ROLLBACK/rollback-20260213-140923-pre-doc-gates-untracked.txt
-docs/ROLLBACK/rollback-20260213-140923-pre-doc-gates.patch

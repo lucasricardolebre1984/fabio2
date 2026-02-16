@@ -1,5 +1,0 @@
-backend/app/services/viva_skill_router_service.py
-docs/ROLLBACK/rollback-20260213-143501-pre-gate2-skill-router-baseline.txt
-docs/ROLLBACK/rollback-20260213-143501-pre-gate2-skill-router-staged.patch
-docs/ROLLBACK/rollback-20260213-143501-pre-gate2-skill-router-untracked.txt
-docs/ROLLBACK/rollback-20260213-143501-pre-gate2-skill-router.patch

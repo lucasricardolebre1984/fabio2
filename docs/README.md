@@ -31,5 +31,5 @@ Escopo: estrutura ativa de documentacao institucional do SaaS FC Solucoes Financ
 
 - Atualizar `docs/STATUS.md` e `docs/SESSION.md` em toda rodada relevante.
 - Registrar bug em `docs/BUGSREPORT.md` antes de corrigir.
-- Nao apagar historico: mover documentos legados para `docs/VAULT/LEGACY/`.
+- Manter apenas documentacao ativa institucional nesta pasta.
 - Nao usar Vercel como alvo institucional desta operacao; alvo principal e Ubuntu AWS + espelhamento de front conforme estrategia comercial.

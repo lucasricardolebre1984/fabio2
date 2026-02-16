@@ -1,6 +1,0 @@
-docs/ROLLBACK/rollback-20260213-145059-pre-avatar-official-refresh-baseline.txt
-docs/ROLLBACK/rollback-20260213-145059-pre-avatar-official-refresh-staged.patch
-docs/ROLLBACK/rollback-20260213-145059-pre-avatar-official-refresh-untracked.txt
-docs/ROLLBACK/rollback-20260213-145059-pre-avatar-official-refresh.patch
-frontend/public/viva-avatar-official.jpg
-frontend/public/viva-avatar-official.png

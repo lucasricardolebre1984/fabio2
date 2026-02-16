@@ -1,2 +1,0 @@
-1d37a12
-?? docs/ROLLBACK/rollback-20260213-140923-pre-doc-gates-baseline.txt
