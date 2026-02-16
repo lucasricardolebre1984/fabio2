@@ -173,6 +173,8 @@ def parse_agenda_command(message: str) -> Optional[Dict[str, Any]]:
 
 def _is_agenda_verb(text: str) -> bool:
     normalized = _normalize_key(text)
+    if "compromiss" in normalized or "promisso" in normalized:
+        return True
     return any(
         term in normalized
         for term in (
@@ -180,6 +182,7 @@ def _is_agenda_verb(text: str) -> bool:
             "agendamento",
             "agendamentos",
             "compromisso",
+            "cpompromisso",
             "compromissos",
             "lembrete",
             "lembra",
@@ -216,6 +219,9 @@ def _has_recent_agenda_prompt(contexto: List[Dict[str, Any]]) -> bool:
                 "me confirme se quer",
                 "sim ou nao",
                 "de hoje ou amanha",
+                "quer detalhes",
+                "listar os proximos 7 dias",
+                "listar os proximos",
             )
         )
         if has_agenda_token and has_question_prompt:
@@ -265,6 +271,7 @@ def is_agenda_query_intent(message: str, contexto: List[Dict[str, Any]]) -> bool
         for term in (
             "quais",
             "listar",
+            "list",
             "liste",
             "lite",
             "lista",
@@ -273,7 +280,9 @@ def is_agenda_query_intent(message: str, contexto: List[Dict[str, Any]]) -> bool
             "como esta",
             "como ta",
             "o que tenho",
+            "o que temos",
             "tenho",
+            "temos",
             "consultar",
             "consulta",
             "ver minha",
@@ -282,6 +291,12 @@ def is_agenda_query_intent(message: str, contexto: List[Dict[str, Any]]) -> bool
         return True
 
     if _is_simple_confirmation(message) and _has_recent_agenda_prompt(contexto):
+        return True
+
+    if _has_recent_agenda_prompt(contexto) and any(
+        term in normalized
+        for term in ("hoje", "h9je", "amanha", "semana", "7 dias", "proximos", "nada")
+    ):
         return True
 
     return False
