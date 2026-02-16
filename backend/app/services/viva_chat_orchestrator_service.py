@@ -4,6 +4,7 @@ Extrai a orquestracao pesada do endpoint /chat para reduzir acoplamento em rota.
 """
 
 import logging
+import re
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 from datetime import datetime
@@ -103,9 +104,45 @@ def _is_contract_templates_intent(message: str) -> bool:
     has_contract = ("contrato" in normalized) or ("contratos" in normalized)
     has_template_signal = any(
         token in normalized
-        for token in ("executamos", "tipos", "modelos", "templates", "titulo dos contratos")
+        for token in (
+            "executamos",
+            "tipos",
+            "modelos",
+            "modolos",
+            "modolo",
+            "templates",
+            "template",
+        )
     )
     return has_contract and has_template_signal
+
+
+def _is_contracts_by_client_intent(message: str) -> bool:
+    normalized = _normalize_key(message or "")
+    if not normalized:
+        return False
+    has_contract = "contrato" in normalized or "contratos" in normalized
+    has_client = "cliente" in normalized or "para " in normalized or "pro " in normalized
+    return has_contract and has_client
+
+
+def _extract_client_name_for_contract_query(message: str) -> Optional[str]:
+    raw = str(message or "").strip()
+    if not raw:
+        return None
+
+    patterns = [
+        r"(?:pro|para|do|da|de)\s+cliente\s+(.+)$",
+        r"cliente\s+(.+)$",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, raw, flags=re.IGNORECASE)
+        if match:
+            name = re.sub(r"[\]\[\)\(\.,;:!?]+$", "", match.group(1).strip())
+            name = re.sub(r"\s+", " ", name).strip()
+            if name:
+                return name
+    return None
 
 
 def _is_client_list_intent(message: str) -> bool:
@@ -167,7 +204,15 @@ def _extract_campaign_mode_filter(message: str) -> Optional[str]:
 
 def _is_direct_confirmation(message: str) -> bool:
     normalized = _normalize_key(message or "")
-    return normalized in {"sim", "todos", "todos registrados", "aqui no chat", "listar todos"}
+    return normalized in {
+        "sim",
+        "todos",
+        "todos registrados",
+        "aqui no chat",
+        "listar todos",
+        "listar",
+        "nomes",
+    }
 
 
 def _last_pending_list_domain(contexto: List[Dict[str, Any]]) -> Optional[str]:
@@ -183,8 +228,10 @@ def _last_pending_list_domain(contexto: List[Dict[str, Any]]) -> Optional[str]:
         ):
             if "cliente" in normalized or "clientes" in normalized:
                 return "clientes"
+            if any(token in normalized for token in ("modelo", "modelos", "template", "templates", "tipos")):
+                return "contratos_modelos"
             if "contrato" in normalized or "contratos" in normalized:
-                return "contratos"
+                return "contratos_emitidos"
     return None
 
 
@@ -476,12 +523,51 @@ class VivaChatOrchestratorService:
 
             pending_list_domain = _last_pending_list_domain(contexto_efetivo)
             contract_templates_intent = _is_contract_templates_intent(request.mensagem)
-            contract_list_intent = _is_contract_list_intent(request.mensagem) or (
-                _is_direct_confirmation(request.mensagem) and pending_list_domain == "contratos"
+            contracts_by_client_intent = _is_contracts_by_client_intent(request.mensagem)
+            contract_list_intent = (_is_contract_list_intent(request.mensagem) and not contract_templates_intent) or (
+                _is_direct_confirmation(request.mensagem) and pending_list_domain == "contratos_emitidos"
             )
-            if contract_list_intent or contract_templates_intent:
+            contract_templates_intent = contract_templates_intent or (
+                _is_direct_confirmation(request.mensagem) and pending_list_domain == "contratos_modelos"
+            )
+            if contracts_by_client_intent or contract_list_intent or contract_templates_intent:
                 contrato_service = ContratoService(db)
-                if contract_templates_intent:
+                if contracts_by_client_intent:
+                    client_name = _extract_client_name_for_contract_query(request.mensagem)
+                    if not client_name:
+                        return await finalize(
+                            resposta="Informe o nome do cliente para eu listar os contratos emitidos."
+                        )
+
+                    contratos_data = await contrato_service.list(
+                        status=None,
+                        search=client_name,
+                        page=1,
+                        page_size=500,
+                    )
+                    contratos_items = list(contratos_data.get("items", []))
+                    filtered_items = [
+                        item
+                        for item in contratos_items
+                        if client_name.lower() in str(getattr(item, "contratante_nome", "") or "").lower()
+                    ]
+                    if not filtered_items:
+                        return await finalize(
+                            resposta=f"Nao encontrei contratos emitidos para o cliente {client_name}."
+                        )
+
+                    lines = [f"Contratos emitidos para {client_name}:"]
+                    for item in filtered_items:
+                        numero = str(getattr(item, "numero", "") or "sem numero")
+                        titulo = str(getattr(item, "template_nome", "") or getattr(item, "template_id", "") or "").strip()
+                        if not titulo:
+                            titulo = "Contrato sem titulo"
+                        status_value = getattr(getattr(item, "status", None), "value", getattr(item, "status", ""))
+                        created_at = getattr(item, "created_at", None)
+                        created_label = created_at.strftime("%d/%m/%Y") if created_at else "sem data"
+                        lines.append(f"- {numero} | {titulo} | {created_label} | {status_value}")
+                    return await finalize(resposta="\n".join(lines))
+                elif contract_templates_intent:
                     templates = await contrato_service.list_templates()
                     titles = [
                         str(item.get("nome") or "").strip()

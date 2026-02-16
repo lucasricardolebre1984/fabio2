@@ -2,7 +2,7 @@
 
 Data da rodada: 2026-02-16
 Branch: main
-Status: consolidacao de arquitetura COFRE + correcao institucional da documentacao ativa.
+Status: consolidacao de arquitetura COFRE + correcao institucional da documentacao ativa + ajuste de roteamento de contratos na VIVA.
 
 ## Objetivo da rodada
 
@@ -18,7 +18,11 @@ Status: consolidacao de arquitetura COFRE + correcao institucional da documentac
 - Reescrito contexto do produto: `docs/CONTEXT.md`
 - Reescrito runbook operacional: `docs/RUNBOOK.md`
 - Criada auditoria documental: `docs/AUDIT/DOCS_AUDIT_2026-02-16.md`
-- Documentos legados movidos para `docs/VAULT/LEGACY/`
+- Documentos legados removidos da estrutura ativa de `docs/`
+- Correcao no chat VIVA para contratos:
+  - modelos de contrato separados de contratos emitidos por cliente;
+  - suporte a comando direto de continuidade (`listar`, `nomes`);
+  - filtro por cliente em consulta de contratos emitidos.
 
 ## Regra de historico
 

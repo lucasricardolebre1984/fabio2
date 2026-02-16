@@ -90,8 +90,8 @@
 | BUG-098 | Alta | VIVA/Voz | Modo "Conversa VIVA" com MiniMax: voz institucional indisponivel e falta diagnostico claro (status/env/erro) | Em validacao (status missing_env + logs) |
 | BUG-099 | Alta | VIVA/Performance | Tempo de resposta alto no chat (sem streaming + contexto grande); precisa otimizar janela e/ou streaming | Aberto |
 | BUG-104 | Alta | VIVA/Agenda | Inconsistencia de agenda: assistente confirma agendamento, mas na consulta seguinte retorna sem compromissos no mesmo dia | Aberto |
-| BUG-105 | Alta | VIVA/SaaS Access | Assistente nao consulta dados reais de contratos/modulos do SaaS quando solicitado, apesar de contexto institucional do proprio sistema | Aberto |
-| BUG-106 | Media | VIVA/Orquestracao UX | Excesso de confirmacoes redundantes e quebra de ordem direta do usuario, contrariando regra de resposta objetiva da persona | Aberto |
+| BUG-105 | Alta | VIVA/SaaS Access | Assistente nao consulta dados reais de contratos/modulos do SaaS quando solicitado, apesar de contexto institucional do proprio sistema | Em validacao (roteamento contratos: modelos vs emitidos por cliente) |
+| BUG-106 | Media | VIVA/Orquestracao UX | Excesso de confirmacoes redundantes e quebra de ordem direta do usuario, contrariando regra de resposta objetiva da persona | Em validacao (confirmacoes curtas `listar`/`nomes`) |
 | BUG-107 | Alta | VIVA/Memoria Persona | Conhecimento da empresa nao esta ancorado de forma consistente no prompt mestre `agents/AGENT.md` + memoria operacional, gerando drift de comportamento | Aberto |
 
 ---
@@ -144,14 +144,31 @@
 **Severidade:** Alta  
 **Descricao:** Ao pedir lista de opcoes/modelos de contratos, o assistente entrou em fluxo de "autorizar token" e "nao consigo acessar", apesar do contexto institucional de operar dentro do proprio SaaS.
 **Esperado:** Consultar backend do proprio sistema e retornar lista objetiva sem burocracia artificial.
-**Status:** Aberto  
+**Status:** Em validacao  
 
 ### BUG-106: Confirmacoes redundantes e baixa obediencia a ordem direta
 **Data:** 2026-02-16  
 **Severidade:** Media  
 **Descricao:** Fluxo conversacional repete confirmacoes desnecessarias e volta a perguntar mesmo apos comando direto do usuario.
 **Esperado:** Resposta curta, execucao direta e no maximo 1 pergunta objetiva quando faltar dado real.
-**Status:** Aberto  
+**Status:** Em validacao  
+
+### Atualizacao 2026-02-16 (BUG-105/BUG-106 - contratos por rota real)
+- backend:
+  - `backend/app/services/viva_chat_orchestrator_service.py`
+- ajustes aplicados:
+  - separacao explicita de intencoes:
+    - modelos de contrato
+    - contratos emitidos por cliente
+    - lista geral de contratos registrados
+  - extracao de nome de cliente em frases como:
+    - `quais contratos tenho emitidos pro cliente lucas`
+    - `contratos do cliente <nome>`
+  - resposta de contratos emitidos agora retorna itens filtrados por cliente (numero, titulo, data e status).
+  - melhora em confirmacao direta apos pergunta da VIVA (`listar`, `nomes`).
+  - tolerancia a variacao de texto para "modelos" (`modolos`/`modolo`).
+- validacao tecnica:
+  - `python -m py_compile backend/app/services/viva_chat_orchestrator_service.py` => OK
 
 ### BUG-107: Drift de memoria/persona fora da fonte canonica
 **Data:** 2026-02-16  

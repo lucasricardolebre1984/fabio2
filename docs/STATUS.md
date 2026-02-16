@@ -17,7 +17,7 @@ Status geral: operacional em ambiente local, com pendencias criticas abertas na 
 - Agenda: operacional no modulo web, com inconsistencia no fluxo via VIVA (BUG-104)
 - Campanhas: operacional com persistencia, ainda com pendencia de aderencia semantica (BUG-015/BUG-099)
 - WhatsApp: operacional
-- VIVA: operacional com inconsistencias de orquestracao (BUG-104, BUG-105, BUG-106, BUG-107)
+- VIVA: operacional com inconsistencias de orquestracao (BUG-104, BUG-107) e correcao de contratos em validacao (BUG-105, BUG-106)
 
 ## Veredito gate a gate (auditoria vigente)
 
@@ -35,8 +35,8 @@ Status geral: operacional em ambiente local, com pendencias criticas abertas na 
 
 - BUG-099: latencia alta no chat interno da VIVA
 - BUG-104: agenda confirma criacao, mas consulta posterior pode nao refletir
-- BUG-105: VIVA nao consulta consistentemente dados reais de modulos SaaS
-- BUG-106: excesso de confirmacoes e quebra de ordem direta
+- BUG-105: em validacao apos ajuste de roteamento de contratos (modelos vs emitidos por cliente)
+- BUG-106: em validacao apos ajuste de confirmacoes curtas
 - BUG-107: drift de memoria/persona fora da ancora canonica
 
 ## Evidencias desta rodada
