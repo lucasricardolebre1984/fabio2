@@ -1,61 +1,44 @@
 ﻿# CONTEXTO DO PROJETO
 
-> **Projeto:** FC Soluções Financeiras SaaS  
-> **Data:** 2026-02-05
+Projeto: FC Solucoes Financeiras SaaS
+Data de revisao: 2026-02-16
 
----
+## Problema de negocio
 
-## Problema de Negócio
+A operacao precisa de um sistema unico para contratos, clientes, agenda, campanhas e atendimento assistido por IA, com trilha auditavel de memoria institucional.
 
-A FC Soluções Financeiras precisava de um sistema único para gerenciar contratos, clientes e agenda, além de integrar o WhatsApp e uma assistente virtual para atendimento e geração de materiais.
+## Objetivo institucional
 
----
+- Centralizar operacao comercial e administrativa em um unico SaaS.
+- Garantir consistencia entre frontend, backend, banco e memoria COFRE.
+- Tornar a VIVA uma assistente operacional alinhada a persona oficial, sem orquestracao artificial excessiva.
 
-## Objetivos
+## Escopo ativo
 
-- Padronizar a criação de contratos (Bacen, Serasa, Protesto)
-- Automatizar cálculos e valores por extenso
-- Gerar PDF institucional com layout profissional
-- Centralizar clientes e histórico de contratos
-- Organizar agenda e compromissos
-- Integrar WhatsApp com atendimento automático via VIVA
+- Contratos (templates, criacao, listagem, PDF)
+- Clientes (cadastro, historico, relacao com contratos)
+- Agenda (compromissos e sincronizacao Google Calendar)
+- Campanhas (geracao, listagem, exclusao sincronizada com COFRE)
+- WhatsApp (status e conversas)
+- VIVA (chat interno com memoria e skills canonicas)
 
----
+## Fonte de verdade semantica
 
-## Público-Alvo
+- Persona: `backend/COFRE/persona-skills/AGENT.md`
+- Skills: `backend/COFRE/persona-skills/*.md`
+- Memorias: `backend/COFRE/memories/<tabela>/`
 
-- Administrador (Fábio)
+## Publico operacional
+
+- Fabio (administrador)
 - Operadores internos
+- Parceiros comerciais autorizados
 
----
+## Criterios de sucesso
 
-## Escopo Atual
+- Fluxos de menu refletem dados reais do SaaS (sem resposta ficticia).
+- Acao no front tem reflexo em banco e COFRE.
+- VIVA executa ordem direta com baixa friccao e sem loops de confirmacao.
+- Documentacao ativa acompanha o estado real de runtime.
 
-- Contratos com templates JSON
-- Visualização e edição de contratos
-- PDF via impressão do navegador
-- Gestão de clientes e agenda
-- Chat interno VIVA com prompts laterais
-- Integração WhatsApp via Evolution API
-
----
-
-## Fora de Escopo (por enquanto)
-
-- Deploy automático em produção
-- Modo offline
-- Modo dark
-- Gerador de PDF 100% backend
-
----
-
-## Critérios de Sucesso
-
-- Usuário cria contrato completo em poucos minutos
-- Layout institucional consistente no PDF
-- Atendimento via WhatsApp registrado no sistema
-- VIVA disponível como assistente interna para produção
-
----
-
-*Documento atualizado em: 2026-02-05*
+Atualizado em: 2026-02-16
