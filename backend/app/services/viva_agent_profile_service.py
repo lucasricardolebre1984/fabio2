@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
+from app.config import settings
 from app.services.viva_brain_paths_service import viva_brain_paths_service
 
 
@@ -43,10 +45,23 @@ class VivaAgentProfileService:
                 continue
         return fallback
 
+    @staticmethod
+    def _sha256(path: Path) -> str:
+        try:
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            return digest
+        except Exception:
+            return ""
+
     def get_agent_prompt(self) -> str:
         content = self._safe_read_text(self._agent_file, "")
         if content:
             return content
+        if bool(getattr(settings, "VIVA_AGENT_STRICT", True)):
+            raise RuntimeError(
+                "AGENT.md canonico ausente/vazio em COFRE/persona-skills. "
+                "Modo estrito ativo para evitar drift de persona."
+            )
         return self._fallback_agent
 
     def get_campaign_skill_prompt(self, max_chars: int = 2400) -> str:
@@ -62,6 +77,29 @@ class VivaAgentProfileService:
         if len(content) <= max_chars:
             return content
         return f"{content[:max_chars].rstrip()}..."
+
+    def get_profile_status(self) -> Dict[str, Any]:
+        agent_exists = self._agent_file.exists()
+        agent_content = self._safe_read_text(self._agent_file, "")
+        using_fallback = not bool(agent_content)
+        strict_mode = bool(getattr(settings, "VIVA_AGENT_STRICT", True))
+
+        campaign_file = None
+        for path in self._campaign_skill_files:
+            if path.exists() and self._safe_read_text(path, ""):
+                campaign_file = path
+                break
+
+        return {
+            "cofre_root": str(self._brain_paths.root_dir),
+            "persona_file": str(self._agent_file),
+            "persona_exists": agent_exists,
+            "persona_sha256": self._sha256(self._agent_file) if agent_exists else "",
+            "persona_fallback_active": using_fallback,
+            "strict_mode": strict_mode,
+            "campaign_skill_file": str(campaign_file) if campaign_file else "",
+            "campaign_skill_sha256": self._sha256(campaign_file) if campaign_file else "",
+        }
 
     def build_system_prompt(self, modo: Optional[str] = None) -> str:
         base = self.get_agent_prompt()

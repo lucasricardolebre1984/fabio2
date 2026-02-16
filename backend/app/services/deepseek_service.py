@@ -19,7 +19,7 @@ class DeepSeekService:
         self.api_key = getattr(settings, "DEEPSEEK_API_KEY", None)
         self.base_url = "https://api.deepseek.com"
         self.model = "deepseek-chat"  # ou "deepseek-reasoner" para thinking mode
-        self.system_prompt = viva_agent_profile_service.build_system_prompt()
+        self.system_prompt = ""
 
     async def chat(self, messages: List[Dict[str, str]]) -> str:
         if not self.api_key:
@@ -60,7 +60,8 @@ class DeepSeekService:
         user_message: str,
         context: Optional[List[Dict[str, Any]]] = None,
     ) -> List[Dict[str, str]]:
-        messages: List[Dict[str, str]] = [{"role": "system", "content": self.system_prompt}]
+        system_prompt = viva_agent_profile_service.build_system_prompt()
+        messages: List[Dict[str, str]] = [{"role": "system", "content": system_prompt}]
 
         if context:
             for msg in context:

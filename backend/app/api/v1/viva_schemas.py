@@ -138,6 +138,10 @@ class VivaModulesRuntime(BaseModel):
     embedding_fallback_local: bool
     rag_premium_ready: bool
     speech_stack: str
+    persona_file: str
+    persona_sha256: str
+    persona_fallback_active: bool
+    persona_strict_mode: bool
 
 
 class VivaModulesStatusResponse(BaseModel):

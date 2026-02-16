@@ -15,15 +15,16 @@ from app.services.viva_agent_profile_service import viva_agent_profile_service
 
 class VivaLocalService:
     def __init__(self) -> None:
-        # Usa o mesmo contrato canonico do agente para nao reintroduzir prompts antigos.
-        self._system_prompt = viva_agent_profile_service.build_system_prompt()
+        # Prompt deve ser carregado em runtime para refletir a versao canonica atual do COFRE.
+        self._system_prompt = ""
 
     def build_messages(
         self,
         user_message: str,
         context: Optional[List[Dict[str, Any]]] = None,
     ) -> List[Dict[str, str]]:
-        messages: List[Dict[str, str]] = [{"role": "system", "content": self._system_prompt}]
+        system_prompt = viva_agent_profile_service.build_system_prompt()
+        messages: List[Dict[str, str]] = [{"role": "system", "content": system_prompt}]
         if context:
             for msg in context:
                 tipo = str(msg.get("tipo") or "").strip().lower()

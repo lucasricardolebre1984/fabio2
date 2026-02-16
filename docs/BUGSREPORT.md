@@ -92,7 +92,7 @@
 | BUG-104 | Alta | VIVA/Agenda | Inconsistencia de agenda: assistente confirma agendamento, mas na consulta seguinte retorna sem compromissos no mesmo dia | Em validacao (saudacao `viva bom dia` estabilizada para nao desviar para contexto antigo) |
 | BUG-105 | Alta | VIVA/SaaS Access | Assistente nao consulta dados reais de contratos/modulos do SaaS quando solicitado, apesar de contexto institucional do proprio sistema | Em validacao (roteamento contratos: modelos vs emitidos por cliente) |
 | BUG-106 | Media | VIVA/Orquestracao UX | Excesso de confirmacoes redundantes e quebra de ordem direta do usuario, contrariando regra de resposta objetiva da persona | Em validacao (confirmacoes curtas `listar`/`nomes`) |
-| BUG-107 | Alta | VIVA/Memoria Persona | Conhecimento da empresa nao esta ancorado de forma consistente no prompt mestre `agents/AGENT.md` + memoria operacional, gerando drift de comportamento | Aberto |
+| BUG-107 | Alta | VIVA/Memoria Persona | Conhecimento da empresa nao esta ancorado de forma consistente no prompt mestre `agents/AGENT.md` + memoria operacional, gerando drift de comportamento | Em validacao (ancora strict COFRE + hash runtime + endpoint de auditoria) |
 
 ---
 
@@ -195,7 +195,28 @@
 **Severidade:** Alta  
 **Descricao:** Comportamento atual nao demonstra ancoragem consistente no prompt mestre `agents/AGENT.md` e nem em memoria operacional do SaaS (agenda/contratos/campanhas), afetando papel de concierge clone do Fabio.
 **Esperado:** Persona e contexto corporativo derivados prioritariamente de `agents/AGENT.md`, com skills imparciais e memoria evolutiva baseada em fatos reais do sistema.
-**Status:** Aberto  
+**Status:** Em validacao  
+
+### Atualizacao 2026-02-16 (BUG-107 - ancora strict de persona no runtime)
+- backend:
+  - `backend/app/config.py`
+  - `backend/app/services/viva_agent_profile_service.py`
+  - `backend/app/services/viva_chat_domain_service.py`
+  - `backend/app/services/viva_local_service.py`
+  - `backend/app/services/deepseek_service.py`
+  - `backend/app/services/viva_modules_service.py`
+  - `backend/app/api/v1/viva_modules_routes.py`
+  - `backend/app/api/v1/viva_schemas.py`
+- ajuste aplicado:
+  - novo `VIVA_AGENT_STRICT=true` (default) para bloquear fallback silencioso quando `COFRE/persona-skills/AGENT.md` estiver ausente/vazio;
+  - runtime agora publica hash SHA256 e arquivo canonico ativo da persona;
+  - nova rota de auditoria: `GET /api/v1/viva/persona/status`;
+  - `GET /api/v1/viva/modules/status` passa a incluir telemetria de ancora de persona;
+  - fallbacks (`viva_local` e `deepseek`) passaram a ler persona em runtime, evitando prompt antigo em memoria do processo.
+- criterio de aceite:
+  - persona_fallback_active deve ficar `false`;
+  - persona_file deve apontar para `backend/COFRE/persona-skills/AGENT.md`;
+  - persona_sha256 deve ser estavel entre requests (sem drift).
 
 ### Atualizacao 2026-02-14 (Gate 4 - BUG-097 formato end-to-end)
 - frontend:

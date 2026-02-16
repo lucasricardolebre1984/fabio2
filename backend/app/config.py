@@ -119,6 +119,7 @@ class Settings(BaseSettings):
     VIVA_MEMORY_ENABLED: bool = False
     VIVA_BRAIN_ROOT: str = "COFRE"
     VIVA_MEMORY_FILE_LOG_ENABLED: bool = True
+    VIVA_AGENT_STRICT: bool = True
 
     # ==================================================================
     # Google Calendar (agenda bridge)

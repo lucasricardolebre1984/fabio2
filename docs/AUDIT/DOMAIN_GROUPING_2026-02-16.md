@@ -187,3 +187,7 @@ A principal melhoria restante e reduzir o acoplamento da VIVA Core para cada dom
   - novo arquivo `backend/app/services/viva_domain_query_router_service.py`
   - responsabilidades movidas: consultas de contratos, clientes, campanhas e catalogo de servicos.
 - `backend/app/services/viva_chat_orchestrator_service.py` agora delega esse conjunto para o router de dominio.
+- Governanca de persona/COFRE reforcada:
+  - ancora strict da persona no runtime (`VIVA_AGENT_STRICT=true`);
+  - status de ancora exposto em `GET /api/v1/viva/persona/status`;
+  - hash SHA256 da persona incorporado em `GET /api/v1/viva/modules/status`.

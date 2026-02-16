@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 
 from app.config import settings
 from app.services.cofre_manifest_service import cofre_manifest_service
+from app.services.viva_agent_profile_service import viva_agent_profile_service
 
 
 class VivaModulesService:
@@ -15,6 +16,7 @@ class VivaModulesService:
         has_openai_key = bool(settings.OPENAI_API_KEY)
         embedding_fallback_local = bool(settings.OPENAI_EMBEDDING_FALLBACK_LOCAL)
         rag_premium_ready = bool(has_openai_key and not embedding_fallback_local)
+        persona_status = viva_agent_profile_service.get_profile_status()
 
         gates: List[Dict[str, Any]] = [
             {
@@ -58,6 +60,10 @@ class VivaModulesService:
             "embedding_fallback_local": embedding_fallback_local,
             "rag_premium_ready": rag_premium_ready,
             "speech_stack": "browser_native",
+            "persona_file": str(persona_status.get("persona_file") or ""),
+            "persona_sha256": str(persona_status.get("persona_sha256") or ""),
+            "persona_fallback_active": bool(persona_status.get("persona_fallback_active")),
+            "persona_strict_mode": bool(persona_status.get("strict_mode")),
         }
 
         return {"gates": gates, "modules": modules, "runtime": runtime}
