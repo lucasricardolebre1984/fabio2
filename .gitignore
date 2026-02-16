@@ -124,6 +124,14 @@ temp/
 backend.tar
 
 # ====================================================================
+# COFRE MEMORY RUNTIME (NAO VERSIONAR DADOS DE CONVERSA)
+# ====================================================================
+backend/COFRE/memories/**
+!backend/COFRE/memories/
+!backend/COFRE/memories/**/
+!backend/COFRE/memories/**/.gitkeep
+
+# ====================================================================
 # BACKUP
 # ====================================================================
 *.bak

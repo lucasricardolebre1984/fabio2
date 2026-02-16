@@ -29,6 +29,10 @@ Toda exclusao funcional no produto deve refletir no COFRE:
 - Nao criar skill operacional fora de `backend/COFRE/persona-skills`.
 - Toda mudanca de comportamento institucional da VIVA deve atualizar o AGENT canonico.
 
+## Regra de versionamento
+- Dados de runtime em `backend/COFRE/memories/` nao devem ser commitados.
+- O repositório deve manter apenas estrutura de pastas com `.gitkeep`.
+
 ## Observabilidade minima
 - Endpoint de status: `GET /api/v1/cofre/memories/status`
 - Endpoint de tabelas: `GET /api/v1/cofre/memories/tables`
