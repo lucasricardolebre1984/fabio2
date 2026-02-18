@@ -94,6 +94,12 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health_check():
         return {"status": "healthy", "version": settings.VERSION}
+
+    # Compat: keep versioned health for tooling/docs without changing the system root health.
+    # Hidden from schema to avoid duplication.
+    @app.get("/api/v1/health", include_in_schema=False)
+    async def health_check_v1():
+        return {"status": "healthy", "version": settings.VERSION}
     
     @app.get("/")
     async def root():

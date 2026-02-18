@@ -1,0 +1,601 @@
+[
+  {
+    "path": "/",
+    "methods": [
+      "GET"
+    ],
+    "name": "root"
+  },
+  {
+    "path": "/api/v1/agenda",
+    "methods": [
+      "GET"
+    ],
+    "name": "list_eventos"
+  },
+  {
+    "path": "/api/v1/agenda",
+    "methods": [
+      "POST"
+    ],
+    "name": "create_evento"
+  },
+  {
+    "path": "/api/v1/agenda/hoje",
+    "methods": [
+      "GET"
+    ],
+    "name": "get_eventos_hoje"
+  },
+  {
+    "path": "/api/v1/agenda/{evento_id}",
+    "methods": [
+      "DELETE"
+    ],
+    "name": "delete_evento"
+  },
+  {
+    "path": "/api/v1/agenda/{evento_id}",
+    "methods": [
+      "GET"
+    ],
+    "name": "get_evento"
+  },
+  {
+    "path": "/api/v1/agenda/{evento_id}",
+    "methods": [
+      "PUT"
+    ],
+    "name": "update_evento"
+  },
+  {
+    "path": "/api/v1/agenda/{evento_id}/concluir",
+    "methods": [
+      "PATCH"
+    ],
+    "name": "concluir_evento"
+  },
+  {
+    "path": "/api/v1/auth/login",
+    "methods": [
+      "POST"
+    ],
+    "name": "login"
+  },
+  {
+    "path": "/api/v1/auth/logout",
+    "methods": [
+      "POST"
+    ],
+    "name": "logout"
+  },
+  {
+    "path": "/api/v1/auth/me",
+    "methods": [
+      "GET"
+    ],
+    "name": "get_me"
+  },
+  {
+    "path": "/api/v1/auth/refresh",
+    "methods": [
+      "POST"
+    ],
+    "name": "refresh_token"
+  },
+  {
+    "path": "/api/v1/clientes",
+    "methods": [
+      "GET"
+    ],
+    "name": "list_clientes"
+  },
+  {
+    "path": "/api/v1/clientes",
+    "methods": [
+      "POST"
+    ],
+    "name": "create_cliente"
+  },
+  {
+    "path": "/api/v1/clientes/deduplicar-documentos",
+    "methods": [
+      "POST"
+    ],
+    "name": "deduplicar_clientes_documento"
+  },
+  {
+    "path": "/api/v1/clientes/documento/{documento}",
+    "methods": [
+      "GET"
+    ],
+    "name": "get_cliente_by_documento"
+  },
+  {
+    "path": "/api/v1/clientes/sincronizar-contratos",
+    "methods": [
+      "POST"
+    ],
+    "name": "sincronizar_clientes_por_contratos"
+  },
+  {
+    "path": "/api/v1/clientes/{cliente_id}",
+    "methods": [
+      "DELETE"
+    ],
+    "name": "delete_cliente"
+  },
+  {
+    "path": "/api/v1/clientes/{cliente_id}",
+    "methods": [
+      "GET"
+    ],
+    "name": "get_cliente"
+  },
+  {
+    "path": "/api/v1/clientes/{cliente_id}",
+    "methods": [
+      "PUT"
+    ],
+    "name": "update_cliente"
+  },
+  {
+    "path": "/api/v1/clientes/{cliente_id}/contratos",
+    "methods": [
+      "GET"
+    ],
+    "name": "get_cliente_contratos"
+  },
+  {
+    "path": "/api/v1/clientes/{cliente_id}/historico",
+    "methods": [
+      "GET"
+    ],
+    "name": "get_cliente_historico"
+  },
+  {
+    "path": "/api/v1/cofre/memories/status",
+    "methods": [
+      "GET"
+    ],
+    "name": "cofre_memory_status"
+  },
+  {
+    "path": "/api/v1/cofre/memories/sync-db-tables",
+    "methods": [
+      "POST"
+    ],
+    "name": "cofre_memory_sync_db_tables"
+  },
+  {
+    "path": "/api/v1/cofre/memories/tables",
+    "methods": [
+      "GET"
+    ],
+    "name": "cofre_memory_tables"
+  },
+  {
+    "path": "/api/v1/cofre/memories/{table_name}/tail",
+    "methods": [
+      "GET"
+    ],
+    "name": "cofre_memory_table_tail"
+  },
+  {
+    "path": "/api/v1/cofre/system/manifest",
+    "methods": [
+      "GET"
+    ],
+    "name": "cofre_system_manifest"
+  },
+  {
+    "path": "/api/v1/cofre/system/schema-status",
+    "methods": [
+      "GET"
+    ],
+    "name": "cofre_system_schema_status"
+  },
+  {
+    "path": "/api/v1/contratos",
+    "methods": [
+      "GET"
+    ],
+    "name": "list_contratos"
+  },
+  {
+    "path": "/api/v1/contratos",
+    "methods": [
+      "POST"
+    ],
+    "name": "create_contrato"
+  },
+  {
+    "path": "/api/v1/contratos/templates",
+    "methods": [
+      "GET"
+    ],
+    "name": "list_templates"
+  },
+  {
+    "path": "/api/v1/contratos/templates/{template_id}",
+    "methods": [
+      "GET"
+    ],
+    "name": "get_template"
+  },
+  {
+    "path": "/api/v1/contratos/{contrato_id}",
+    "methods": [
+      "DELETE"
+    ],
+    "name": "delete_contrato"
+  },
+  {
+    "path": "/api/v1/contratos/{contrato_id}",
+    "methods": [
+      "GET"
+    ],
+    "name": "get_contrato"
+  },
+  {
+    "path": "/api/v1/contratos/{contrato_id}",
+    "methods": [
+      "PUT"
+    ],
+    "name": "update_contrato"
+  },
+  {
+    "path": "/api/v1/contratos/{contrato_id}/enviar",
+    "methods": [
+      "POST"
+    ],
+    "name": "send_whatsapp"
+  },
+  {
+    "path": "/api/v1/contratos/{contrato_id}/pdf",
+    "methods": [
+      "GET"
+    ],
+    "name": "generate_pdf"
+  },
+  {
+    "path": "/api/v1/google-calendar/callback",
+    "methods": [
+      "GET"
+    ],
+    "name": "google_calendar_callback"
+  },
+  {
+    "path": "/api/v1/google-calendar/connect-url",
+    "methods": [
+      "GET"
+    ],
+    "name": "google_calendar_connect_url"
+  },
+  {
+    "path": "/api/v1/google-calendar/disconnect",
+    "methods": [
+      "POST"
+    ],
+    "name": "google_calendar_disconnect"
+  },
+  {
+    "path": "/api/v1/google-calendar/status",
+    "methods": [
+      "GET"
+    ],
+    "name": "google_calendar_status"
+  },
+  {
+    "path": "/api/v1/google-calendar/sync/agenda/{evento_id}",
+    "methods": [
+      "POST"
+    ],
+    "name": "google_calendar_sync_agenda_event"
+  },
+  {
+    "path": "/api/v1/viva/audio/speak",
+    "methods": [
+      "POST"
+    ],
+    "name": "speak_text"
+  },
+  {
+    "path": "/api/v1/viva/audio/transcribe",
+    "methods": [
+      "POST"
+    ],
+    "name": "transcribe_audio"
+  },
+  {
+    "path": "/api/v1/viva/campanhas",
+    "methods": [
+      "GET"
+    ],
+    "name": "list_campanhas"
+  },
+  {
+    "path": "/api/v1/viva/campanhas",
+    "methods": [
+      "POST"
+    ],
+    "name": "save_campanha"
+  },
+  {
+    "path": "/api/v1/viva/campanhas/reset-all",
+    "methods": [
+      "POST"
+    ],
+    "name": "reset_all_campanhas"
+  },
+  {
+    "path": "/api/v1/viva/campanhas/reset-patterns",
+    "methods": [
+      "POST"
+    ],
+    "name": "reset_campanha_patterns"
+  },
+  {
+    "path": "/api/v1/viva/campanhas/{campanha_id}",
+    "methods": [
+      "DELETE"
+    ],
+    "name": "delete_campanha"
+  },
+  {
+    "path": "/api/v1/viva/campanhas/{campanha_id}",
+    "methods": [
+      "GET"
+    ],
+    "name": "get_campanha"
+  },
+  {
+    "path": "/api/v1/viva/capabilities",
+    "methods": [
+      "GET"
+    ],
+    "name": "get_capabilities"
+  },
+  {
+    "path": "/api/v1/viva/chat",
+    "methods": [
+      "POST"
+    ],
+    "name": "chat_with_viva"
+  },
+  {
+    "path": "/api/v1/viva/chat/session/new",
+    "methods": [
+      "POST"
+    ],
+    "name": "create_chat_session"
+  },
+  {
+    "path": "/api/v1/viva/chat/sessions",
+    "methods": [
+      "GET"
+    ],
+    "name": "list_chat_sessions"
+  },
+  {
+    "path": "/api/v1/viva/chat/snapshot",
+    "methods": [
+      "GET"
+    ],
+    "name": "get_chat_snapshot"
+  },
+  {
+    "path": "/api/v1/viva/chat/stream",
+    "methods": [
+      "POST"
+    ],
+    "name": "chat_with_viva_stream"
+  },
+  {
+    "path": "/api/v1/viva/handoff",
+    "methods": [
+      "GET"
+    ],
+    "name": "list_handoff"
+  },
+  {
+    "path": "/api/v1/viva/handoff/process-due",
+    "methods": [
+      "POST"
+    ],
+    "name": "process_handoff_due"
+  },
+  {
+    "path": "/api/v1/viva/handoff/schedule",
+    "methods": [
+      "POST"
+    ],
+    "name": "schedule_handoff"
+  },
+  {
+    "path": "/api/v1/viva/image/generate",
+    "methods": [
+      "POST"
+    ],
+    "name": "generate_image"
+  },
+  {
+    "path": "/api/v1/viva/modules/status",
+    "methods": [
+      "GET"
+    ],
+    "name": "get_modules_status"
+  },
+  {
+    "path": "/api/v1/viva/persona/status",
+    "methods": [
+      "GET"
+    ],
+    "name": "get_persona_status"
+  },
+  {
+    "path": "/api/v1/viva/status",
+    "methods": [
+      "GET"
+    ],
+    "name": "viva_status"
+  },
+  {
+    "path": "/api/v1/viva/tts/status",
+    "methods": [
+      "GET"
+    ],
+    "name": "tts_status"
+  },
+  {
+    "path": "/api/v1/viva/video/generate",
+    "methods": [
+      "POST"
+    ],
+    "name": "generate_video"
+  },
+  {
+    "path": "/api/v1/viva/video/result/{task_id}",
+    "methods": [
+      "GET"
+    ],
+    "name": "get_video_result"
+  },
+  {
+    "path": "/api/v1/viva/vision",
+    "methods": [
+      "POST"
+    ],
+    "name": "analyze_image"
+  },
+  {
+    "path": "/api/v1/viva/vision/upload",
+    "methods": [
+      "POST"
+    ],
+    "name": "analyze_image_upload"
+  },
+  {
+    "path": "/api/v1/webhook/evolution",
+    "methods": [
+      "GET"
+    ],
+    "name": "evolution_webhook_verify"
+  },
+  {
+    "path": "/api/v1/webhook/evolution",
+    "methods": [
+      "POST"
+    ],
+    "name": "evolution_webhook"
+  },
+  {
+    "path": "/api/v1/whatsapp-chat/conversas",
+    "methods": [
+      "GET"
+    ],
+    "name": "listar_conversas"
+  },
+  {
+    "path": "/api/v1/whatsapp-chat/conversas/{conversa_id}",
+    "methods": [
+      "GET"
+    ],
+    "name": "obter_conversa"
+  },
+  {
+    "path": "/api/v1/whatsapp-chat/conversas/{conversa_id}/arquivar",
+    "methods": [
+      "POST"
+    ],
+    "name": "arquivar_conversa"
+  },
+  {
+    "path": "/api/v1/whatsapp-chat/conversas/{conversa_id}/mensagens",
+    "methods": [
+      "GET"
+    ],
+    "name": "listar_mensagens"
+  },
+  {
+    "path": "/api/v1/whatsapp-chat/status",
+    "methods": [
+      "GET"
+    ],
+    "name": "status_whatsapp"
+  },
+  {
+    "path": "/api/v1/whatsapp/conectar",
+    "methods": [
+      "POST"
+    ],
+    "name": "conectar"
+  },
+  {
+    "path": "/api/v1/whatsapp/desconectar",
+    "methods": [
+      "POST"
+    ],
+    "name": "desconectar"
+  },
+  {
+    "path": "/api/v1/whatsapp/enviar-arquivo",
+    "methods": [
+      "POST"
+    ],
+    "name": "enviar_arquivo"
+  },
+  {
+    "path": "/api/v1/whatsapp/enviar-texto",
+    "methods": [
+      "POST"
+    ],
+    "name": "enviar_texto"
+  },
+  {
+    "path": "/api/v1/whatsapp/status",
+    "methods": [
+      "GET"
+    ],
+    "name": "get_status"
+  },
+  {
+    "path": "/docs",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "name": "swagger_ui_html"
+  },
+  {
+    "path": "/docs/oauth2-redirect",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "name": "swagger_ui_redirect"
+  },
+  {
+    "path": "/health",
+    "methods": [
+      "GET"
+    ],
+    "name": "health_check"
+  },
+  {
+    "path": "/openapi.json",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "name": "openapi"
+  },
+  {
+    "path": "/redoc",
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "name": "redoc_html"
+  }
+]

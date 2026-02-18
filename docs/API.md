@@ -28,7 +28,7 @@ Request (JSON)
 ```json
 {
   "email": "fabio@fcsolucoes.com",
-  "password": "1234"
+  "password": "SUA_SENHA"
 }
 ```
 
@@ -799,6 +799,15 @@ Response 200
 { "status": "healthy", "version": "1.0.0" }
 ```
 
+### GET /api/v1/health
+
+Alias de compatibilidade (mesma resposta de `/health`) para ferramentas que assumem health sob a Base URL versionada.
+
+Response 200
+```json
+{ "status": "healthy", "version": "1.0.0" }
+```
+
 ### GET /
 
 Response 200
@@ -832,17 +841,35 @@ As rotas abaixo já estão ativas no backend e complementam os blocos acima:
 - Requer Bearer.
 - Inicia nova sessão preservando histórico persistido.
 
-### GET /viva/memory/status
-- Requer Bearer.
-- Exibe status da memória híbrida (curta/média/longa), incluindo `embedding_runtime` com tier semântico atual (`premium_openai` ou `fallback_local`).
+## COFRE (Fonte Unica de Persona/Skills/Memorias)
 
-### GET /viva/memory/search
-- Requer Bearer.
-- Busca semântica na memória de longo prazo.
+Observacao institucional:
+- COFRE e a fonte unica (persona, skills e memorias auditaveis).
+- Memoria semantica e operacoes de indice sao expostas via COFRE, nao via `/viva/memory/*`.
 
-### POST /viva/memory/reindex
+### GET /cofre/system/manifest
 - Requer Bearer.
-- Dispara reindexação da memória vetorial.
+- Retorna manifest canonico (endpoints/skills/persona) do COFRE.
+
+### GET /cofre/system/schema-status
+- Requer Bearer.
+- Status do bootstrap COFRE (pastas, tabelas espelhadas, integridade).
+
+### GET /cofre/memories/status
+- Requer Bearer.
+- Status do espelho de memorias (contagem, ultimas escritas, integridade).
+
+### GET /cofre/memories/tables
+- Requer Bearer.
+- Lista tabelas/colecoes de memoria registradas.
+
+### GET /cofre/memories/{table_name}/tail
+- Requer Bearer.
+- Retorna os ultimos registros (tail) da memoria da tabela indicada.
+
+### POST /cofre/memories/sync-db-tables
+- Requer Bearer (admin).
+- Sincroniza tabelas do banco com a estrutura canonica em `backend/COFRE/memories/<tabela>/`.
 
 ### GET /viva/capabilities
 - Requer Bearer.
@@ -851,6 +878,18 @@ As rotas abaixo já estão ativas no backend e complementam os blocos acima:
 ### GET /viva/modules/status
 - Requer Bearer.
 - Retorna estado dos gates institucionais e readiness dos modulos comercializaveis (`core_saas`, `modulo_viva`, `modulo_viviane`, `modulo_campanhas`, `modulo_memoria`).
+
+### GET /viva/persona/status
+- Requer Bearer.
+- Retorna status da persona em runtime (ancora COFRE + hash/metadata).
+
+### GET /viva/tts/status
+- Requer Bearer.
+- Retorna status do TTS (provider/env/fallback).
+
+### POST /viva/chat/stream
+- Requer Bearer.
+- Streaming do chat (SSE/chunks) quando habilitado no runtime.
 
 ### POST /viva/audio/speak
 - Requer Bearer.
@@ -899,6 +938,18 @@ As rotas abaixo já estão ativas no backend e complementam os blocos acima:
 ### GET /viva/campanhas/{campanha_id}
 - Requer Bearer.
 - Consulta campanha específica por ID.
+
+### DELETE /viva/campanhas/{campanha_id}
+- Requer Bearer.
+- Remove campanha (banco + espelho COFRE aplicável).
+
+### POST /viva/campanhas/reset-all
+- Requer Bearer (admin).
+- Apaga todas as campanhas (banco + COFRE).
+
+### POST /viva/campanhas/reset-patterns
+- Requer Bearer (admin).
+- Reseta padroes de diversidade/seed e metadados de campanha.
 
 ### POST /viva/video/generate
 - Requer Bearer.
