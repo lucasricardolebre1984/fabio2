@@ -6,7 +6,7 @@ Extrai a orquestracao pesada do endpoint /chat para reduzir acoplamento em rota.
 import logging
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import HTTPException
 from zoneinfo import ZoneInfo
@@ -95,6 +95,24 @@ def _is_time_query_intent(message: str) -> bool:
 def _format_brt_now() -> str:
     now_brt = datetime.now(ZoneInfo("America/Sao_Paulo"))
     return now_brt.strftime("%d/%m/%Y %H:%M")
+
+
+def _format_datetime_brt(value: Any) -> str:
+    if not isinstance(value, datetime):
+        return ""
+    dt = value
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M")
+
+
+def _wants_google_calendar_verification(message: str) -> bool:
+    normalized = _normalize_key(message or "")
+    if not normalized:
+        return False
+    has_google = any(token in normalized for token in ("google", "calendar", "calendario"))
+    has_verify = any(token in normalized for token in ("verifique", "verifica", "confirme", "confirma", "vinculad", "conectad", "integrad", "linkad"))
+    return has_google and has_verify
 
 
 class VivaChatOrchestratorService:
@@ -241,6 +259,20 @@ class VivaChatOrchestratorService:
                 )
                 await _sync_google_event_safe(evento)
 
+                google_status_line = ""
+                if _wants_google_calendar_verification(request.mensagem):
+                    status = await google_calendar_service.get_status(db=db, user_id=current_user.id)
+                    if status.get("connected"):
+                        expires_at = status.get("expires_at")
+                        expires_text = _format_datetime_brt(expires_at) if expires_at else ""
+                        calendar_id = status.get("calendar_id") or "primary"
+                        if expires_text:
+                            google_status_line = f"\nGoogle Calendar: conectado ({calendar_id}). Token expira em {expires_text}."
+                        else:
+                            google_status_line = f"\nGoogle Calendar: conectado ({calendar_id})."
+                    else:
+                        google_status_line = "\nGoogle Calendar: nao conectado."
+
                 if handoff_intent:
                     numero = _extract_phone_candidate(request.mensagem)
                     cliente_nome = _extract_cliente_nome(request.mensagem)
@@ -250,6 +282,7 @@ class VivaChatOrchestratorService:
                                 "Agendamento criado com sucesso: "
                                 f"{evento.titulo} em {evento.data_inicio.strftime('%d/%m/%Y %H:%M')}.\n"
                                 "Para eu acionar a Viviane no horario, me passe o WhatsApp do cliente com DDD."
+                                f"{google_status_line}"
                             )
                         )
 
@@ -277,6 +310,7 @@ class VivaChatOrchestratorService:
                             "Agendamento criado com sucesso: "
                             f"{evento.titulo} em {evento.data_inicio.strftime('%d/%m/%Y %H:%M')}.\n"
                             f"Handoff para Viviane agendado no WhatsApp (ID: {task_id})."
+                            f"{google_status_line}"
                         )
                     )
 
@@ -284,6 +318,7 @@ class VivaChatOrchestratorService:
                     resposta=(
                         "Agendamento criado com sucesso: "
                         f"{evento.titulo} em {evento.data_inicio.strftime('%d/%m/%Y %H:%M')}."
+                        f"{google_status_line}"
                     )
                 )
 

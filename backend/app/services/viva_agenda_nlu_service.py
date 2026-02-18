@@ -48,6 +48,14 @@ def _has_create_imperative(normalized: str) -> bool:
         "novo compromisso",
         "adicionar compromisso",
         "adicione compromisso",
+        # Natural variants commonly used by operators.
+        "coloque na agenda",
+        "coloca na agenda",
+        "mande para a agenda",
+        "manda para a agenda",
+        "me avise",
+        "me lembre",
+        "me lembra",
     )
     return _has_any_phrase(normalized, imperative_phrases)
 
@@ -247,12 +255,15 @@ def is_agenda_query_intent(message: str, contexto: List[Dict[str, Any]]) -> bool
 
     if any(term in normalized for term in conclude_terms):
         return False
+
+    # Strong create imperative must win, even if the message also asks for verification.
+    if _has_create_imperative(normalized):
+        return False
+
     # Consulta de existencia tem prioridade sobre criacao para evitar falso positivo:
     # "eu marquei algo amanha?" nao deve cair no fluxo de criar compromisso.
     if _has_query_existence_intent(normalized):
         return True
-    if _has_create_imperative(normalized):
-        return False
 
     query_terms = (
         "minha agenda",
@@ -352,10 +363,13 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
         return None
 
     normalized = _normalize_key(raw)
-    if _has_query_existence_intent(normalized):
+    if not _has_create_imperative(normalized):
         return None
 
-    if not _has_create_imperative(normalized):
+    # Messages can legitimately combine creation + verification, e.g.:
+    # "coloque na agenda ... hoje 18h, verifique se o Google Calendar esta conectado".
+    # In that case, we should still create the event and let the orchestrator answer the verification part.
+    if _has_query_existence_intent(normalized) and not _has_phrase(normalized, "coloque na agenda") and not _has_phrase(normalized, "coloca na agenda"):
         return None
 
     if "|" in raw:
@@ -458,7 +472,14 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
             return {"error": "Data/hora invalida"}
         date_time = date_value.replace(hour=hour, minute=minute, second=0, microsecond=0)
 
-    title = raw
+    # Trim verification clause from title to keep it clean (ex.: "... verifique se google agenda ...")
+    title_source = raw
+    if any(token in normalized for token in ("google", "calendar", "calendario")) and any(
+        phrase in normalized for phrase in ("verifique", "verifica", "confirme", "confirma", "cheque", "checar", "veja")
+    ):
+        title_source = re.split(r"(?i)\b(verifique|verifica|confirme|confirma|cheque|checar|veja)\b", raw, maxsplit=1)[0].strip()
+
+    title = title_source
     verb_match = re.search(
         r"(?i)\b(agendar|agende|agenda|marcar|marca|marque|novo compromisso|criar compromisso|crie compromisso|adicionar compromisso|adicione compromisso)\b",
         title,
@@ -484,6 +505,9 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
     title = re.sub(r"[^0-9A-Za-zÀ-ÿ\s-]+", " ", title)
     title = re.sub(r"(?i)\b(o|a|os|as|um|uma)\b", " ", title)
     title = re.sub(r"\s+", " ", title).strip(" -,:;.")
+
+    if title.lower().startswith("compromisso "):
+        title = title[len("compromisso "):].strip()
 
     if len(title.split()) > 8:
         title = " ".join(title.split()[:8]).strip()

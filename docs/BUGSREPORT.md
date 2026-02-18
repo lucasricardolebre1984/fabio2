@@ -102,6 +102,7 @@
 | BUG-118 | Alta | Backend/Testes | `pytest` com 12 falhas (auth/contratos/viva) por regressao de status HTTP e erros asyncpg/event loop | Aberto |
 | BUG-119 | Alta | Backend/Security | Fluxo real de auth ainda importa `security_stub` com senha dev `1234` | Aberto |
 | BUG-120 | Media | Backend/CORS | CORS excessivamente amplo (`allow_methods=*`, `allow_headers=*`) | Aberto |
+| BUG-121 | Alta | VIVA/Agenda NLU | Comando com "coloque na agenda ... verifique se Google Calendar ..." caia em consulta e nao criava evento | Resolvido |
 
 ---
 
@@ -2304,3 +2305,22 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
 - `backend/app/main.py` -> `allow_headers=["*"]`
 **Impacto:** aumento de superficie para abuso e configuracao pouco restritiva para producao.
 **Status:** Aberto
+
+### BUG-121: "coloque na agenda" com verificacao Google nao criava evento
+**Data:** 2026-02-18
+**Severidade:** Alta
+**Descricao:** No chat `/viva`, comando do tipo "coloque na agenda ... hoje as 18 horas verifique se google agenda ja esta vinculada" era interpretado como consulta (por conter `verifique se`) e nao criava o compromisso.
+**Causa raiz:**
+- NLU de criacao exigia verbo `agendar/marcar/criar compromisso` e nao reconhecia `coloque na agenda`;
+- clausula de verificacao (`verifique se`) ativava intent de consulta e bloqueava criacao.
+**Correcao aplicada:**
+- `backend/app/services/viva_agenda_nlu_service.py`
+  - `_has_create_imperative` ampliado para `coloque na agenda`, `mande para a agenda`, `me lembre`, etc.;
+  - `parse_agenda_natural_create` agora tolera clausula de verificacao quando ha imperativo forte;
+  - titulo e sanitizado removendo a clausula de verificacao Google;
+  - `is_agenda_query_intent` agora respeita criacao quando ha imperativo forte.
+- `backend/app/services/viva_chat_orchestrator_service.py`
+  - quando o usuario pede verificacao Google, resposta inclui status real (`connected`, `calendar_id`, `expires_at` em BRT).
+**Teste:**
+- `backend/tests/test_viva_domain_intents.py` adicionou caso de regressao para `coloque na agenda ... verifique se google ...` e passou (`pytest -q tests/test_viva_domain_intents.py`).
+**Status:** Resolvido

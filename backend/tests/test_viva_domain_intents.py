@@ -60,6 +60,18 @@ def test_agenda_natural_create_accepts_marca_variant():
     assert "antonio" in str(payload.get("title", "")).lower()
 
 
+def test_agenda_natural_create_accepts_coloque_na_agenda_with_google_verification_clause():
+    payload = parse_agenda_natural_create(
+        "coloque na agenda compromisso ligar para fabio hoje as 18 horas verifique se google agenda ja esta vinculada"
+    )
+    assert payload is not None
+    assert payload.get("error") is None
+    title = str(payload.get("title", "")).lower()
+    assert "google" not in title
+    assert "verifique" not in title
+    assert "ligar" in title
+
+
 @pytest.mark.asyncio
 async def test_domain_router_returns_client_detail_with_real_fields(monkeypatch):
     class _FakeClienteService:
