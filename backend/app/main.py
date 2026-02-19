@@ -15,6 +15,7 @@ from app.services.viva_handoff_service import viva_handoff_service
 from app.services.viva_brain_paths_service import viva_brain_paths_service
 from app.services.viva_memory_service import viva_memory_service
 from app.services.cofre_schema_service import cofre_schema_service
+from app.services.evolution_webhook_service import webhook_service
 
 
 @asynccontextmanager
@@ -47,6 +48,7 @@ async def lifespan(app: FastAPI):
                 try:
                     async with AsyncSessionLocal() as db:
                         await viva_handoff_service.process_due_tasks(db=db, limit=20)
+                        await webhook_service.process_pending_outbound(db=db, limit=50)
                 except Exception:
                     # Keep server up even if handoff has a transient failure.
                     pass

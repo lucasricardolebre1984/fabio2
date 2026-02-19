@@ -6,6 +6,7 @@ import base64
 from datetime import datetime
 import logging
 import re
+from uuid import uuid4
 from typing import Any, Dict, Optional
 
 from sqlalchemy import and_, select
@@ -123,6 +124,13 @@ class EvolutionWebhookService:
                 payload_data=payload_data,
                 contexto_atual=contexto_atual,
             )
+            # Tenta entregar mensagens pendentes antigas antes de responder a nova entrada.
+            await self._flush_pending_outbound_for_conversation(
+                db=db,
+                conversa=conversa,
+                push_name=push_name,
+                remote_jid=remote_jid,
+            )
             if contexto_atual.get("non_deliverable_number"):
                 if isinstance(remote_jid, str) and remote_jid.lower().endswith("@lid"):
                     contexto = dict(contexto_atual)
@@ -207,6 +215,15 @@ class EvolutionWebhookService:
                 contexto["non_deliverable_reason"] = "exists_false"
                 contexto["non_deliverable_at"] = datetime.utcnow().isoformat()
                 conversa.contexto_ia = contexto
+            elif erro_envio and "\"exists\":false" in str(erro_envio).replace(" ", "").lower():
+                await self._queue_pending_outbound(
+                    db=db,
+                    conversa=conversa,
+                    conteudo=resposta_ia,
+                    remote_jid=destino_envio,
+                    push_name=push_name,
+                    erro=erro_envio,
+                )
 
             await db.commit()
 
@@ -683,6 +700,100 @@ class EvolutionWebhookService:
         _ = data
         _ = db
         return True
+
+    async def _queue_pending_outbound(
+        self,
+        db: AsyncSession,
+        conversa: WhatsappConversa,
+        conteudo: str,
+        remote_jid: str,
+        push_name: Optional[str],
+        erro: Optional[str],
+    ) -> None:
+        contexto = dict(conversa.contexto_ia or {})
+        queue = list(contexto.get("pending_outbound") or [])
+        queue.append(
+            {
+                "id": str(uuid4()),
+                "conteudo": str(conteudo or "").strip(),
+                "remote_jid": str(remote_jid or "").strip(),
+                "push_name": str(push_name or "").strip() or None,
+                "created_at": datetime.utcnow().isoformat(),
+                "attempts": 0,
+                "last_error": str(erro or "").strip() or None,
+                "last_attempt_at": None,
+            }
+        )
+        contexto["pending_outbound"] = queue[-20:]
+        conversa.contexto_ia = contexto
+        await db.commit()
+
+    async def _flush_pending_outbound_for_conversation(
+        self,
+        db: AsyncSession,
+        conversa: WhatsappConversa,
+        push_name: Optional[str],
+        remote_jid: Optional[str],
+    ) -> int:
+        contexto = dict(conversa.contexto_ia or {})
+        queue = list(contexto.get("pending_outbound") or [])
+        if not queue:
+            return 0
+
+        wa_service = WhatsAppService()
+        preferred = self._pick_preferred_number_from_context(contexto)
+        kept = []
+        sent_count = 0
+        for item in queue:
+            attempts = int(item.get("attempts") or 0)
+            if attempts >= 6:
+                continue
+            conteudo = str(item.get("conteudo") or "").strip()
+            if not conteudo:
+                continue
+            destino = str(item.get("remote_jid") or "").strip() or str(remote_jid or "").strip()
+            nome = str(item.get("push_name") or "").strip() or push_name
+            result = await wa_service.send_text(
+                numero=destino,
+                mensagem=conteudo,
+                context_push_name=nome,
+                context_preferred_number=preferred,
+            )
+            if bool(result.get("sucesso")):
+                sent_count += 1
+                continue
+            item["attempts"] = attempts + 1
+            item["last_error"] = str(result.get("erro") or "falha envio")
+            item["last_attempt_at"] = datetime.utcnow().isoformat()
+            kept.append(item)
+
+        contexto["pending_outbound"] = kept
+        conversa.contexto_ia = contexto
+        await db.commit()
+        return sent_count
+
+    async def process_pending_outbound(self, db: AsyncSession, limit: int = 30) -> Dict[str, int]:
+        stmt = (
+            select(WhatsappConversa)
+            .where(WhatsappConversa.status == StatusConversa.ATIVA)
+            .order_by(WhatsappConversa.updated_at.desc())
+            .limit(max(1, min(limit, 200)))
+        )
+        rows = (await db.execute(stmt)).scalars().all()
+        processed = 0
+        sent = 0
+        for conversa in rows:
+            contexto = dict(conversa.contexto_ia or {})
+            if not list(contexto.get("pending_outbound") or []):
+                continue
+            processed += 1
+            sent += await self._flush_pending_outbound_for_conversation(
+                db=db,
+                conversa=conversa,
+                push_name=conversa.nome_contato,
+                remote_jid=conversa.numero_telefone,
+            )
+        return {"processed": processed, "sent": sent}
 
 
 webhook_service = EvolutionWebhookService()
