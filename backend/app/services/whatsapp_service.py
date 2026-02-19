@@ -763,6 +763,19 @@ class WhatsAppService:
                     candidate_numbers.append(numero_alt)
 
         nome_base = self._normalizar_nome(context_push_name or (current_contact or {}).get("pushName"))
+        profile_pic_base = str((current_contact or {}).get("profilePicUrl") or "").strip()
+        if profile_pic_base:
+            same_pic_matches = [
+                item
+                for item in contacts
+                if str(item.get("remoteJid", "")).endswith("@s.whatsapp.net")
+                and str(item.get("profilePicUrl") or "").strip() == profile_pic_base
+            ]
+            if len(same_pic_matches) == 1:
+                numero_match = self._extrair_numero_de_jid(same_pic_matches[0].get("remoteJid", ""))
+                if numero_match and self._is_plausible_phone_number(numero_match):
+                    candidate_numbers.append(numero_match)
+
         if nome_base:
             contact_matches = [
                 item

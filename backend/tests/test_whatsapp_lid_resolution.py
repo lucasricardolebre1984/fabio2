@@ -101,3 +101,42 @@ async def test_resolve_lid_does_not_return_unvalidated_fallback(monkeypatch):
     )
 
     assert resolved is None
+
+
+@pytest.mark.asyncio
+async def test_resolve_lid_uses_unique_profile_picture_match(monkeypatch):
+    service = WhatsAppService()
+
+    async def _fake_fetch_contacts(client, instance):
+        return [
+            {
+                "remoteJid": "260129056403704@lid",
+                "pushName": "Contato FC Soluções",
+                "profilePicUrl": "https://img.example/a.jpg",
+            },
+            {
+                "remoteJid": "5516982223333@s.whatsapp.net",
+                "pushName": "Nome Diferente",
+                "profilePicUrl": "https://img.example/a.jpg",
+            },
+        ]
+
+    async def _fake_fetch_chats(client, instance):
+        return []
+
+    async def _fake_check_whatsapp_number(client, instance, number):
+        return number if number == "5516982223333" else None
+
+    monkeypatch.setattr(service, "_fetch_contacts", _fake_fetch_contacts)
+    monkeypatch.setattr(service, "_fetch_chats", _fake_fetch_chats)
+    monkeypatch.setattr(service, "_check_whatsapp_number", _fake_check_whatsapp_number)
+
+    resolved = await service._resolve_lid_number(
+        client=None,
+        instance="fc-solucoes",
+        numero="260129056403704@lid",
+        context_push_name=None,
+        context_preferred_number=None,
+    )
+
+    assert resolved == "5516982223333"
