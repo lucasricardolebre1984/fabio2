@@ -260,6 +260,28 @@ class EvolutionWebhookService:
         remote_jid = self._extrair_remote_jid(message_wrapper, payload_data)
         if not remote_jid:
             return ""
+        key_data = message_wrapper.get("key") if isinstance(message_wrapper.get("key"), dict) else {}
+        if isinstance(remote_jid, str) and remote_jid.lower().endswith("@lid"):
+            candidate_fields = [
+                key_data.get("participant"),
+                key_data.get("sender"),
+                key_data.get("senderPn"),
+                payload_data.get("participant") if isinstance(payload_data, dict) else None,
+                payload_data.get("sender") if isinstance(payload_data, dict) else None,
+                payload_data.get("senderPn") if isinstance(payload_data, dict) else None,
+                message_wrapper.get("participant"),
+                message_wrapper.get("sender"),
+            ]
+            for candidate in candidate_fields:
+                if not isinstance(candidate, str) or "@" not in candidate:
+                    continue
+                lowered = candidate.lower()
+                if lowered.endswith("@lid") or lowered.endswith("@g.us"):
+                    continue
+                number = candidate.split("@")[0]
+                if self._is_plausible_phone_digits(number):
+                    return number
+
         return remote_jid.split("@")[0]
 
     def _extrair_remote_jid(self, message_wrapper: Dict[str, Any], payload_data: Dict[str, Any]) -> str:
@@ -293,6 +315,10 @@ class EvolutionWebhookService:
             digits = "55" + digits
         return digits
 
+    def _is_plausible_phone_digits(self, value: str) -> bool:
+        digits = "".join(ch for ch in (value or "") if ch.isdigit())
+        return 10 <= len(digits) <= 15
+
     def _extract_phone_from_text(self, text: str) -> Optional[str]:
         if not isinstance(text, str):
             return None
@@ -310,12 +336,12 @@ class EvolutionWebhookService:
         if not isinstance(context, dict):
             return None
         direct = self._normalize_digits(str(context.get("resolved_whatsapp_number") or ""))
-        if direct:
+        if self._is_plausible_phone_digits(direct):
             return direct
         lead = context.get("lead")
         if isinstance(lead, dict):
             lead_phone = self._normalize_digits(str(lead.get("telefone") or ""))
-            if lead_phone:
+            if self._is_plausible_phone_digits(lead_phone):
                 return lead_phone
         return None
 
@@ -334,7 +360,10 @@ class EvolutionWebhookService:
         matches = [item for item in result.scalars().all() if getattr(item, "telefone", None)]
         if len(matches) != 1:
             return None
-        return self._normalize_digits(str(matches[0].telefone or ""))
+        candidate = self._normalize_digits(str(matches[0].telefone or ""))
+        if self._is_plausible_phone_digits(candidate):
+            return candidate
+        return None
 
     async def _refresh_lid_resolution_context(
         self,
@@ -350,23 +379,32 @@ class EvolutionWebhookService:
 
         contexto = dict(contexto_atual or {})
         changed = False
+        existing_resolved = self._normalize_digits(str(contexto.get("resolved_whatsapp_number") or ""))
+        if existing_resolved and not self._is_plausible_phone_digits(existing_resolved):
+            contexto.pop("resolved_whatsapp_number", None)
+            contexto.pop("resolved_whatsapp_source", None)
+            changed = True
 
         extracted_from_text = self._extract_phone_from_text(texto_usuario)
-        if extracted_from_text and contexto.get("resolved_whatsapp_number") != extracted_from_text:
+        if (
+            extracted_from_text
+            and self._is_plausible_phone_digits(extracted_from_text)
+            and contexto.get("resolved_whatsapp_number") != extracted_from_text
+        ):
             contexto["resolved_whatsapp_number"] = extracted_from_text
             contexto["resolved_whatsapp_source"] = "user_text"
             changed = True
 
         if not contexto.get("resolved_whatsapp_number"):
             from_lead = self._pick_preferred_number_from_context(contexto)
-            if from_lead:
+            if from_lead and self._is_plausible_phone_digits(from_lead):
                 contexto["resolved_whatsapp_number"] = from_lead
                 contexto["resolved_whatsapp_source"] = "lead_context"
                 changed = True
 
         if not contexto.get("resolved_whatsapp_number"):
             from_registry = await self._resolve_phone_from_client_registry(db=db, push_name=push_name)
-            if from_registry:
+            if from_registry and self._is_plausible_phone_digits(from_registry):
                 contexto["resolved_whatsapp_number"] = from_registry
                 contexto["resolved_whatsapp_source"] = "client_registry"
                 changed = True
