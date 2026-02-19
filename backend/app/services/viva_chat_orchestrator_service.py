@@ -115,6 +115,41 @@ def _wants_google_calendar_verification(message: str) -> bool:
     return has_google and has_verify
 
 
+def _is_timezone_adjust_intent(message: str) -> bool:
+    normalized = _normalize_key(message or "")
+    if not normalized:
+        return False
+    has_timezone_word = any(token in normalized for token in ("fuso", "timezone", "sao paulo", "brasilia", "gmt"))
+    has_adjust_word = any(token in normalized for token in ("ajuste", "ajustar", "corrija", "corrigir", "acertar"))
+    return has_timezone_word and has_adjust_word
+
+
+def _is_campaign_rule_memory_intent(message: str) -> bool:
+    normalized = _normalize_key(message or "")
+    if not normalized:
+        return False
+    has_campaign_context = any(
+        token in normalized
+        for token in ("campanha", "campanhas", "imagem", "imagens", "banner", "promocao")
+    )
+    has_save_request = any(
+        token in normalized
+        for token in ("salve", "memorize", "memoria", "nao perca o contexto", "regra de ouro")
+    )
+    has_instruction_shape = any(
+        token in normalized
+        for token in (
+            "se adapte",
+            "sempre vou",
+            "nao quero padrao",
+            "cada campanha",
+            "criatividade nova",
+            "conseguiu entender",
+        )
+    )
+    return has_campaign_context and has_save_request and has_instruction_shape
+
+
 class VivaChatOrchestratorService:
     async def handle_chat_with_viva(self, request: Any, current_user: Any, db: Any):
         """Chat direto com a VIVA usando OpenAI como provedor institucional."""
@@ -231,6 +266,13 @@ class VivaChatOrchestratorService:
                 return await finalize(
                     resposta=f"Horario de Brasilia (BRT) agora: {_format_brt_now()}."
                 )
+            if _is_timezone_adjust_intent(request.mensagem):
+                return await finalize(
+                    resposta=(
+                        "Para ajustar fuso com seguranca, me informe o titulo ou ID do compromisso. "
+                        "Exemplo: ajustar fuso do compromisso <titulo> para America/Sao_Paulo."
+                    )
+                )
 
             if agenda_command is not None:
                 if agenda_command.get("error"):
@@ -280,7 +322,7 @@ class VivaChatOrchestratorService:
                         return await finalize(
                             resposta=(
                                 "Agendamento criado com sucesso: "
-                                f"{evento.titulo} em {evento.data_inicio.strftime('%d/%m/%Y %H:%M')}.\n"
+                                f"{evento.titulo} em {_format_datetime_brt(evento.data_inicio)}.\n"
                                 "Para eu acionar a Viviane no horario, me passe o WhatsApp do cliente com DDD."
                                 f"{google_status_line}"
                             )
@@ -308,7 +350,7 @@ class VivaChatOrchestratorService:
                     return await finalize(
                         resposta=(
                             "Agendamento criado com sucesso: "
-                            f"{evento.titulo} em {evento.data_inicio.strftime('%d/%m/%Y %H:%M')}.\n"
+                            f"{evento.titulo} em {_format_datetime_brt(evento.data_inicio)}.\n"
                             f"Handoff para Viviane agendado no WhatsApp (ID: {task_id})."
                             f"{google_status_line}"
                         )
@@ -317,7 +359,7 @@ class VivaChatOrchestratorService:
                 return await finalize(
                     resposta=(
                         "Agendamento criado com sucesso: "
-                        f"{evento.titulo} em {evento.data_inicio.strftime('%d/%m/%Y %H:%M')}."
+                        f"{evento.titulo} em {_format_datetime_brt(evento.data_inicio)}."
                         f"{google_status_line}"
                     )
                 )
@@ -373,7 +415,7 @@ class VivaChatOrchestratorService:
                 return await finalize(
                     resposta=(
                         "Compromisso concluido com sucesso: "
-                        f"{evento.titulo} ({evento.data_inicio.strftime('%d/%m/%Y %H:%M')})."
+                        f"{evento.titulo} ({_format_datetime_brt(evento.data_inicio)})."
                     )
                 )
 
@@ -482,6 +524,24 @@ class VivaChatOrchestratorService:
                 return await finalize(
                     resposta="Memoria salva.",
                     meta={"pinned_saved": True, "memory_write": saved},
+                )
+
+            if _is_campaign_rule_memory_intent(request.mensagem):
+                saved = await viva_memory_service.append_memory(
+                    db=db,
+                    user_id=current_user.id,
+                    session_id=session_id,
+                    tipo="pinned",
+                    conteudo=str(request.mensagem or "").strip(),
+                    modo=modo,
+                    meta={"pinned": True, "source": "campaign_rule_instruction"},
+                )
+                return await finalize(
+                    resposta=(
+                        "Confirmado. Regra de Ouro de campanhas salva na memoria. "
+                        "Nao vou gerar imagem automaticamente nesse tipo de instrucao."
+                    ),
+                    meta={"campaign_rule_saved": True, "memory_write": saved},
                 )
 
             campaign_flow_requested = False

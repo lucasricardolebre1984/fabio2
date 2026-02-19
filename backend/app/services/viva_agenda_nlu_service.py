@@ -15,9 +15,16 @@ from app.models.agenda import EventoTipo
 BRT_TZ = ZoneInfo("America/Sao_Paulo")
 
 
-def _now_brt_naive() -> datetime:
-    """Retorna datetime naive no fuso de Brasilia para consistencia em toda agenda."""
-    return datetime.now(BRT_TZ).replace(tzinfo=None)
+def _now_brt() -> datetime:
+    """Retorna datetime aware no fuso de Brasilia para consistencia em toda agenda."""
+    return datetime.now(BRT_TZ)
+
+
+def _to_brt_aware(value: datetime) -> datetime:
+    """Normaliza datetime para timezone America/Sao_Paulo."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=BRT_TZ)
+    return value.astimezone(BRT_TZ)
 
 
 def _normalize_key(texto: str) -> str:
@@ -61,10 +68,20 @@ def _has_create_imperative(normalized: str) -> bool:
 
 
 def _has_query_existence_intent(normalized: str) -> bool:
-    existence_phrases = (
+    agenda_tokens = ("agenda", "agendamento", "agendamentos", "compromisso", "compromissos", "obrigacao", "obrigacoes")
+    has_agenda_token = any(_has_phrase(normalized, token) for token in agenda_tokens)
+
+    # Frases fortes de existencia de agendamento (podem aparecer sem "agenda" explicita).
+    strong_agenda_phrases = (
         "eu marquei",
         "se eu marquei",
         "ja marquei",
+    )
+    if _has_any_phrase(normalized, strong_agenda_phrases):
+        return True
+
+    # Frases genericas de confirmacao so valem quando houver contexto de agenda.
+    generic_confirmation_phrases = (
         "tem algum",
         "tem alguma",
         "ha algum",
@@ -78,10 +95,9 @@ def _has_query_existence_intent(normalized: str) -> bool:
         "verifica se",
         "verifique se",
     )
-    if _has_any_phrase(normalized, existence_phrases):
+    if has_agenda_token and _has_any_phrase(normalized, generic_confirmation_phrases):
         return True
 
-    agenda_tokens = ("agenda", "agendamento", "agendamentos", "compromisso", "compromissos", "obrigacao", "obrigacoes")
     query_tokens = (
         "tenho",
         "tem",
@@ -97,7 +113,6 @@ def _has_query_existence_intent(normalized: str) -> bool:
         "mostra",
         "consultar",
     )
-    has_agenda_token = any(_has_phrase(normalized, token) for token in agenda_tokens)
     has_query_token = any(_has_phrase(normalized, token) for token in query_tokens)
     return has_agenda_token and has_query_token
 
@@ -112,7 +127,7 @@ def _parse_datetime_input(raw: str) -> Optional[datetime]:
     )
     for fmt in formats:
         try:
-            return datetime.strptime(value, fmt)
+            return _to_brt_aware(datetime.strptime(value, fmt))
         except ValueError:
             continue
     return None
@@ -326,7 +341,7 @@ def is_agenda_query_intent(message: str, contexto: List[Dict[str, Any]]) -> bool
 
 def agenda_window_from_text(message: str) -> Tuple[datetime, datetime, str]:
     normalized = _normalize_key(message)
-    now = _now_brt_naive()
+    now = _now_brt()
 
     if "amanha" in normalized:
         start = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -351,7 +366,7 @@ def format_agenda_list(items: List[Any], period_label: str) -> str:
     lines = [f"Seus compromissos {period_label}:"]
     for item in ordered:
         status = "Concluido" if item.concluido else "Pendente"
-        horario = item.data_inicio.strftime("%H:%M")
+        horario = _to_brt_aware(item.data_inicio).strftime("%H:%M")
         lines.append(f"- {horario} | {item.titulo} ({status})")
 
     return "\n".join(lines)
@@ -460,17 +475,18 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
             except ValueError:
                 continue
     elif has_tomorrow_hint:
-        date_value = _now_brt_naive() + timedelta(days=1)
+        date_value = _now_brt() + timedelta(days=1)
     elif has_today_hint:
-        date_value = _now_brt_naive()
+        date_value = _now_brt()
 
     if relative_delta is not None:
-        date_time = _now_brt_naive() + relative_delta
+        date_time = _now_brt() + relative_delta
         date_time = date_time.replace(second=0, microsecond=0)
     else:
         if not date_value:
             return {"error": "Data/hora invalida"}
         date_time = date_value.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    date_time = _to_brt_aware(date_time)
 
     # Trim verification clause from title to keep it clean (ex.: "... verifique se google agenda ...")
     title_source = raw

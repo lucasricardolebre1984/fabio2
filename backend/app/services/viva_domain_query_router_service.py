@@ -46,21 +46,22 @@ def _is_direct_confirmation(message: str) -> bool:
 
 
 def _last_pending_list_domain(contexto: List[Dict[str, Any]]) -> Optional[str]:
-    for msg in reversed(contexto[-10:]):
-        if str(msg.get("tipo") or "") != "ia":
-            continue
-        normalized = _normalize_key(str(msg.get("conteudo") or ""))
-        if not normalized:
-            continue
-        if ("deseja" in normalized or "quer" in normalized or "confirmo" in normalized) and (
-            "listar" in normalized or "liste" in normalized or "lista" in normalized or "exiba" in normalized
-        ):
-            if "cliente" in normalized or "clientes" in normalized:
-                return "clientes"
-            if any(token in normalized for token in ("modelo", "modelos", "template", "templates", "tipos")):
-                return "contratos_modelos"
-            if "contrato" in normalized or "contratos" in normalized:
-                return "contratos_emitidos"
+    # Considera apenas o ultimo prompt da IA para evitar capturar confirmacoes antigas.
+    for msg in reversed(contexto[-4:]):
+        if str(msg.get("tipo") or "") == "ia":
+            normalized = _normalize_key(str(msg.get("conteudo") or ""))
+            if not normalized:
+                return None
+            if ("deseja" in normalized or "quer" in normalized or "confirmo" in normalized) and (
+                "listar" in normalized or "liste" in normalized or "lista" in normalized or "exiba" in normalized
+            ):
+                if "cliente" in normalized or "clientes" in normalized:
+                    return "clientes"
+                if any(token in normalized for token in ("modelo", "modelos", "template", "templates", "tipos")):
+                    return "contratos_modelos"
+                if "contrato" in normalized or "contratos" in normalized:
+                    return "contratos_emitidos"
+            return None
     return None
 
 
@@ -217,6 +218,11 @@ def _is_count_contracts_request(message: str) -> bool:
     return has_contract and has_count
 
 
+def _wants_all_records(message: str) -> bool:
+    normalized = _normalize_key(message or "")
+    return any(token in normalized for token in ("todos", "todas", "geral", "emitidos", "incluindo"))
+
+
 async def _resolve_client_from_message(
     *,
     cliente_service: ClienteService,
@@ -281,13 +287,14 @@ class VivaDomainQueryRouterService:
 
         contract_templates_intent = is_contract_templates_intent(message)
         contracts_by_client_intent = is_contracts_by_client_intent(message)
+        contract_count_intent = _is_count_contracts_request(message) and not contracts_by_client_intent
         contract_list_intent = (is_contract_list_intent(message) and not contract_templates_intent) or (
             _is_direct_confirmation(message) and pending_list_domain == "contratos_emitidos"
         )
         contract_templates_intent = contract_templates_intent or (
             _is_direct_confirmation(message) and pending_list_domain == "contratos_modelos"
         )
-        if contracts_by_client_intent or contract_list_intent or contract_templates_intent:
+        if contracts_by_client_intent or contract_list_intent or contract_templates_intent or contract_count_intent:
             contrato_service = ContratoService(db)
             if contracts_by_client_intent:
                 cliente_service = ClienteService(db)
@@ -327,6 +334,25 @@ class VivaDomainQueryRouterService:
                     created_label = created_at.strftime("%d/%m/%Y") if created_at else "sem data"
                     lines.append(f"- {numero} | {titulo} | {created_label} | {status_value}")
                 return "\n".join(lines)
+            if contract_count_intent:
+                contratos_data = await contrato_service.list(
+                    status=None,
+                    search=None,
+                    page=1,
+                    page_size=500,
+                )
+                contratos_items = list(contratos_data.get("items", []))
+                total = len(contratos_items)
+                ativos = [
+                    item
+                    for item in contratos_items
+                    if str(getattr(getattr(item, "status", None), "value", getattr(item, "status", ""))).lower().strip()
+                    != "cancelado"
+                ]
+                if _wants_all_records(message):
+                    return f"Total de contratos emitidos (todos os status): {total}."
+                return f"Total de contratos ativos: {len(ativos)}. Total emitido geral: {total}."
+
             if contract_templates_intent:
                 templates = await contrato_service.list_templates()
                 titles = [
@@ -447,6 +473,7 @@ class VivaDomainQueryRouterService:
                 lines.append(f"- {_normalize_mojibake_text(row.titulo)} ({row.modo}) - {created_label}")
             return "\n".join(lines)
         if is_campaign_count_intent(message):
+            normalized = _normalize_key(message or "")
             mode_filter = extract_campaign_mode_filter(message)
             _, total = await viva_campaign_repository_service.list_campaign_rows(
                 db=db,
@@ -455,6 +482,13 @@ class VivaDomainQueryRouterService:
                 limit=1,
                 offset=0,
             )
+            asks_active = any(token in normalized for token in ("ativa", "ativas", "ativva", "ativo", "ativos"))
+            if asks_active:
+                scope = f" em {mode_filter}" if mode_filter else ""
+                return (
+                    f"No historico{scope}, encontrei {total} campanhas registradas. "
+                    "Obs.: o modulo atual nao classifica campanhas por status ativo/pausado."
+                )
             if mode_filter:
                 return f"Total de campanhas feitas em {mode_filter}: {total}."
             return f"Total geral de campanhas feitas: {total}."

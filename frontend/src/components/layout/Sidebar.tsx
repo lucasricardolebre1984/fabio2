@@ -2,19 +2,15 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { FileText, Users, Calendar, MessageCircle, LogOut, Bot, Megaphone } from 'lucide-react'
+import { LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { APP_BRAND, DASHBOARD_NAV_ITEMS } from '@/components/layout/navigation'
 
-const menuItems = [
-  { href: '/viva', label: 'Chat IA VIVA', icon: Bot },
-  { href: '/campanhas', label: 'Campanhas', icon: Megaphone },
-  { href: '/contratos', label: 'Contratos', icon: FileText },
-  { href: '/clientes', label: 'Clientes', icon: Users },
-  { href: '/agenda', label: 'Agenda', icon: Calendar },
-  { href: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
-]
+type SidebarProps = {
+  onNavigate?: () => void
+}
 
-export function Sidebar() {
+export function Sidebar({ onNavigate }: SidebarProps) {
   const pathname = usePathname()
 
   const handleLogout = () => {
@@ -26,12 +22,12 @@ export function Sidebar() {
   return (
     <aside className="w-64 bg-primary-900 text-white min-h-screen flex flex-col">
       <div className="p-6 border-b border-primary-800">
-        <h1 className="text-xl font-bold">FC Soluções</h1>
-        <p className="text-primary-400 text-sm">Financeiras</p>
+        <h1 className="text-xl font-bold">{APP_BRAND.name}</h1>
+        <p className="text-primary-400 text-sm">{APP_BRAND.tagline}</p>
       </div>
 
       <nav className="flex-1 p-4 space-y-2">
-        {menuItems.map((item) => {
+        {DASHBOARD_NAV_ITEMS.map((item) => {
           const Icon = item.icon
           const isActive = pathname.startsWith(item.href)
 
@@ -39,6 +35,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={cn(
                 'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
                 isActive

@@ -2,36 +2,30 @@
 
 `COFRE` e a raiz unica de persona, skills e trilha de memorias da VIVA.
 
-## Estrutura
+## Estrutura canonica
 
 - `persona-skills/`
   - `AGENT.md`: prompt mestre institucional.
   - `skill-generate-campanha-neutra.md`
   - `skill-interpretar-contratos.md`
   - `skill-memoria-cofre.md`
-  - `skillconteudo.txt` (legacy compat)
+  - `skillconteudo.txt` (compatibilidade legada ainda usada em runtime)
 - `memories/`
-  - `viva_chat_sessions/`
-  - `viva_chat_messages/`
-  - `viva_campanhas/`
-    - `items/`
-    - `assets/`
-  - `viva_handoff_tasks/`
-  - `viva_memory_vectors/`
-  - `redis_viva_memory_medium/`
-  - cada pasta recebe arquivos `YYYY-MM-DD.jsonl`
+  - espelho por tabela em `backend/COFRE/memories/<tabela>/`
+  - no Git: somente estrutura de pastas + `.gitkeep`
+  - arquivos `*.jsonl` e assets sao runtime local (nao versionar)
 - `system/`
   - `endpoints_manifest.json`: catalogo canonico de modulos/capacidades/endpoints.
 
-## Regra operacional
+## Regras institucionais (anti-frankenstein)
 
-1. Edite persona e skill somente em `backend/COFRE/persona-skills/`.
-2. Nao crie persona paralela em outras pastas de runtime.
-3. Use `backend/COFRE/memories/` para auditoria e tuning da memoria.
-4. Delete funcional no SaaS deve refletir delete no COFRE quando aplicavel.
-5. Catalogos de capacidades/modulos devem sair de `COFRE/system/endpoints_manifest.json`.
+1. Persona e skills oficiais existem somente em `backend/COFRE/persona-skills/`.
+2. Nao criar persona paralela fora do COFRE.
+3. Nao commitar dados de runtime em `backend/COFRE/memories/`.
+4. Toda exclusao funcional no SaaS deve refletir no espelho COFRE quando aplicavel.
+5. Catalogo de capacidades/modulos vem de `backend/COFRE/system/endpoints_manifest.json`.
 
-## Compatibilidade
+## Observacao de compatibilidade
 
-Nao existe fallback operacional para persona/skills fora do COFRE.
-O backend carrega `AGENT.md` e skills somente de `COFRE/persona-skills`.
+`skillconteudo.txt` permanece por compatibilidade com `viva_agent_profile_service.py`.
+Remover esse arquivo exige ajuste de codigo e validacao de persona em runtime.

@@ -28,7 +28,24 @@ def is_campaign_count_intent(message: str) -> bool:
     has_campaign = "campanha" in normalized or "campanhas" in normalized
     has_count = any(
         token in normalized
-        for token in ("quantas", "quanto", "total", "numero", "qtd", "quantidade", "feitas", "criadas")
+        for token in (
+            "quantas",
+            "quanto",
+            "total",
+            "numero",
+            "qtd",
+            "quantidade",
+            "feitas",
+            "criadas",
+            "alguma",
+            "algum",
+            "temos",
+            "tem",
+            "existe",
+            "ativa",
+            "ativas",
+            "ativva",
+        )
     )
     has_generate_signal = bool(_is_image_request(message) or _is_direct_generation_intent(message))
     return has_campaign and has_count and not has_generate_signal

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -40,11 +40,7 @@ export default function EditarContratoPage() {
   const [contrato, setContrato] = useState<Contrato | null>(null)
   const [formData, setFormData] = useState<Partial<Contrato>>({})
 
-  useEffect(() => {
-    carregarContrato()
-  }, [])
-
-  const carregarContrato = async () => {
+  const carregarContrato = useCallback(async () => {
     try {
       const id = params.id as string
       const data = await contratosApi.getById(id)
@@ -69,7 +65,11 @@ export default function EditarContratoPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [params.id, router])
+
+  useEffect(() => {
+    carregarContrato()
+  }, [carregarContrato])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

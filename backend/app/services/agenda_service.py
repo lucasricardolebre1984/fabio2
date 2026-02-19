@@ -16,6 +16,14 @@ class AgendaService:
     
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    @staticmethod
+    def _normalize_event_datetime(value: Optional[datetime]) -> Optional[datetime]:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+        return value
     
     async def create(self, data: EventoCreate, user_id: UUID) -> Agenda:
         """Create a new event."""
@@ -23,8 +31,8 @@ class AgendaService:
             titulo=data.titulo,
             descricao=data.descricao,
             tipo=data.tipo,
-            data_inicio=data.data_inicio,
-            data_fim=data.data_fim,
+            data_inicio=self._normalize_event_datetime(data.data_inicio),
+            data_fim=self._normalize_event_datetime(data.data_fim),
             cliente_id=data.cliente_id,
             contrato_id=data.contrato_id,
             concluido=False,
@@ -101,6 +109,8 @@ class AgendaService:
         update_data = data.model_dump(exclude_unset=True)
         
         for field, value in update_data.items():
+            if field in {"data_inicio", "data_fim"}:
+                value = self._normalize_event_datetime(value)
             setattr(evento, field, value)
         
         await self.db.commit()
@@ -130,7 +140,7 @@ class AgendaService:
     
     async def get_hoje(self, user_id: Optional[UUID] = None) -> Dict[str, Any]:
         """Get today's events."""
-        hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None, hour=0, minute=0, second=0, microsecond=0)
+        hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).replace(hour=0, minute=0, second=0, microsecond=0)
         amanha = hoje + timedelta(days=1)
         
         return await self.list(
