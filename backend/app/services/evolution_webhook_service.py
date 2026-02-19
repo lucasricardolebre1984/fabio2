@@ -119,6 +119,8 @@ class EvolutionWebhookService:
                 push_name=push_name,
                 texto_usuario=texto,
                 remote_jid=remote_jid,
+                message_wrapper=message_wrapper,
+                payload_data=payload_data,
                 contexto_atual=contexto_atual,
             )
             if contexto_atual.get("non_deliverable_number"):
@@ -266,11 +268,20 @@ class EvolutionWebhookService:
                 key_data.get("participant"),
                 key_data.get("sender"),
                 key_data.get("senderPn"),
+                key_data.get("participantAlt"),
+                key_data.get("senderAlt"),
+                key_data.get("remoteJidAlt"),
                 payload_data.get("participant") if isinstance(payload_data, dict) else None,
                 payload_data.get("sender") if isinstance(payload_data, dict) else None,
                 payload_data.get("senderPn") if isinstance(payload_data, dict) else None,
+                payload_data.get("participantAlt") if isinstance(payload_data, dict) else None,
+                payload_data.get("senderAlt") if isinstance(payload_data, dict) else None,
+                payload_data.get("remoteJidAlt") if isinstance(payload_data, dict) else None,
                 message_wrapper.get("participant"),
                 message_wrapper.get("sender"),
+                message_wrapper.get("participantAlt"),
+                message_wrapper.get("senderAlt"),
+                message_wrapper.get("remoteJidAlt"),
             ]
             for candidate in candidate_fields:
                 if not isinstance(candidate, str) or "@" not in candidate:
@@ -283,6 +294,44 @@ class EvolutionWebhookService:
                     return number
 
         return remote_jid.split("@")[0]
+
+    def _extract_number_from_lid_metadata(
+        self,
+        message_wrapper: Dict[str, Any],
+        payload_data: Dict[str, Any],
+    ) -> Optional[str]:
+        """Extract real phone from @lid companion fields when available."""
+        key_data = message_wrapper.get("key") if isinstance(message_wrapper.get("key"), dict) else {}
+        candidate_fields = [
+            key_data.get("participant"),
+            key_data.get("sender"),
+            key_data.get("senderPn"),
+            key_data.get("participantAlt"),
+            key_data.get("senderAlt"),
+            key_data.get("remoteJidAlt"),
+            payload_data.get("participant") if isinstance(payload_data, dict) else None,
+            payload_data.get("sender") if isinstance(payload_data, dict) else None,
+            payload_data.get("senderPn") if isinstance(payload_data, dict) else None,
+            payload_data.get("participantAlt") if isinstance(payload_data, dict) else None,
+            payload_data.get("senderAlt") if isinstance(payload_data, dict) else None,
+            payload_data.get("remoteJidAlt") if isinstance(payload_data, dict) else None,
+            message_wrapper.get("participant"),
+            message_wrapper.get("sender"),
+            message_wrapper.get("participantAlt"),
+            message_wrapper.get("senderAlt"),
+            message_wrapper.get("remoteJidAlt"),
+        ]
+        for candidate in candidate_fields:
+            if not isinstance(candidate, str) or "@" not in candidate:
+                continue
+            lowered = candidate.lower()
+            if lowered.endswith("@lid") or lowered.endswith("@g.us"):
+                continue
+            number = candidate.split("@")[0]
+            normalized = self._normalize_digits(number)
+            if self._is_plausible_phone_digits(normalized):
+                return normalized
+        return None
 
     def _extrair_remote_jid(self, message_wrapper: Dict[str, Any], payload_data: Dict[str, Any]) -> str:
         key_data = message_wrapper.get("key") if isinstance(message_wrapper.get("key"), dict) else {}
@@ -372,6 +421,8 @@ class EvolutionWebhookService:
         push_name: Optional[str],
         texto_usuario: str,
         remote_jid: str,
+        message_wrapper: Dict[str, Any],
+        payload_data: Dict[str, Any],
         contexto_atual: Dict[str, Any],
     ) -> Dict[str, Any]:
         if not isinstance(remote_jid, str) or not remote_jid.lower().endswith("@lid"):
@@ -394,6 +445,16 @@ class EvolutionWebhookService:
             contexto["resolved_whatsapp_number"] = extracted_from_text
             contexto["resolved_whatsapp_source"] = "user_text"
             changed = True
+
+        if not contexto.get("resolved_whatsapp_number"):
+            from_meta = self._extract_number_from_lid_metadata(
+                message_wrapper=message_wrapper,
+                payload_data=payload_data,
+            )
+            if from_meta and self._is_plausible_phone_digits(from_meta):
+                contexto["resolved_whatsapp_number"] = from_meta
+                contexto["resolved_whatsapp_source"] = "lid_meta"
+                changed = True
 
         if not contexto.get("resolved_whatsapp_number"):
             from_lead = self._pick_preferred_number_from_context(contexto)

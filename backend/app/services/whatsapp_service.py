@@ -821,15 +821,15 @@ class WhatsAppService:
                 continue
             unique_candidates.append(normalized)
 
-        fallback_candidate: Optional[str] = None
         for candidate in unique_candidates:
             checked = await self._check_whatsapp_number(client, instance, candidate)
             if checked:
                 return checked
-            if not fallback_candidate and self._is_plausible_phone_number(candidate):
-                fallback_candidate = candidate
 
-        return fallback_candidate
+        # Nao retornar fallback nao validado.
+        # Em cenarios @lid, enviar para numero "chutado" aumenta falso negativo (exists:false)
+        # e piora a taxa de entrega. Se nao validar, mantemos fluxo sem resolucao.
+        return None
 
     def _format_number(self, numero: str) -> str:
         """Format phone number for WhatsApp API."""

@@ -22,3 +22,15 @@ def test_extract_numero_from_lid_prefers_participant_real_phone():
     payload_data = {}
     assert service._extrair_numero(message_wrapper, payload_data) == "5516997030530"
 
+
+def test_extract_number_from_lid_metadata_remote_jid_alt():
+    service = EvolutionWebhookService()
+    message_wrapper = {
+        "key": {
+            "remoteJid": "260129056403704@lid",
+            "remoteJidAlt": "5516981234567@s.whatsapp.net",
+        },
+        "message": {"conversation": "Oi"},
+    }
+    payload_data = {}
+    assert service._extract_number_from_lid_metadata(message_wrapper, payload_data) == "5516981234567"
