@@ -240,9 +240,18 @@ function WhatsAppConversasPageContent() {
               ) : (
                 <div className="divide-y">
                   {conversasFiltradas.map((conversa) => (
-                    <button
+                    <div
                       key={conversa.id}
                       onClick={() => handleSelecionarConversa(conversa)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleSelecionarConversa(conversa);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Abrir conversa de ${conversa.nome_contato || formatarNumero(conversa.numero_telefone)}`}
                       className={`w-full p-4 text-left transition-colors hover:bg-gray-50 ${
                         conversaSelecionada?.id === conversa.id ? "border-l-4 border-blue-500 bg-blue-50" : ""
                       }`}
@@ -266,13 +275,14 @@ function WhatsAppConversasPageContent() {
                           <button
                             onClick={(e) => handleArquivar(e, conversa.id)}
                             className="p-1 text-gray-400 hover:text-gray-600"
+                            aria-label={`Arquivar conversa de ${conversa.nome_contato || formatarNumero(conversa.numero_telefone)}`}
                             title="Arquivar"
                           >
                             <Archive className="h-4 w-4" />
                           </button>
                         </div>
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -358,7 +368,12 @@ function WhatsAppConversasPageContent() {
                         }
                       }}
                     />
-                    <Button size="icon" onClick={handleEnviarMensagem} disabled={loadingEnvio || !novaMensagem.trim()}>
+                    <Button
+                      size="icon"
+                      onClick={handleEnviarMensagem}
+                      disabled={loadingEnvio || !novaMensagem.trim()}
+                      aria-label="Enviar mensagem"
+                    >
                       <Send className="h-4 w-4" />
                     </Button>
                   </div>

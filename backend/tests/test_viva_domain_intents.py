@@ -72,6 +72,19 @@ def test_agenda_natural_create_accepts_coloque_na_agenda_with_google_verificatio
     assert "ligar" in title
 
 
+def test_agenda_natural_create_accepts_viva_prefix_and_only_hour():
+    payload = parse_agenda_natural_create("viva marque na agenda teste com a nega as 17 horas")
+    assert payload is not None
+    assert payload.get("error") is None
+    title = str(payload.get("title", "")).lower()
+    assert "teste" in title
+    assert "nega" in title
+    date_time = payload.get("date_time")
+    assert isinstance(date_time, datetime)
+    assert date_time.hour == 17
+    assert date_time.minute == 0
+
+
 @pytest.mark.asyncio
 async def test_domain_router_returns_client_detail_with_real_fields(monkeypatch):
     class _FakeClienteService:

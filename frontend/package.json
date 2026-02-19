@@ -6,6 +6,7 @@
     "dev": "next dev",
     "clean:next": "node -e \"require('fs').rmSync('.next',{ recursive: true, force: true }); console.log('cleaned .next')\"",
     "dev:reset": "npm run clean:next && next dev",
+    "smoke:routes": "node scripts/smoke-routes.cjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

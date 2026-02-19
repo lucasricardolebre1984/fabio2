@@ -149,6 +149,8 @@ def parse_agenda_command(message: str) -> Optional[Dict[str, Any]]:
     if not text:
         return None
 
+    # Permite wake-word no inicio sem quebrar comandos de agenda.
+    text = re.sub(r"(?i)^\s*viva\b[:,]?\s*", "", text).strip()
     lower = text.lower()
     if not (
         lower.startswith("agendar")
@@ -377,6 +379,8 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
     if not raw:
         return None
 
+    # Permite wake-word no inicio sem atrapalhar reconhecimento natural.
+    raw = re.sub(r"(?i)^\s*viva\b[:,]?\s*", "", raw).strip()
     normalized = _normalize_key(raw)
     if not _has_create_imperative(normalized):
         return None
@@ -433,29 +437,34 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
             else:
                 relative_delta = timedelta(minutes=amount)
 
+    explicit_time_detected = False
     hh_mm_match = re.search(r"\b(\d{1,2}):(\d{2})\b", raw)
     if hh_mm_match:
         hour = int(hh_mm_match.group(1))
         minute = int(hh_mm_match.group(2))
         time_token = hh_mm_match.group(0)
+        explicit_time_detected = True
     else:
         short_hour_match = re.search(r"\b(?:as|a|s)\s*(\d{1,2})(?:h(\d{2})?)?\b", normalized)
         if short_hour_match:
             hour = int(short_hour_match.group(1))
             minute = int(short_hour_match.group(2)) if short_hour_match.group(2) else 0
             time_token = ""
+            explicit_time_detected = True
         else:
             compact_hour_match = re.search(r"(?i)\b(\d{1,2})h(\d{2})?\b", raw)
             if compact_hour_match:
                 hour = int(compact_hour_match.group(1))
                 minute = int(compact_hour_match.group(2)) if compact_hour_match.group(2) else 0
                 time_token = compact_hour_match.group(0)
+                explicit_time_detected = True
             else:
                 fallback_hour_match = re.search(r"\b(\d{1,2})(?:h(\d{2})?)?\b", normalized)
                 if fallback_hour_match and (has_tomorrow_hint or has_today_hint):
                     hour = int(fallback_hour_match.group(1))
                     minute = int(fallback_hour_match.group(2)) if fallback_hour_match.group(2) else 0
                     time_token = ""
+                    explicit_time_detected = True
                 else:
                     if relative_delta is None:
                         return {"error": "Data/hora invalida"}
@@ -483,6 +492,16 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
         date_time = _now_brt() + relative_delta
         date_time = date_time.replace(second=0, microsecond=0)
     else:
+        # Se o operador informou apenas horario (sem data), assume hoje;
+        # caso horario ja tenha passado e nao tenha "hoje", agenda para amanha.
+        if date_value is None and explicit_time_detected:
+            now_brt = _now_brt()
+            candidate = now_brt.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            if not has_today_hint and candidate < now_brt:
+                date_value = now_brt + timedelta(days=1)
+            else:
+                date_value = now_brt
+
         if not date_value:
             return {"error": "Data/hora invalida"}
         date_time = date_value.replace(hour=hour, minute=minute, second=0, microsecond=0)

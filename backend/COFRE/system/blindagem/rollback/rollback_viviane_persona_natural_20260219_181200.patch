@@ -1,0 +1,555 @@
+diff --git a/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md b/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
+deleted file mode 100644
+index 8e2873f..0000000
+--- a/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
++++ /dev/null
+@@ -1,40 +0,0 @@
+-# BLINDAGEM - Indice Canonico (COFRE)
+-
+-Atualizado em: 2026-02-19
+-
+-Este arquivo centraliza os artefatos institucionais de blindagem para homologacao.
+-
+-## Auditorias
+-- `backend/COFRE/system/blindagem/audit/API_DOCS_ENDPOINT_DRIFT_2026-02-18.md`
+-- `backend/COFRE/system/blindagem/audit/DOCS_AUDIT_2026-02-16.md`
+-- `backend/COFRE/system/blindagem/audit/DOMAIN_GROUPING_2026-02-16.md`
+-- `backend/COFRE/system/blindagem/audit/lighthouse-agenda-route.json`
+-- `backend/COFRE/system/blindagem/audit/lighthouse-a11y-agenda.json`
+-- `backend/COFRE/system/blindagem/audit/lighthouse-a11y-root.json`
+-- `backend/COFRE/system/blindagem/audit/lighthouse-a11y-root-after.json`
+-- `backend/COFRE/system/blindagem/audit/lighthouse-a11y-root-final.json`
+-- `backend/COFRE/system/blindagem/audit/lighthouse-a11y-viva.json`
+-- `backend/COFRE/system/blindagem/audit/lighthouse-a11y-whatsapp.json`
+-- `backend/COFRE/system/blindagem/audit/lighthouse-a11y-whatsapp-conversas.json`
+-- `backend/COFRE/system/blindagem/audit/lighthouse-login.json`
+-- `backend/COFRE/system/blindagem/audit/menu-endpoint-matrix.json`
+-- `backend/COFRE/system/blindagem/audit/menu-endpoint-matrix.md`
+-- `backend/COFRE/system/blindagem/audit/runtime-fastapi-routes.json`
+-- `backend/COFRE/system/blindagem/audit/WEB_QUALITY_AUDIT_2026-02-16.md`
+-- `backend/COFRE/system/blindagem/audit/A11Y_VIVIANE_STATUS_2026-02-19.md`
+-- `backend/COFRE/system/blindagem/audit/api-proof-2026-02-19.json`
+-- `backend/COFRE/system/blindagem/audit/docker-compose.resolved.yml`
+-- `backend/COFRE/system/blindagem/audit/HOMOLOG_PRE_AWS_2026-02-19.md`
+-- `backend/COFRE/system/blindagem/audit/VIVIANE_HUMANIZATION_2026-02-19.md`
+-- `backend/COFRE/system/blindagem/audit/VIVIANE_PERSONA_NATURAL_PATCH_2026-02-19.md`
+-
+-## Rollbacks
+-- `backend/COFRE/system/blindagem/rollback/rollback_gate2_cca7e3d.patch`
+-- `backend/COFRE/system/blindagem/rollback/rollback_gate_layout_viva_20260219_135831.patch`
+-- `backend/COFRE/system/blindagem/rollback/rollback_whatsapp_lid_guard_20260219_155732.patch`
+-- `backend/COFRE/system/blindagem/rollback/rollback_full_homolog_20260219_180518.patch`
+-
+-## Regra
+-- Novos relatorios de auditoria devem entrar em `backend/COFRE/system/blindagem/audit/`.
+-- Novos patches de rollback devem entrar em `backend/COFRE/system/blindagem/rollback/`.
+-- Nao manter artefatos de blindagem fora do COFRE.
+diff --git a/backend/COFRE/system/blindagem/audit/VIVIANE_PERSONA_NATURAL_PATCH_2026-02-19.md b/backend/COFRE/system/blindagem/audit/VIVIANE_PERSONA_NATURAL_PATCH_2026-02-19.md
+deleted file mode 100644
+index 2e23bb0..0000000
+--- a/backend/COFRE/system/blindagem/audit/VIVIANE_PERSONA_NATURAL_PATCH_2026-02-19.md
++++ /dev/null
+@@ -1,60 +0,0 @@
+-# AUDITORIA E BLINDAGEM - VIVIANE PERSONA NATURAL
+-
+-Data: 2026-02-19
+-Escopo: backend VIVA/Viviane (WhatsApp), blindagem COFRE e validacao de regressao.
+-
+-## Resumo Executivo
+-- Patch de humanizacao aplicado para reduzir insistencia e manter contexto.
+-- Fluxo reforcado para perguntas sociais/identidade durante qualificacao (sem travar).
+-- Guardrail de descompressao adicionado quando usuario demonstra frustracao.
+-- Blindagem conferida em `backend/COFRE/system/blindagem` (audit + rollback).
+-
+-## Estado do Repositorio (antes do commit)
+-- Branch: `main`
+-- Remote: `origin` -> `https://github.com/lucasricardolebre1984/fabio2.git`
+-- Worktree: com mudancas acumuladas de auditoria/hardening e este patch atual.
+-
+-## Ajustes Aplicados no Patch Atual
+-Arquivo principal:
+-- `backend/app/services/viva_ia_service.py`
+-
+-Mudancas:
+-- Novo modo de conversa em contexto: `conversation_mode` (`qualificacao`/`descompressao`).
+-- Novo detector de pergunta social de identidade: `_is_social_identity_question`.
+-- Novo detector de frustracao de usuario: `_is_user_frustrated`.
+-- Resposta de descompressao para evitar repeticao agressiva: `_build_decompression_reply`.
+-- Em `fase == aguardando_nome`, se usuario perguntar "e voce/qual seu nome", responder naturalmente e seguir coleta.
+-- Em casos de frustracao + faltantes, priorizar resposta curta, direta e opcao de handoff humano.
+-
+-Arquivo de testes atualizado:
+-- `backend/tests/test_viviane_humanizacao.py`
+-
+-Novos testes:
+-- `test_social_identity_question_detected`
+-- `test_user_frustration_detected`
+-- `test_decompression_reply_offers_human_handoff`
+-
+-## Validacao Executada
+-Comando:
+-- `PYTHONPATH=. pytest tests/test_viva_domain_intents.py tests/test_viviane_humanizacao.py -q`
+-
+-Resultado:
+-- `24 passed, 5 warnings`
+-- Warnings: deprecacao do Pydantic v2 (`ConfigDict`), sem falha funcional.
+-
+-## Blindagem Conferida
+-Diretorio canonico:
+-- `backend/COFRE/system/blindagem/`
+-
+-Subpastas e conteudo:
+-- `audit/` com evidencias de qualidade (Lighthouse, rotas, matriz menu-endpoint, homolog pre-AWS).
+-- `rollback/` com patches de reversao versionados.
+-- `BLINDAGEM_INDEX.md` como indice institucional.
+-
+-## Proximo Passo de Seguranca
+-- Gerar novo rollback patch do estado a ser commitado e registrar em:
+-  - `backend/COFRE/system/blindagem/rollback/rollback_viviane_persona_natural_20260219_180518.patch`
+-
+-## Skills Operadas nesta etapa
+-- `coding-guidelines`: alteracoes cirurgicas no backend e testes.
+-- `docs-writer`: documentacao de auditoria/blindagem no COFRE.
+diff --git a/backend/app/services/viva_ia_service.py b/backend/app/services/viva_ia_service.py
+index b5c03cc..eff81a5 100644
+--- a/backend/app/services/viva_ia_service.py
++++ b/backend/app/services/viva_ia_service.py
+@@ -32,9 +32,6 @@ PERSONA E TOM:
+ - Evite cliches e respostas enlatadas.
+ - Responda de forma curta (1 a 4 linhas), com uma pergunta por vez.
+ - Se o cliente estiver formal, pode usar resposta mais completa com resumo.
+-- Priorize naturalidade: responda primeiro ao que o cliente acabou de perguntar.
+-- Evite insistencia: nao repetir a mesma pergunta de cadastro em toda mensagem.
+-- Se o cliente demonstrar cansaco/desinteresse, desacelere e ofereca saida elegante.
+ 
+ FLUXO COMERCIAL OBRIGATORIO:
+ 1) Objetivo do cliente.
+@@ -145,35 +142,6 @@ ESCALA PARA HUMANO:
+             "vamos pagar",
+         }
+ 
+-        self.disengage_keywords = {
+-            "nao quero mais",
+-            "não quero mais",
+-            "vou procurar outra empresa",
+-            "vou procurar outra",
+-            "pode cancelar",
+-            "cancela",
+-            "encerrar atendimento",
+-            "nao tenho interesse",
+-            "não tenho interesse",
+-            "desisto",
+-        }
+-
+-        self.frustration_keywords = {
+-            "insistente",
+-            "insistente",
+-            "enrolando",
+-            "nao enrola",
+-            "não enrola",
+-            "nao invente",
+-            "não invente",
+-            "voce nao sabe",
+-            "você não sabe",
+-            "isso e robo",
+-            "isso é robô",
+-            "parece robo",
+-            "parece robô",
+-        }
+-
+         self.urgency_patterns = {
+             "alta": ("urgente", "hoje", "agora", "imediato", "imediata"),
+             "media": ("essa semana", "rapido", "rápido", "breve"),
+@@ -199,7 +167,6 @@ ESCALA PARA HUMANO:
+             lead.pop("nome", None)
+             if contexto.get("fase") == "atendimento":
+                 contexto["fase"] = "aguardando_nome"
+-        contexto.setdefault("conversation_mode", "qualificacao")
+ 
+         self._atualizar_dados_lead(lead=lead, texto_original=mensagem, texto_normalizado=texto)
+         service_info = viva_knowledge_service.find_service_from_message(mensagem)
+@@ -218,24 +185,9 @@ ESCALA PARA HUMANO:
+             await db.commit()
+             return resposta
+ 
+-        if self._is_disengage_intent(texto):
+-            if self._tem_objeccao_financeira(texto):
+-                contexto["motivo_nao_fechamento"] = "financeiro"
+-            else:
+-                contexto["motivo_nao_fechamento"] = "desistencia"
+-            contexto["status_followup"] = "encerrado"
+-            contexto["lead"] = lead
+-            conversa.contexto_ia = contexto
+-            await db.commit()
+-            return (
+-                "Entendo e respeito sua decisao. Obrigada pelo seu tempo. "
+-                "Se mudar de ideia, eu te atendo por aqui sem burocracia."
+-            )
+-
+         if self._deve_escalar_para_humano(texto):
+             contexto["lead"] = lead
+             contexto["ultima_escala"] = datetime.now(timezone.utc).isoformat()
+-            contexto["conversation_mode"] = "descompressao"
+             conversa.contexto_ia = contexto
+             await db.commit()
+             return (
+@@ -264,7 +216,6 @@ ESCALA PARA HUMANO:
+                 lead["nome"] = nome
+                 contexto["nome_cliente"] = nome
+                 contexto["fase"] = "atendimento"
+-                contexto["conversation_mode"] = "qualificacao"
+                 contexto["lead"] = lead
+                 conversa.nome_contato = nome
+                 conversa.contexto_ia = contexto
+@@ -273,43 +224,8 @@ ESCALA PARA HUMANO:
+                     f"Prazer, {nome}! Sou a Viviane, consultora de negocios da Rezeta. "
+                     "Me conta seu objetivo para eu te ajudar da melhor forma."
+                 )
+-            if self._is_social_identity_question(texto):
+-                contexto["lead"] = lead
+-                contexto["conversation_mode"] = "descompressao"
+-                conversa.contexto_ia = contexto
+-                await db.commit()
+-                return (
+-                    "Sou a Viviane, consultora de negocios da Rezeta. "
+-                    "Para seguir seu atendimento certinho, me diz seu nome."
+-                )
+             return "Me diz seu nome, por favor, para eu seguir com seu atendimento."
+ 
+-        if self._is_who_am_i_query(texto):
+-            contexto["lead"] = lead
+-            conversa.contexto_ia = contexto
+-            await db.commit()
+-            return self._build_known_identity_reply(lead=lead, fallback_phone=self._format_phone(numero))
+-
+-        if self._eh_saudacao_curta(texto):
+-            contexto["lead"] = lead
+-            conversa.contexto_ia = contexto
+-            await db.commit()
+-            nome = str(lead.get("nome") or contexto.get("nome_cliente") or "").strip()
+-            if nome:
+-                return f"Oi, {nome}! Tudo bem? Estou por aqui para te ajudar no que voce precisar."
+-            return "Oi! Tudo bem? Estou por aqui para te ajudar no que voce precisar."
+-
+-        if self._is_price_question(texto):
+-            known_service = service_info or viva_knowledge_service.find_service_from_message(str(lead.get("servico") or ""))
+-            if known_service:
+-                contexto["lead"] = lead
+-                conversa.contexto_ia = contexto
+-                await db.commit()
+-                return (
+-                    f"A faixa inicial de {known_service.name} e {known_service.price_label}. "
+-                    "Se quiser, te explico em 1 minuto como funciona o processo."
+-                )
+-
+         if self._tem_objeccao_financeira(texto):
+             contexto["motivo_nao_fechamento"] = "financeiro"
+             contexto["status_followup"] = "pendente"
+@@ -339,26 +255,10 @@ ESCALA PARA HUMANO:
+             )
+ 
+         faltantes = self._lead_missing_fields(lead)
+-        primeiro_faltante = faltantes[0] if faltantes else None
+-        if primeiro_faltante:
+-            last_field = str(contexto.get("last_missing_field") or "")
+-            streak = int(contexto.get("missing_field_streak") or 0)
+-            contexto["missing_field_streak"] = streak + 1 if last_field == primeiro_faltante else 1
+-            contexto["last_missing_field"] = primeiro_faltante
+-        else:
+-            contexto["missing_field_streak"] = 0
+-            contexto["last_missing_field"] = ""
+-        if self._is_user_frustrated(texto):
+-            contexto["conversation_mode"] = "descompressao"
+-        elif not faltantes:
+-            contexto["conversation_mode"] = "qualificacao"
+         contexto["lead"] = lead
+         conversa.contexto_ia = contexto
+         await db.commit()
+ 
+-        if faltantes and self._is_user_frustrated(texto):
+-            return self._build_decompression_reply(lead=lead, faltantes=faltantes)
+-
+         historico = await self._get_historico(conversa, db)
+         formal = self._eh_formal(texto)
+         messages = self._montar_contexto(
+@@ -368,15 +268,12 @@ ESCALA PARA HUMANO:
+             lead=lead,
+             service_info=service_info,
+             faltantes=faltantes,
+-            missing_field_streak=int(contexto.get("missing_field_streak") or 0),
+-            last_missing_field=str(contexto.get("last_missing_field") or ""),
+         )
+         resposta_modelo = await self._chamar_glm(messages, formal=formal)
+         return self._garantir_resposta_texto(
+             resposta_modelo,
+             faltantes=faltantes,
+             lead=lead,
+-            missing_field_streak=int(contexto.get("missing_field_streak") or 0),
+         )
+ 
+     def _normalizar(self, texto: str) -> str:
+@@ -430,70 +327,9 @@ ESCALA PARA HUMANO:
+             return False
+         return any(keyword in texto for keyword in self.handoff_keywords)
+ 
+-    def _is_disengage_intent(self, texto: str) -> bool:
+-        if not texto:
+-            return False
+-        return any(keyword in texto for keyword in self.disengage_keywords)
+-
+-    def _is_who_am_i_query(self, texto: str) -> bool:
+-        if not texto:
+-            return False
+-        patterns = (
+-            "sabe quem sou eu",
+-            "quem sou eu",
+-            "voce sabe quem eu sou",
+-            "você sabe quem eu sou",
+-            "ja sabe quem sou",
+-            "já sabe quem sou",
+-        )
+-        return any(pattern in texto for pattern in patterns)
+-
+-    def _is_social_identity_question(self, texto: str) -> bool:
+-        if not texto:
+-            return False
+-        patterns = (
+-            "e voce",
+-            "e você",
+-            "qual seu nome",
+-            "qual o seu nome",
+-            "como voce se chama",
+-            "como você se chama",
+-            "e o seu",
+-        )
+-        return any(pattern in texto for pattern in patterns)
+-
+-    def _is_price_question(self, texto: str) -> bool:
+-        if not texto:
+-            return False
+-        patterns = (
+-            "qual o valor",
+-            "qual e o valor",
+-            "quanto custa",
+-            "preco",
+-            "preço",
+-            "valor do",
+-            "valor da",
+-        )
+-        return any(pattern in texto for pattern in patterns)
+-
+-    def _build_known_identity_reply(self, lead: Dict[str, str], fallback_phone: str) -> str:
+-        nome = str(lead.get("nome") or "").strip() or "sem nome confirmado"
+-        telefone = str(lead.get("telefone") or "").strip() or fallback_phone or "-"
+-        servico = str(lead.get("servico") or "").strip() or "ainda nao definido"
+-        return (
+-            f"Tenho voce cadastrada como \"{nome}\" "
+-            f"(telefone {telefone}, servico {servico}). "
+-            "Se quiser, atualizo algum dado agora."
+-        )
+-
+     def _tem_objeccao_financeira(self, texto: str) -> bool:
+         return any(keyword in texto for keyword in self.financial_objection_keywords)
+ 
+-    def _is_user_frustrated(self, texto: str) -> bool:
+-        if not texto:
+-            return False
+-        return any(keyword in texto for keyword in self.frustration_keywords)
+-
+     def _tem_intencao_fechamento(self, texto: str) -> bool:
+         return any(keyword in texto for keyword in self.close_intent_keywords)
+ 
+@@ -519,23 +355,13 @@ ESCALA PARA HUMANO:
+         padroes = [
+             r"meu nome e\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+             r"eu sou\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+-            r"sou o\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+-            r"sou a\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+             r"sou\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+             r"aqui e\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+-            r"^\s*([a-zA-ZÀ-ÿ]{2,30})\s+(?:qual|e voce|e você|e o seu|e o seu nome)",
+-            r"^\s*([a-zA-ZÀ-ÿ]{2,30})\s*$",
+         ]
+         for padrao in padroes:
+             match = re.search(padrao, texto, flags=re.IGNORECASE)
+             if match:
+-                candidato = re.sub(
+-                    r"\b(e\s+voce|e\s+você|qual\s+o\s+seu(?:\s+nome)?|qual\s+o\s+seu)\b.*$",
+-                    "",
+-                    match.group(1),
+-                    flags=re.IGNORECASE,
+-                )
+-                return self._limpar_nome(candidato)
++                return self._limpar_nome(match.group(1))
+         return self._limpar_nome(texto)
+ 
+     def _limpar_nome(self, valor: str) -> Optional[str]:
+@@ -578,7 +404,6 @@ ESCALA PARA HUMANO:
+         resposta: object,
+         faltantes: List[str],
+         lead: Dict[str, str],
+-        missing_field_streak: int = 0,
+     ) -> str:
+         """Garante resposta textual valida para envio no WhatsApp."""
+         texto = resposta.strip() if isinstance(resposta, str) else ""
+@@ -595,16 +420,6 @@ ESCALA PARA HUMANO:
+             }
+             campo = labels.get(faltantes[0], faltantes[0])
+             servico = str(lead.get("servico") or "").strip()
+-            if missing_field_streak >= 3:
+-                if servico:
+-                    return (
+-                        f"Sem pressa. Se fizer sentido para voce, seguimos seu caso de {servico} no seu tempo. "
+-                        f"Quando quiser, me passa {campo}."
+-                    )
+-                return (
+-                    "Sem pressa. Se quiser continuar depois, eu te ajudo daqui. "
+-                    f"Quando quiser, me passa {campo}."
+-                )
+             if servico:
+                 return (
+                     f"Perfeito. No seu caso de {servico}, "
+@@ -617,29 +432,6 @@ ESCALA PARA HUMANO:
+             "Me conta em uma frase seu objetivo para eu te orientar agora."
+         )
+ 
+-    def _build_decompression_reply(self, lead: Dict[str, str], faltantes: List[str]) -> str:
+-        servico = str(lead.get("servico") or "").strip()
+-        campo = faltantes[0] if faltantes else "seu objetivo"
+-        labels = {
+-            "nome": "seu nome",
+-            "telefone": "seu telefone com DDD",
+-            "servico": "o servico desejado",
+-            "cidade": "sua cidade",
+-            "urgencia": "sua urgencia",
+-        }
+-        campo_label = labels.get(campo, campo)
+-        if servico:
+-            return (
+-                f"Sem problema, vamos direto no seu caso de {servico}. "
+-                f"Se quiser seguir agora, so me confirma {campo_label}. "
+-                "Se preferir, te passo para atendimento humano."
+-            )
+-        return (
+-            "Sem problema, vamos direto. "
+-            f"Se quiser seguir agora, so me confirma {campo_label}. "
+-            "Se preferir, te passo para atendimento humano."
+-        )
+-
+     def _resposta_modelo_valida(self, texto: str) -> bool:
+         """Descarta saidas tecnicas/meta que nao devem ir para o cliente."""
+         if not texto:
+@@ -728,8 +520,6 @@ ESCALA PARA HUMANO:
+         lead: Dict[str, str],
+         service_info: Optional[ServiceInfo],
+         faltantes: List[str],
+-        missing_field_streak: int = 0,
+-        last_missing_field: str = "",
+     ) -> List[Dict[str, str]]:
+         """Monta contexto completo para o modelo."""
+         contexto_cliente = f"Cliente em atendimento: {nome_cliente}." if nome_cliente else ""
+@@ -756,20 +546,13 @@ ESCALA PARA HUMANO:
+                 f"Tipo do servico: {tipo}."
+             )
+ 
+-        insistencia_block = (
+-            f"Nivel de repeticao da mesma pendencia: {missing_field_streak} "
+-            f"(campo atual: {last_missing_field or '-'})"
+-        )
+-
+         dynamic_rules = (
+             "TABELA DE SERVICOS (faixa inicial com margem de 15%):\n"
+             f"{viva_knowledge_service.prices_prompt_block()}\n\n"
+             "Diretriz de proposta:\n"
+             "- Para servicos simples (Limpa Nome, Score, Rating), pode conduzir venda direta.\n"
+             "- Para servicos complexos, orientar e encaminhar fechamento humano no momento certo.\n"
+-            "- Diagnostico 360 deve ser sugerido como primeiro passo, salvo excecao de servico simples.\n"
+-            "- Responda primeiro ao que o cliente perguntou agora; depois conduza o proximo passo.\n"
+-            "- Se a mesma pendencia ja foi solicitada 2+ vezes, nao insistir de forma repetitiva."
++            "- Diagnostico 360 deve ser sugerido como primeiro passo, salvo excecao de servico simples."
+         )
+         if viva_knowledge_service.services_text:
+             dynamic_rules = (
+@@ -781,7 +564,7 @@ ESCALA PARA HUMANO:
+         system = (
+             f"{self.base_system_prompt}\n\n"
+             f"{dynamic_rules}\n\n"
+-            f"{contexto_cliente}\n{lead_block}\n{faltantes_block}\n{selected_service_block}\n{insistencia_block}"
++            f"{contexto_cliente}\n{lead_block}\n{faltantes_block}\n{selected_service_block}"
+         )
+ 
+         messages = [{"role": "system", "content": system}]
+diff --git a/backend/tests/test_viviane_humanizacao.py b/backend/tests/test_viviane_humanizacao.py
+deleted file mode 100644
+index 0895f33..0000000
+--- a/backend/tests/test_viviane_humanizacao.py
++++ /dev/null
+@@ -1,68 +0,0 @@
+-from app.services.viva_ia_service import VivaIAService
+-
+-
+-def test_disengage_intent_detected():
+-    service = VivaIAService()
+-    assert service._is_disengage_intent("vc e muito insistente nao quero mais vou procurar outra empresa")
+-
+-
+-def test_who_am_i_reply_contains_known_data():
+-    service = VivaIAService()
+-    lead = {
+-        "nome": "Teste Webhook Lid",
+-        "telefone": "55223927414591688",
+-        "servico": "Limpa Nome Standart",
+-    }
+-    text = service._build_known_identity_reply(lead=lead, fallback_phone="5516999999999")
+-    assert "Teste Webhook Lid" in text
+-    assert "55223927414591688" in text
+-    assert "Limpa Nome Standart" in text
+-
+-
+-def test_price_question_detected():
+-    service = VivaIAService()
+-    assert service._is_price_question("qual e o valor do limpa nome?")
+-    assert service._is_price_question("quanto custa o servico?")
+-
+-
+-def test_fallback_reduces_insistence_when_missing_field_repeats():
+-    service = VivaIAService()
+-    resposta = service._garantir_resposta_texto(
+-        resposta="",
+-        faltantes=["cidade"],
+-        lead={"servico": "Limpa Nome"},
+-        missing_field_streak=3,
+-    )
+-    assert "Sem pressa" in resposta
+-    assert "Quando quiser" in resposta
+-
+-
+-def test_extract_name_from_natural_intro_with_question():
+-    service = VivaIAService()
+-    assert service._extrair_nome("Sou o Ricardo e você ?") == "Ricardo"
+-
+-
+-def test_extract_name_from_short_turn_with_question():
+-    service = VivaIAService()
+-    assert service._extrair_nome("Ricardo qual o seu ?") == "Ricardo"
+-
+-
+-def test_social_identity_question_detected():
+-    service = VivaIAService()
+-    assert service._is_social_identity_question("sou o Ricardo e você?")
+-    assert service._is_social_identity_question("Ricardo qual o seu nome?")
+-
+-
+-def test_user_frustration_detected():
+-    service = VivaIAService()
+-    assert service._is_user_frustrated("viva nao enrola, voce ta insistente")
+-
+-
+-def test_decompression_reply_offers_human_handoff():
+-    service = VivaIAService()
+-    reply = service._build_decompression_reply(
+-        lead={"servico": "Limpa Nome"},
+-        faltantes=["cidade"],
+-    )
+-    assert "Sem problema" in reply
+-    assert "atendimento humano" in reply

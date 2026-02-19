@@ -103,6 +103,8 @@
 | BUG-119 | Alta | Backend/Security | Fluxo real de auth ainda importa `security_stub` com senha dev `1234` | Aberto |
 | BUG-120 | Media | Backend/CORS | CORS excessivamente amplo (`allow_methods=*`, `allow_headers=*`) | Aberto |
 | BUG-121 | Alta | VIVA/Agenda NLU | Comando com "coloque na agenda ... verifique se Google Calendar ..." caia em consulta e nao criava evento | Resolvido |
+| BUG-122 | Alta | WhatsApp/Webhook | Conversas recebidas com `@lid` eram marcadas como nao entregaveis (`exists:false`) e bloqueavam resposta automatica da VIVA | Resolvido |
+| BUG-123 | Alta | VIVA/Agenda NLU | Comando natural sem data explicita (`viva marque ... as 17 horas`) falhava com pedido de data/hora e quebrava fluxo operacional | Resolvido |
 
 ---
 
@@ -212,6 +214,46 @@
   - resumo agora retorna cadastro real + contratos ativos (cancelados excluidos da lista ativa).
 - validacao tecnica:
   - `python -m pytest tests/test_viva_domain_intents.py -q` (em `backend/`) => OK
+
+### Atualizacao 2026-02-19 (BUG-122 - WhatsApp `@lid` sem resposta)
+- backend:
+  - `backend/app/services/evolution_webhook_service.py`
+  - `backend/app/services/whatsapp_service.py`
+- causa raiz:
+  - mensagens inbound com `remoteJid` no formato `@lid` entravam no envio outbound como numero invalido (ou ficavam bloqueadas por `non_deliverable_number=true` legado), gerando `exists:false` e silencio no WhatsApp.
+- ajustes aplicados:
+  - webhook passou a preservar `remoteJid` e `pushName` no fluxo de resposta;
+  - envio do WhatsApp ganhou fallback de resolucao `@lid -> @s.whatsapp.net` via `POST /chat/findContacts/{instance}` quando houver match confiavel por nome;
+  - fallback agora aceita numero preferencial de contexto (`resolved_whatsapp_number` / `lead.telefone`) para qualquer lead, sem hardcode por contato;
+  - webhook passa a tentar enriquecer contexto de resolucao `@lid` por:
+    - numero informado pelo usuario em texto (quando houver marcador de telefone/whatsapp),
+    - telefone de contexto de lead,
+    - cadastro de cliente (match unico por nome);
+  - bloqueio legado `non_deliverable_number` agora e limpo automaticamente quando chega nova mensagem `@lid`;
+  - flag de `non_deliverable_number` nao e mais gravada para destino `@lid` (evita bloqueio permanente indevido).
+- validacao tecnica:
+  - `python -m py_compile /app/app/services/whatsapp_service.py /app/app/services/evolution_webhook_service.py` (container `fabio2-backend`) => OK
+  - POST de teste em `POST /api/v1/webhook/evolution` com `remoteJid=223927414591688@lid` => mensagem usuario + resposta IA persistidas com `enviada=true` apos bind contextual.
+
+### Atualizacao 2026-02-19 (BUG-123 - Agenda natural com hora sem data)
+- backend:
+  - `backend/app/services/viva_agenda_nlu_service.py`
+  - `backend/tests/test_viva_domain_intents.py`
+- causa raiz:
+  - parser `parse_agenda_natural_create` exigia data explicita (`hoje/amanha/dd/mm`) para comandos com hora absoluta; frases validas de operador como `viva marque na agenda teste com a nega as 17 horas` retornavam erro `Data/hora invalida`.
+- ajustes aplicados:
+  - suporte a wake-word `viva` no inicio dos comandos de agenda (`parse_agenda_command` e `parse_agenda_natural_create`);
+  - quando houver horario explicito sem data, o parser assume:
+    - hoje, se o horario ainda nao passou;
+    - amanha, se o horario ja passou e nao houver indicacao de `hoje`.
+- blindagem de regressao:
+  - novo teste: `test_agenda_natural_create_accepts_viva_prefix_and_only_hour`.
+- validacao funcional:
+  - `POST /api/v1/viva/chat` com `viva marque na agenda teste com a nega as 17 horas` => `Agendamento criado com sucesso ... 17:00`;
+  - `POST /api/v1/viva/chat` com `viva quais compromissos na agenda hoje` => lista de compromissos retornada corretamente.
+- evidencias auxiliares:
+  - Playwright em `/agenda` sem falhas JS/network: `/tmp/agenda-page.png`;
+  - Lighthouse executado para `/agenda`: `docs/AUDIT/lighthouse-agenda-route.json` (com `FAILED_DOCUMENT_REQUEST` por rota autenticada em contexto sem sessao).
 
 ### BUG-107: Drift de memoria/persona fora da fonte canonica
 **Data:** 2026-02-16  
@@ -2324,3 +2366,22 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
 **Teste:**
 - `backend/tests/test_viva_domain_intents.py` adicionou caso de regressao para `coloque na agenda ... verifique se google ...` e passou (`pytest -q tests/test_viva_domain_intents.py`).
 **Status:** Resolvido
+
+### Atualizacao 2026-02-19 (BUG-122 - resolucao `@lid` generica para qualquer numero)
+- backend:
+  - `backend/app/services/whatsapp_service.py`
+  - `backend/tests/test_whatsapp_lid_resolution.py`
+- ajuste aplicado (blindagem adicional):
+  - resolucao `@lid` agora usa estrategia multipla, sem dependencia de um unico vinculo manual:
+    - candidato de contexto (`context_preferred_number`),
+    - `remoteJidAlt` quando presente,
+    - contatos por nome,
+    - chats por similaridade de nome + recencia (`/chat/findChats/{instance}`);
+  - cada candidato e validado em tempo real via `POST /chat/whatsappNumbers/{instance}` antes do envio;
+  - numeros improvaveis (ids longos de `@lid`) deixam de ser tratados como telefone valido.
+- regressao coberta:
+  - `test_resolve_lid_prefers_validated_preferred_number`
+  - `test_resolve_lid_ignores_invalid_preferred_and_uses_chat_similarity`
+- validacao tecnica:
+  - `pytest backend/tests/test_whatsapp_lid_resolution.py backend/tests/test_viva_domain_intents.py -q` => `17 passed`.
+  - validacao real de resolucao para `223927414591688@lid` retornou numero entregavel (`5516981903443`) sem bind manual.

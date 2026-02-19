@@ -1,0 +1,244 @@
+{
+  "generated_at": "2026-02-19T19:28:25.887296Z",
+  "checks": [
+    {
+      "endpoint": "/auth/login",
+      "status": 200
+    },
+    {
+      "endpoint": "/whatsapp/status",
+      "status": 200,
+      "payload": {
+        "conectado": true,
+        "estado": "open",
+        "numero": "5516997794167",
+        "nome_perfil": "Fábio D C Silva",
+        "instance_name": "fc-solucoes"
+      }
+    },
+    {
+      "endpoint": "/whatsapp-chat/status",
+      "status": 200,
+      "payload": {
+        "conversas_ativas": 5,
+        "mensagens_hoje": 18,
+        "status": "online"
+      }
+    },
+    {
+      "endpoint": "/viva/handoff",
+      "status": 200,
+      "payload": {
+        "items": [
+          {
+            "id": "7ee7889d-9582-43df-9616-d48931dbeb69",
+            "user_id": "95b4288e-91ee-4849-9faa-aebec1e988d0",
+            "agenda_event_id": null,
+            "cliente_nome": "Teste Cliente",
+            "cliente_numero": "16999999998",
+            "mensagem": "Teste de handoff vencido",
+            "scheduled_for": "2026-02-13T09:14:41.584755Z",
+            "status": "sent",
+            "attempts": 1,
+            "sent_at": "2026-02-13T09:16:41.632394Z",
+            "last_error": null,
+            "meta_json": {
+              "source": "bug64-proof"
+            },
+            "created_at": "2026-02-13T09:16:41.608485Z",
+            "updated_at": "2026-02-13T09:16:41.632394Z"
+          },
+          {
+            "id": "aeddabcb-42a5-4bde-b93e-7e89285de2d6",
+            "user_id": "95b4288e-91ee-4849-9faa-aebec1e988d0",
+            "agenda_event_id": "cbbf2f44-c0f7-47dd-a4ca-9ba8a1441c3e",
+            "cliente_nome": "Carlos",
+            "cliente_numero": "16999999999",
+            "mensagem": "Oi Carlos, aqui e a Viviane, secretaria da FC Solucoes Financeiras. Lembrete do seu compromisso: retorno com cliente Carlos e avise whatsapp 16999999999 em 14/02/2026 as 11:00. Se precisar remarcar, me responda por aqui.",
+            "scheduled_for": "2026-02-14T11:00:00Z",
+            "status": "sent",
+            "attempts": 1,
+            "sent_at": "2026-02-14T11:00:25.498998Z",
+            "last_error": null,
+            "meta_json": {
+              "source": "viva_chat",
+              "session_id": "584ec178-7686-419c-940d-d547082e4b09"
+            },
+            "created_at": "2026-02-13T09:16:38.616550Z",
+            "updated_at": "2026-02-14T11:00:25.498998Z"
+          },
+          {
+            "id": "4098f1c4-6a4f-43db-bbc4-50c98fe0ab8a",
+            "user_id": "95b4288e-91ee-4849-9faa-aebec1e988d0",
+            "agenda_event_id": null,
+            "cliente_nome": "Cliente Teste",
+            "cliente_numero": "11999900000",
+            "mensagem": "Lembrete de teste da Viviane",
+            "scheduled_for": "2026-02-11T13:30:00Z",
+            "status": "sent",
+            "attempts": 1,
+            "sent_at": "2026-02-11T13:30:17.469912Z",
+            "last_error": null,
+            "meta_json": {
+              "source": "smoke"
+            },
+            "created_at": "2026-02-10T21:12:17.373031Z",
+            "updated_at": "2026-02-11T13:30:17.469912Z"
+          },
+          {
+            "id": "31150980-4e84-41a8-aa83-dbf89c034047",
+            "user_id": "95b4288e-91ee-4849-9faa-aebec1e988d0",
+            "agenda_event_id": "7ce5e9f8-037c-46f4-b363-cfa3293e536c",
+            "cliente_nome": "Carlos",
+            "cliente_numero": "11999558877",
+            "mensagem": "Oi Carlos, aqui e a Viviane, secretaria da FC Solucoes Financeiras. Lembrete do seu compromisso: retorno cliente Carlos e avisar no whatsapp 11999558877 com texto: Carlos, lembrete da nossa reuniao agora . em 10/02/2026 as 18:20. Se precisar remarcar, me responda por aqui.",
+            "scheduled_for": "2026-02-10T18:20:00Z",
+            "status": "sent",
+            "attempts": 1,
+            "sent_at": "2026-02-10T19:30:34.763345Z",
+            "last_error": null,
+            "meta_json": {
+              "source": "viva_chat",
+              "session_id": "cd3a91d3-c4fb-46f2-81b3-7e25ac10388c"
+            },
+            "created_at": "2026-02-10T19:30:14.108781Z",
+            "updated_at": "2026-02-10T19:30:34.763345Z"
+          },
+          {
+            "id": "c8439913-c276-4956-92a0-506ab1bcede7",
+            "user_id": "95b4288e-91ee-4849-9faa-aebec1e988d0",
+            "agenda_event_id": "0a92b368-260e-4c95-af06-a3b8d679afd1",
+            "cliente_nome": "Carlos",
+            "cliente_numero": "11999558877",
+            "mensagem": "Oi Carlos, aqui e a Viviane, secretaria da FC Solucoes Financeiras. Lembrete do seu compromisso: retorno cliente Carlos e avisar no whatsapp 11999558877 com texto: Carlos, lembrete da nossa reuniao agora . em 10/02/2026 as 18:10. Se precisar remarcar, me responda por aqui.",
+            "scheduled_for": "2026-02-10T18:10:00Z",
+            "status": "sent",
+            "attempts": 1,
+            "sent_at": "2026-02-10T19:28:19.248128Z",
+            "last_error": null,
+            "meta_json": {
+              "source": "viva_chat",
+              "session_id": "cd3a91d3-c4fb-46f2-81b3-7e25ac10388c"
+            },
+            "created_at": "2026-02-10T19:28:13.393012Z",
+            "updated_at": "2026-02-10T19:28:19.248128Z"
+          },
+          {
+            "id": "b020ec6e-726b-4163-91e7-64b63f471f8f",
+            "user_id": "95b4288e-91ee-4849-9faa-aebec1e988d0",
+            "agenda_event_id": null,
+            "cliente_nome": "Carlos",
+            "cliente_numero": "16999998888",
+            "mensagem": "Teste worker automatico",
+            "scheduled_for": "2026-02-10T19:22:34.093831Z",
+            "status": "sent",
+            "attempts": 1,
+            "sent_at": "2026-02-10T19:23:42.594122Z",
+            "last_error": null,
+            "meta_json": {},
+            "created_at": "2026-02-10T19:23:34.138008Z",
+            "updated_at": "2026-02-10T19:23:42.594122Z"
+          },
+          {
+            "id": "eae29a9b-5416-4f14-9354-639dec986331",
+            "user_id": "95b4288e-91ee-4849-9faa-aebec1e988d0",
+            "agenda_event_id": null,
+            "cliente_nome": "Joao",
+            "cliente_numero": "16999998888",
+            "mensagem": "Teste de handoff automatico VIVA -> Viviane",
+            "scheduled_for": "2026-02-10T19:11:26.149822Z",
+            "status": "sent",
+            "attempts": 1,
+            "sent_at": "2026-02-10T19:13:26.227954Z",
+            "last_error": null,
+            "meta_json": {},
+            "created_at": "2026-02-10T19:13:26.190932Z",
+            "updated_at": "2026-02-10T19:13:26.227954Z"
+          },
+          {
+            "id": "d2bc66ca-91d8-426a-b529-56a0565ef261",
+            "user_id": "95b4288e-91ee-4849-9faa-aebec1e988d0",
+            "agenda_event_id": "13fa32c0-2382-427e-99a9-25f820ef6508",
+            "cliente_nome": "Joao",
+            "cliente_numero": "16999998888",
+            "mensagem": "Oi Joao, aqui e a Viviane, secretaria da FC Solucoes Financeiras. Lembrete do seu compromisso: reuniao com cliente Joao e avisar cliente no whatsapp 16999998888 em 11/02/2026 as 10:30. Se precisar remarcar, me responda por aqui.",
+            "scheduled_for": "2026-02-11T10:30:00Z",
+            "status": "sent",
+            "attempts": 1,
+            "sent_at": "2026-02-11T12:05:33.779813Z",
+            "last_error": null,
+            "meta_json": {
+              "source": "viva_chat",
+              "session_id": "cd3a91d3-c4fb-46f2-81b3-7e25ac10388c"
+            },
+            "created_at": "2026-02-10T19:11:15.411867Z",
+            "updated_at": "2026-02-11T12:05:33.779813Z"
+          }
+        ],
+        "total": 8,
+        "page": 1,
+        "page_size": 20
+      }
+    },
+    {
+      "endpoint": "/cofre/memories/status",
+      "status": 200,
+      "payload": {
+        "cofre_root": "/app/COFRE",
+        "tables": [
+          "agenda",
+          "campanha_imagens",
+          "clientes",
+          "cofre_manifest_registry",
+          "cofre_memory_registry",
+          "cofre_persona_registry",
+          "cofre_skill_registry",
+          "contrato_templates",
+          "contratos",
+          "google_calendar_connections",
+          "google_calendar_event_links",
+          "imagens",
+          "imagens_custos",
+          "redis_viva_memory_medium",
+          "users",
+          "viva_campanhas",
+          "viva_chat_messages",
+          "viva_chat_sessions",
+          "viva_handoff_tasks",
+          "viva_memory_vectors",
+          "whatsapp_conversas",
+          "whatsapp_mensagens"
+        ],
+        "viva_memory": {
+          "vector_enabled": true,
+          "redis_enabled": true,
+          "total_vectors": 19,
+          "medium_items": 0,
+          "embedding_model": "text-embedding-3-small",
+          "embedding_runtime": {
+            "configured": true,
+            "model": "text-embedding-3-small",
+            "fallback_enabled": true,
+            "provider_last": "none",
+            "semantic_tier": "fallback_local",
+            "premium_active": false
+          }
+        }
+      }
+    },
+    {
+      "endpoint": "/viva/persona/status",
+      "status": 200,
+      "payload": {
+        "cofre_root": "/app/COFRE",
+        "persona_file": "/app/COFRE/persona-skills/AGENT.md",
+        "persona_exists": true,
+        "persona_sha256": "12d1ece648704bab279a2c1e0a8ac32b217cd63e29f2c2c92a8db7555ad61d78",
+        "persona_fallback_active": false,
+        "strict_mode": true,
+        "campaign_skill_file": "/app/COFRE/persona-skills/skill-generate-campanha-neutra.md",
+        "campaign_skill_sha256": "11af4027b9d833a74dd9958d389a87483f590f529913c876745efbc277dbda75"
+      }
+    }
+  ]
+}

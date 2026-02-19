@@ -1,0 +1,1025 @@
+diff --git a/.github/workflows/main.yml b/.github/workflows/main.yml
+index 8b13789..b180049 100644
+--- a/.github/workflows/main.yml
++++ b/.github/workflows/main.yml
+@@ -1 +1,56 @@
++name: CI
+ 
++on:
++  push:
++    branches: [main]
++  pull_request:
++    branches: [main]
++  workflow_dispatch:
++
++jobs:
++  frontend:
++    runs-on: ubuntu-latest
++    defaults:
++      run:
++        working-directory: frontend
++    steps:
++      - name: Checkout
++        uses: actions/checkout@v4
++
++      - name: Setup Node
++        uses: actions/setup-node@v4
++        with:
++          node-version: 20
++          cache: npm
++          cache-dependency-path: frontend/package-lock.json
++
++      - name: Install dependencies
++        run: npm ci
++
++      - name: Type check
++        run: npm run type-check
++
++      - name: Build frontend
++        run: npm run build
++
++  backend:
++    runs-on: ubuntu-latest
++    defaults:
++      run:
++        working-directory: backend
++    steps:
++      - name: Checkout
++        uses: actions/checkout@v4
++
++      - name: Setup Python
++        uses: actions/setup-python@v5
++        with:
++          python-version: "3.11"
++
++      - name: Install dependencies
++        run: |
++          python -m pip install --upgrade pip
++          pip install -r requirements.txt
++
++      - name: Syntax smoke test
++        run: python -m compileall app
+diff --git a/backend/COFRE/README.md b/backend/COFRE/README.md
+index 5875935..f4f3ea4 100644
+--- a/backend/COFRE/README.md
++++ b/backend/COFRE/README.md
+@@ -2,36 +2,30 @@
+ 
+ `COFRE` e a raiz unica de persona, skills e trilha de memorias da VIVA.
+ 
+-## Estrutura
++## Estrutura canonica
+ 
+ - `persona-skills/`
+   - `AGENT.md`: prompt mestre institucional.
+   - `skill-generate-campanha-neutra.md`
+   - `skill-interpretar-contratos.md`
+   - `skill-memoria-cofre.md`
+-  - `skillconteudo.txt` (legacy compat)
++  - `skillconteudo.txt` (compatibilidade legada ainda usada em runtime)
+ - `memories/`
+-  - `viva_chat_sessions/`
+-  - `viva_chat_messages/`
+-  - `viva_campanhas/`
+-    - `items/`
+-    - `assets/`
+-  - `viva_handoff_tasks/`
+-  - `viva_memory_vectors/`
+-  - `redis_viva_memory_medium/`
+-  - cada pasta recebe arquivos `YYYY-MM-DD.jsonl`
++  - espelho por tabela em `backend/COFRE/memories/<tabela>/`
++  - no Git: somente estrutura de pastas + `.gitkeep`
++  - arquivos `*.jsonl` e assets sao runtime local (nao versionar)
+ - `system/`
+   - `endpoints_manifest.json`: catalogo canonico de modulos/capacidades/endpoints.
+ 
+-## Regra operacional
++## Regras institucionais (anti-frankenstein)
+ 
+-1. Edite persona e skill somente em `backend/COFRE/persona-skills/`.
+-2. Nao crie persona paralela em outras pastas de runtime.
+-3. Use `backend/COFRE/memories/` para auditoria e tuning da memoria.
+-4. Delete funcional no SaaS deve refletir delete no COFRE quando aplicavel.
+-5. Catalogos de capacidades/modulos devem sair de `COFRE/system/endpoints_manifest.json`.
++1. Persona e skills oficiais existem somente em `backend/COFRE/persona-skills/`.
++2. Nao criar persona paralela fora do COFRE.
++3. Nao commitar dados de runtime em `backend/COFRE/memories/`.
++4. Toda exclusao funcional no SaaS deve refletir no espelho COFRE quando aplicavel.
++5. Catalogo de capacidades/modulos vem de `backend/COFRE/system/endpoints_manifest.json`.
+ 
+-## Compatibilidade
++## Observacao de compatibilidade
+ 
+-Nao existe fallback operacional para persona/skills fora do COFRE.
+-O backend carrega `AGENT.md` e skills somente de `COFRE/persona-skills`.
++`skillconteudo.txt` permanece por compatibilidade com `viva_agent_profile_service.py`.
++Remover esse arquivo exige ajuste de codigo e validacao de persona em runtime.
+diff --git a/backend/app/services/agenda_service.py b/backend/app/services/agenda_service.py
+index cdef415..512b686 100644
+--- a/backend/app/services/agenda_service.py
++++ b/backend/app/services/agenda_service.py
+@@ -16,6 +16,14 @@ class AgendaService:
+     
+     def __init__(self, db: AsyncSession):
+         self.db = db
++
++    @staticmethod
++    def _normalize_event_datetime(value: Optional[datetime]) -> Optional[datetime]:
++        if value is None:
++            return None
++        if value.tzinfo is None:
++            return value.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
++        return value
+     
+     async def create(self, data: EventoCreate, user_id: UUID) -> Agenda:
+         """Create a new event."""
+@@ -23,8 +31,8 @@ class AgendaService:
+             titulo=data.titulo,
+             descricao=data.descricao,
+             tipo=data.tipo,
+-            data_inicio=data.data_inicio,
+-            data_fim=data.data_fim,
++            data_inicio=self._normalize_event_datetime(data.data_inicio),
++            data_fim=self._normalize_event_datetime(data.data_fim),
+             cliente_id=data.cliente_id,
+             contrato_id=data.contrato_id,
+             concluido=False,
+@@ -101,6 +109,8 @@ class AgendaService:
+         update_data = data.model_dump(exclude_unset=True)
+         
+         for field, value in update_data.items():
++            if field in {"data_inicio", "data_fim"}:
++                value = self._normalize_event_datetime(value)
+             setattr(evento, field, value)
+         
+         await self.db.commit()
+@@ -130,7 +140,7 @@ class AgendaService:
+     
+     async def get_hoje(self, user_id: Optional[UUID] = None) -> Dict[str, Any]:
+         """Get today's events."""
+-        hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None, hour=0, minute=0, second=0, microsecond=0)
++        hoje = datetime.now(ZoneInfo("America/Sao_Paulo")).replace(hour=0, minute=0, second=0, microsecond=0)
+         amanha = hoje + timedelta(days=1)
+         
+         return await self.list(
+diff --git a/backend/app/services/assistant/intents/campanhas.py b/backend/app/services/assistant/intents/campanhas.py
+index a204a47..bf638be 100644
+--- a/backend/app/services/assistant/intents/campanhas.py
++++ b/backend/app/services/assistant/intents/campanhas.py
+@@ -28,7 +28,24 @@ def is_campaign_count_intent(message: str) -> bool:
+     has_campaign = "campanha" in normalized or "campanhas" in normalized
+     has_count = any(
+         token in normalized
+-        for token in ("quantas", "quanto", "total", "numero", "qtd", "quantidade", "feitas", "criadas")
++        for token in (
++            "quantas",
++            "quanto",
++            "total",
++            "numero",
++            "qtd",
++            "quantidade",
++            "feitas",
++            "criadas",
++            "alguma",
++            "algum",
++            "temos",
++            "tem",
++            "existe",
++            "ativa",
++            "ativas",
++            "ativva",
++        )
+     )
+     has_generate_signal = bool(_is_image_request(message) or _is_direct_generation_intent(message))
+     return has_campaign and has_count and not has_generate_signal
+diff --git a/backend/app/services/assistant/intents/clientes.py b/backend/app/services/assistant/intents/clientes.py
+index 36cafbb..9c4f29a 100644
+--- a/backend/app/services/assistant/intents/clientes.py
++++ b/backend/app/services/assistant/intents/clientes.py
+@@ -15,7 +15,7 @@ def is_client_list_intent(message: str) -> bool:
+     has_client = ("cliente" in normalized) or ("clientes" in normalized)
+     has_list_signal = any(
+         token in normalized
+-        for token in ("listar", "liste", "lista", "quais", "todos", "registrados", "mostre", "lite", "list")
++        for token in ("listar", "liste", "lista", "quais", "todos", "registrados", "mostre", "lite", "list", "cadastro")
+     )
+     return has_client and has_list_signal
+ 
+diff --git a/backend/app/services/viva_agenda_nlu_service.py b/backend/app/services/viva_agenda_nlu_service.py
+index 3ad6231..4514de2 100644
+--- a/backend/app/services/viva_agenda_nlu_service.py
++++ b/backend/app/services/viva_agenda_nlu_service.py
+@@ -15,9 +15,16 @@ from app.models.agenda import EventoTipo
+ BRT_TZ = ZoneInfo("America/Sao_Paulo")
+ 
+ 
+-def _now_brt_naive() -> datetime:
+-    """Retorna datetime naive no fuso de Brasilia para consistencia em toda agenda."""
+-    return datetime.now(BRT_TZ).replace(tzinfo=None)
++def _now_brt() -> datetime:
++    """Retorna datetime aware no fuso de Brasilia para consistencia em toda agenda."""
++    return datetime.now(BRT_TZ)
++
++
++def _to_brt_aware(value: datetime) -> datetime:
++    """Normaliza datetime para timezone America/Sao_Paulo."""
++    if value.tzinfo is None:
++        return value.replace(tzinfo=BRT_TZ)
++    return value.astimezone(BRT_TZ)
+ 
+ 
+ def _normalize_key(texto: str) -> str:
+@@ -61,10 +68,20 @@ def _has_create_imperative(normalized: str) -> bool:
+ 
+ 
+ def _has_query_existence_intent(normalized: str) -> bool:
+-    existence_phrases = (
++    agenda_tokens = ("agenda", "agendamento", "agendamentos", "compromisso", "compromissos", "obrigacao", "obrigacoes")
++    has_agenda_token = any(_has_phrase(normalized, token) for token in agenda_tokens)
++
++    # Frases fortes de existencia de agendamento (podem aparecer sem "agenda" explicita).
++    strong_agenda_phrases = (
+         "eu marquei",
+         "se eu marquei",
+         "ja marquei",
++    )
++    if _has_any_phrase(normalized, strong_agenda_phrases):
++        return True
++
++    # Frases genericas de confirmacao so valem quando houver contexto de agenda.
++    generic_confirmation_phrases = (
+         "tem algum",
+         "tem alguma",
+         "ha algum",
+@@ -78,10 +95,9 @@ def _has_query_existence_intent(normalized: str) -> bool:
+         "verifica se",
+         "verifique se",
+     )
+-    if _has_any_phrase(normalized, existence_phrases):
++    if has_agenda_token and _has_any_phrase(normalized, generic_confirmation_phrases):
+         return True
+ 
+-    agenda_tokens = ("agenda", "agendamento", "agendamentos", "compromisso", "compromissos", "obrigacao", "obrigacoes")
+     query_tokens = (
+         "tenho",
+         "tem",
+@@ -97,7 +113,6 @@ def _has_query_existence_intent(normalized: str) -> bool:
+         "mostra",
+         "consultar",
+     )
+-    has_agenda_token = any(_has_phrase(normalized, token) for token in agenda_tokens)
+     has_query_token = any(_has_phrase(normalized, token) for token in query_tokens)
+     return has_agenda_token and has_query_token
+ 
+@@ -112,7 +127,7 @@ def _parse_datetime_input(raw: str) -> Optional[datetime]:
+     )
+     for fmt in formats:
+         try:
+-            return datetime.strptime(value, fmt)
++            return _to_brt_aware(datetime.strptime(value, fmt))
+         except ValueError:
+             continue
+     return None
+@@ -326,7 +341,7 @@ def is_agenda_query_intent(message: str, contexto: List[Dict[str, Any]]) -> bool
+ 
+ def agenda_window_from_text(message: str) -> Tuple[datetime, datetime, str]:
+     normalized = _normalize_key(message)
+-    now = _now_brt_naive()
++    now = _now_brt()
+ 
+     if "amanha" in normalized:
+         start = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+@@ -351,7 +366,7 @@ def format_agenda_list(items: List[Any], period_label: str) -> str:
+     lines = [f"Seus compromissos {period_label}:"]
+     for item in ordered:
+         status = "Concluido" if item.concluido else "Pendente"
+-        horario = item.data_inicio.strftime("%H:%M")
++        horario = _to_brt_aware(item.data_inicio).strftime("%H:%M")
+         lines.append(f"- {horario} | {item.titulo} ({status})")
+ 
+     return "\n".join(lines)
+@@ -460,17 +475,18 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
+             except ValueError:
+                 continue
+     elif has_tomorrow_hint:
+-        date_value = _now_brt_naive() + timedelta(days=1)
++        date_value = _now_brt() + timedelta(days=1)
+     elif has_today_hint:
+-        date_value = _now_brt_naive()
++        date_value = _now_brt()
+ 
+     if relative_delta is not None:
+-        date_time = _now_brt_naive() + relative_delta
++        date_time = _now_brt() + relative_delta
+         date_time = date_time.replace(second=0, microsecond=0)
+     else:
+         if not date_value:
+             return {"error": "Data/hora invalida"}
+         date_time = date_value.replace(hour=hour, minute=minute, second=0, microsecond=0)
++    date_time = _to_brt_aware(date_time)
+ 
+     # Trim verification clause from title to keep it clean (ex.: "... verifique se google agenda ...")
+     title_source = raw
+diff --git a/backend/app/services/viva_chat_orchestrator_service.py b/backend/app/services/viva_chat_orchestrator_service.py
+index d991e44..bed1803 100644
+--- a/backend/app/services/viva_chat_orchestrator_service.py
++++ b/backend/app/services/viva_chat_orchestrator_service.py
+@@ -115,6 +115,41 @@ def _wants_google_calendar_verification(message: str) -> bool:
+     return has_google and has_verify
+ 
+ 
++def _is_timezone_adjust_intent(message: str) -> bool:
++    normalized = _normalize_key(message or "")
++    if not normalized:
++        return False
++    has_timezone_word = any(token in normalized for token in ("fuso", "timezone", "sao paulo", "brasilia", "gmt"))
++    has_adjust_word = any(token in normalized for token in ("ajuste", "ajustar", "corrija", "corrigir", "acertar"))
++    return has_timezone_word and has_adjust_word
++
++
++def _is_campaign_rule_memory_intent(message: str) -> bool:
++    normalized = _normalize_key(message or "")
++    if not normalized:
++        return False
++    has_campaign_context = any(
++        token in normalized
++        for token in ("campanha", "campanhas", "imagem", "imagens", "banner", "promocao")
++    )
++    has_save_request = any(
++        token in normalized
++        for token in ("salve", "memorize", "memoria", "nao perca o contexto", "regra de ouro")
++    )
++    has_instruction_shape = any(
++        token in normalized
++        for token in (
++            "se adapte",
++            "sempre vou",
++            "nao quero padrao",
++            "cada campanha",
++            "criatividade nova",
++            "conseguiu entender",
++        )
++    )
++    return has_campaign_context and has_save_request and has_instruction_shape
++
++
+ class VivaChatOrchestratorService:
+     async def handle_chat_with_viva(self, request: Any, current_user: Any, db: Any):
+         """Chat direto com a VIVA usando OpenAI como provedor institucional."""
+@@ -231,6 +266,13 @@ class VivaChatOrchestratorService:
+                 return await finalize(
+                     resposta=f"Horario de Brasilia (BRT) agora: {_format_brt_now()}."
+                 )
++            if _is_timezone_adjust_intent(request.mensagem):
++                return await finalize(
++                    resposta=(
++                        "Para ajustar fuso com seguranca, me informe o titulo ou ID do compromisso. "
++                        "Exemplo: ajustar fuso do compromisso <titulo> para America/Sao_Paulo."
++                    )
++                )
+ 
+             if agenda_command is not None:
+                 if agenda_command.get("error"):
+@@ -280,7 +322,7 @@ class VivaChatOrchestratorService:
+                         return await finalize(
+                             resposta=(
+                                 "Agendamento criado com sucesso: "
+-                                f"{evento.titulo} em {evento.data_inicio.strftime('%d/%m/%Y %H:%M')}.\n"
++                                f"{evento.titulo} em {_format_datetime_brt(evento.data_inicio)}.\n"
+                                 "Para eu acionar a Viviane no horario, me passe o WhatsApp do cliente com DDD."
+                                 f"{google_status_line}"
+                             )
+@@ -308,7 +350,7 @@ class VivaChatOrchestratorService:
+                     return await finalize(
+                         resposta=(
+                             "Agendamento criado com sucesso: "
+-                            f"{evento.titulo} em {evento.data_inicio.strftime('%d/%m/%Y %H:%M')}.\n"
++                            f"{evento.titulo} em {_format_datetime_brt(evento.data_inicio)}.\n"
+                             f"Handoff para Viviane agendado no WhatsApp (ID: {task_id})."
+                             f"{google_status_line}"
+                         )
+@@ -317,7 +359,7 @@ class VivaChatOrchestratorService:
+                 return await finalize(
+                     resposta=(
+                         "Agendamento criado com sucesso: "
+-                        f"{evento.titulo} em {evento.data_inicio.strftime('%d/%m/%Y %H:%M')}."
++                        f"{evento.titulo} em {_format_datetime_brt(evento.data_inicio)}."
+                         f"{google_status_line}"
+                     )
+                 )
+@@ -373,7 +415,7 @@ class VivaChatOrchestratorService:
+                 return await finalize(
+                     resposta=(
+                         "Compromisso concluido com sucesso: "
+-                        f"{evento.titulo} ({evento.data_inicio.strftime('%d/%m/%Y %H:%M')})."
++                        f"{evento.titulo} ({_format_datetime_brt(evento.data_inicio)})."
+                     )
+                 )
+ 
+@@ -484,6 +526,24 @@ class VivaChatOrchestratorService:
+                     meta={"pinned_saved": True, "memory_write": saved},
+                 )
+ 
++            if _is_campaign_rule_memory_intent(request.mensagem):
++                saved = await viva_memory_service.append_memory(
++                    db=db,
++                    user_id=current_user.id,
++                    session_id=session_id,
++                    tipo="pinned",
++                    conteudo=str(request.mensagem or "").strip(),
++                    modo=modo,
++                    meta={"pinned": True, "source": "campaign_rule_instruction"},
++                )
++                return await finalize(
++                    resposta=(
++                        "Confirmado. Regra de Ouro de campanhas salva na memoria. "
++                        "Nao vou gerar imagem automaticamente nesse tipo de instrucao."
++                    ),
++                    meta={"campaign_rule_saved": True, "memory_write": saved},
++                )
++
+             campaign_flow_requested = False
+             campaign_fields: Dict[str, str] = {}
+             campaign_prompt_source = request.mensagem
+diff --git a/backend/app/services/viva_domain_query_router_service.py b/backend/app/services/viva_domain_query_router_service.py
+index b8a1636..b5d7535 100644
+--- a/backend/app/services/viva_domain_query_router_service.py
++++ b/backend/app/services/viva_domain_query_router_service.py
+@@ -46,21 +46,22 @@ def _is_direct_confirmation(message: str) -> bool:
+ 
+ 
+ def _last_pending_list_domain(contexto: List[Dict[str, Any]]) -> Optional[str]:
+-    for msg in reversed(contexto[-10:]):
+-        if str(msg.get("tipo") or "") != "ia":
+-            continue
+-        normalized = _normalize_key(str(msg.get("conteudo") or ""))
+-        if not normalized:
+-            continue
+-        if ("deseja" in normalized or "quer" in normalized or "confirmo" in normalized) and (
+-            "listar" in normalized or "liste" in normalized or "lista" in normalized or "exiba" in normalized
+-        ):
+-            if "cliente" in normalized or "clientes" in normalized:
+-                return "clientes"
+-            if any(token in normalized for token in ("modelo", "modelos", "template", "templates", "tipos")):
+-                return "contratos_modelos"
+-            if "contrato" in normalized or "contratos" in normalized:
+-                return "contratos_emitidos"
++    # Considera apenas o ultimo prompt da IA para evitar capturar confirmacoes antigas.
++    for msg in reversed(contexto[-4:]):
++        if str(msg.get("tipo") or "") == "ia":
++            normalized = _normalize_key(str(msg.get("conteudo") or ""))
++            if not normalized:
++                return None
++            if ("deseja" in normalized or "quer" in normalized or "confirmo" in normalized) and (
++                "listar" in normalized or "liste" in normalized or "lista" in normalized or "exiba" in normalized
++            ):
++                if "cliente" in normalized or "clientes" in normalized:
++                    return "clientes"
++                if any(token in normalized for token in ("modelo", "modelos", "template", "templates", "tipos")):
++                    return "contratos_modelos"
++                if "contrato" in normalized or "contratos" in normalized:
++                    return "contratos_emitidos"
++            return None
+     return None
+ 
+ 
+@@ -217,6 +218,11 @@ def _is_count_contracts_request(message: str) -> bool:
+     return has_contract and has_count
+ 
+ 
++def _wants_all_records(message: str) -> bool:
++    normalized = _normalize_key(message or "")
++    return any(token in normalized for token in ("todos", "todas", "geral", "emitidos", "incluindo"))
++
++
+ async def _resolve_client_from_message(
+     *,
+     cliente_service: ClienteService,
+@@ -281,13 +287,14 @@ class VivaDomainQueryRouterService:
+ 
+         contract_templates_intent = is_contract_templates_intent(message)
+         contracts_by_client_intent = is_contracts_by_client_intent(message)
++        contract_count_intent = _is_count_contracts_request(message) and not contracts_by_client_intent
+         contract_list_intent = (is_contract_list_intent(message) and not contract_templates_intent) or (
+             _is_direct_confirmation(message) and pending_list_domain == "contratos_emitidos"
+         )
+         contract_templates_intent = contract_templates_intent or (
+             _is_direct_confirmation(message) and pending_list_domain == "contratos_modelos"
+         )
+-        if contracts_by_client_intent or contract_list_intent or contract_templates_intent:
++        if contracts_by_client_intent or contract_list_intent or contract_templates_intent or contract_count_intent:
+             contrato_service = ContratoService(db)
+             if contracts_by_client_intent:
+                 cliente_service = ClienteService(db)
+@@ -327,6 +334,25 @@ class VivaDomainQueryRouterService:
+                     created_label = created_at.strftime("%d/%m/%Y") if created_at else "sem data"
+                     lines.append(f"- {numero} | {titulo} | {created_label} | {status_value}")
+                 return "\n".join(lines)
++            if contract_count_intent:
++                contratos_data = await contrato_service.list(
++                    status=None,
++                    search=None,
++                    page=1,
++                    page_size=500,
++                )
++                contratos_items = list(contratos_data.get("items", []))
++                total = len(contratos_items)
++                ativos = [
++                    item
++                    for item in contratos_items
++                    if str(getattr(getattr(item, "status", None), "value", getattr(item, "status", ""))).lower().strip()
++                    != "cancelado"
++                ]
++                if _wants_all_records(message):
++                    return f"Total de contratos emitidos (todos os status): {total}."
++                return f"Total de contratos ativos: {len(ativos)}. Total emitido geral: {total}."
++
+             if contract_templates_intent:
+                 templates = await contrato_service.list_templates()
+                 titles = [
+@@ -447,6 +473,7 @@ class VivaDomainQueryRouterService:
+                 lines.append(f"- {_normalize_mojibake_text(row.titulo)} ({row.modo}) - {created_label}")
+             return "\n".join(lines)
+         if is_campaign_count_intent(message):
++            normalized = _normalize_key(message or "")
+             mode_filter = extract_campaign_mode_filter(message)
+             _, total = await viva_campaign_repository_service.list_campaign_rows(
+                 db=db,
+@@ -455,6 +482,13 @@ class VivaDomainQueryRouterService:
+                 limit=1,
+                 offset=0,
+             )
++            asks_active = any(token in normalized for token in ("ativa", "ativas", "ativva", "ativo", "ativos"))
++            if asks_active:
++                scope = f" em {mode_filter}" if mode_filter else ""
++                return (
++                    f"No historico{scope}, encontrei {total} campanhas registradas. "
++                    "Obs.: o modulo atual nao classifica campanhas por status ativo/pausado."
++                )
+             if mode_filter:
+                 return f"Total de campanhas feitas em {mode_filter}: {total}."
+             return f"Total geral de campanhas feitas: {total}."
+diff --git a/frontend/src/app/(dashboard)/contratos/[id]/editar/page.tsx b/frontend/src/app/(dashboard)/contratos/[id]/editar/page.tsx
+index b2d240f..ad3617a 100644
+--- a/frontend/src/app/(dashboard)/contratos/[id]/editar/page.tsx
++++ b/frontend/src/app/(dashboard)/contratos/[id]/editar/page.tsx
+@@ -1,6 +1,6 @@
+ 'use client'
+ 
+-import { useState, useEffect } from 'react'
++import { useState, useEffect, useCallback } from 'react'
+ import { useParams, useRouter } from 'next/navigation'
+ import { Button } from '@/components/ui/button'
+ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+@@ -40,11 +40,7 @@ export default function EditarContratoPage() {
+   const [contrato, setContrato] = useState<Contrato | null>(null)
+   const [formData, setFormData] = useState<Partial<Contrato>>({})
+ 
+-  useEffect(() => {
+-    carregarContrato()
+-  }, [])
+-
+-  const carregarContrato = async () => {
++  const carregarContrato = useCallback(async () => {
+     try {
+       const id = params.id as string
+       const data = await contratosApi.getById(id)
+@@ -69,7 +65,11 @@ export default function EditarContratoPage() {
+     } finally {
+       setLoading(false)
+     }
+-  }
++  }, [params.id, router])
++
++  useEffect(() => {
++    carregarContrato()
++  }, [carregarContrato])
+ 
+   const handleSubmit = async (e: React.FormEvent) => {
+     e.preventDefault()
+diff --git a/frontend/src/app/(dashboard)/layout.tsx b/frontend/src/app/(dashboard)/layout.tsx
+index 48e9482..374a625 100644
+--- a/frontend/src/app/(dashboard)/layout.tsx
++++ b/frontend/src/app/(dashboard)/layout.tsx
+@@ -1,16 +1,9 @@
+-import { Sidebar } from '@/components/layout/Sidebar'
++import { AppShell } from '@/components/layout/AppShell'
+ 
+ export default function DashboardLayout({
+   children,
+ }: {
+   children: React.ReactNode
+ }) {
+-  return (
+-    <div className="flex min-h-screen bg-gray-50">
+-      <Sidebar />
+-      <main className="flex-1 p-8 overflow-auto">
+-        {children}
+-      </main>
+-    </div>
+-  )
++  return <AppShell>{children}</AppShell>
+ }
+diff --git a/frontend/src/app/(dashboard)/whatsapp/page.tsx b/frontend/src/app/(dashboard)/whatsapp/page.tsx
+index 95927c3..caa8ea7 100644
+--- a/frontend/src/app/(dashboard)/whatsapp/page.tsx
++++ b/frontend/src/app/(dashboard)/whatsapp/page.tsx
+@@ -1,8 +1,9 @@
+ 'use client'
+ 
++import Link from 'next/link'
+ import { useCallback, useEffect, useMemo, useState } from 'react'
+ import Image from 'next/image'
+-import { MessageCircle, QrCode, RefreshCw } from 'lucide-react'
++import { Bot, Funnel, MessageCircle, QrCode, RefreshCw, Send, UserRound } from 'lucide-react'
+ 
+ import { Button } from '@/components/ui/button'
+ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+@@ -29,12 +30,55 @@ type ConnectResponse = {
+   instance_name?: string
+ }
+ 
++type WhatsAppConversa = {
++  id: string
++  numero_telefone: string
++  nome_contato: string | null
++  instance_name: string
++  status: 'ativa' | 'arquivada' | 'aguardando' | string
++  ultima_mensagem_em: string | null
++  created_at: string
++}
++
++type WhatsAppChatStats = {
++  conversas_ativas: number
++  mensagens_hoje: number
++  status?: string
++}
++
++type HandoffItem = {
++  id: string
++  status: 'pending' | 'sent' | 'failed' | string
++}
++
++type HandoffListResponse = {
++  items: HandoffItem[]
++  total: number
++  page: number
++  page_size: number
++}
++
+ export default function WhatsAppPage() {
+   const { toast } = useToast()
+   const [loading, setLoading] = useState(true)
+   const [actionLoading, setActionLoading] = useState(false)
++  const [crmLoading, setCrmLoading] = useState(true)
+   const [statusData, setStatusData] = useState<WhatsAppStatus | null>(null)
+   const [qrCode, setQrCode] = useState<string | null>(null)
++  const [chatStats, setChatStats] = useState<WhatsAppChatStats>({ conversas_ativas: 0, mensagens_hoje: 0 })
++  const [conversasRecentes, setConversasRecentes] = useState<WhatsAppConversa[]>([])
++  const [funnelCounts, setFunnelCounts] = useState({
++    ativa: 0,
++    aguardando: 0,
++    arquivada: 0,
++    total: 0,
++  })
++  const [handoffCounts, setHandoffCounts] = useState({
++    pending: 0,
++    sent: 0,
++    failed: 0,
++    total: 0,
++  })
+ 
+   const qrSrc = useMemo(() => {
+     if (!qrCode) return null
+@@ -55,13 +99,55 @@ export default function WhatsAppPage() {
+     }
+   }, [toast])
+ 
++  const carregarCrm = useCallback(async () => {
++    setCrmLoading(true)
++    try {
++      const [statsResp, ativasResp, aguardandoResp, arquivadasResp, handoffResp] = await Promise.all([
++        api.get<WhatsAppChatStats>('/whatsapp-chat/status'),
++        api.get<WhatsAppConversa[]>('/whatsapp-chat/conversas', { params: { status: 'ativa', limit: 100 } }),
++        api.get<WhatsAppConversa[]>('/whatsapp-chat/conversas', { params: { status: 'aguardando', limit: 100 } }),
++        api.get<WhatsAppConversa[]>('/whatsapp-chat/conversas', { params: { status: 'arquivada', limit: 100 } }),
++        api.get<HandoffListResponse>('/viva/handoff'),
++      ])
++
++      const ativas = ativasResp.data || []
++      const aguardando = aguardandoResp.data || []
++      const arquivadas = arquivadasResp.data || []
++      const handoffItems = handoffResp.data?.items || []
++
++      setChatStats(statsResp.data || { conversas_ativas: 0, mensagens_hoje: 0 })
++      setConversasRecentes(ativas.slice(0, 8))
++      setFunnelCounts({
++        ativa: ativas.length,
++        aguardando: aguardando.length,
++        arquivada: arquivadas.length,
++        total: ativas.length + aguardando.length + arquivadas.length,
++      })
++
++      setHandoffCounts({
++        pending: handoffItems.filter((item) => item.status === 'pending').length,
++        sent: handoffItems.filter((item) => item.status === 'sent').length,
++        failed: handoffItems.filter((item) => item.status === 'failed').length,
++        total: handoffResp.data?.total || handoffItems.length,
++      })
++    } catch (error) {
++      toast({
++        title: 'Falha ao carregar CRM do WhatsApp',
++        description: 'Nao foi possivel montar o funil completo no momento.',
++        variant: 'destructive',
++      })
++    } finally {
++      setCrmLoading(false)
++    }
++  }, [toast])
++
+   useEffect(() => {
+     const run = async () => {
+-      await carregarStatus()
++      await Promise.all([carregarStatus(), carregarCrm()])
+       setLoading(false)
+     }
+     run()
+-  }, [carregarStatus])
++  }, [carregarStatus, carregarCrm])
+ 
+   const handleConectar = async () => {
+     setActionLoading(true)
+@@ -83,7 +169,7 @@ export default function WhatsAppPage() {
+           description: data.mensagem || 'Escaneie o QR Code no aplicativo',
+         })
+       }
+-      await carregarStatus()
++      await Promise.all([carregarStatus(), carregarCrm()])
+     } catch (error: any) {
+       const detail = error?.response?.data?.detail || 'Erro ao conectar WhatsApp'
+       toast({ title: 'Erro ao conectar', description: String(detail), variant: 'destructive' })
+@@ -106,7 +192,7 @@ export default function WhatsAppPage() {
+           variant: 'destructive',
+         })
+       }
+-      await carregarStatus()
++      await Promise.all([carregarStatus(), carregarCrm()])
+     } catch (error: any) {
+       const detail = error?.response?.data?.detail || 'Erro ao desconectar WhatsApp'
+       toast({ title: 'Erro ao desconectar', description: String(detail), variant: 'destructive' })
+@@ -115,6 +201,27 @@ export default function WhatsAppPage() {
+     }
+   }
+ 
++  const conectado = Boolean(statusData?.conectado)
++
++  const taxaFechamento = useMemo(() => {
++    if (!funnelCounts.total) return 0
++    return Math.round((funnelCounts.arquivada / funnelCounts.total) * 100)
++  }, [funnelCounts])
++
++  const formatarNumero = (numero: string) => {
++    const digits = String(numero || '').replace(/\D/g, '')
++    if (digits.length === 13) {
++      return `+${digits.slice(0, 2)} (${digits.slice(2, 4)}) ${digits.slice(4, 9)}-${digits.slice(9)}`
++    }
++    return numero
++  }
++
++  const formatarData = (data: string | null) => {
++    if (!data) return '-'
++    const dt = new Date(data)
++    return dt.toLocaleString('pt-BR')
++  }
++
+   if (loading) {
+     return (
+       <div className="flex min-h-[60vh] items-center justify-center">
+@@ -123,15 +230,86 @@ export default function WhatsAppPage() {
+     )
+   }
+ 
+-  const conectado = Boolean(statusData?.conectado)
+-
+   return (
+     <div className="space-y-6">
+       <header>
+         <h1 className="text-3xl font-bold text-gray-900">WhatsApp</h1>
+-        <p className="mt-1 text-sm text-gray-600">Conexao institucional com Evolution API</p>
++        <p className="mt-1 text-sm text-gray-600">
++          CRM institucional da persona Viviane + conexao Evolution API
++        </p>
+       </header>
+ 
++      <Card>
++        <CardHeader>
++          <CardTitle className="flex items-center gap-2">
++            <Funnel className="h-5 w-5 text-primary-600" />
++            Funil operacional (Fabio {'>'} VIVA {'>'} Viviane)
++          </CardTitle>
++        </CardHeader>
++        <CardContent>
++          {crmLoading ? (
++            <div className="flex items-center gap-2 text-sm text-gray-500">
++              <RefreshCw className="h-4 w-4 animate-spin" />
++              Carregando funil e metricas...
++            </div>
++          ) : (
++            <div className="grid gap-3 md:grid-cols-4">
++              <div className="rounded-lg border bg-white p-4">
++                <p className="text-xs uppercase tracking-wide text-gray-500">Leads no funil</p>
++                <p className="mt-1 text-2xl font-bold text-slate-900">{funnelCounts.total}</p>
++              </div>
++              <div className="rounded-lg border bg-white p-4">
++                <p className="text-xs uppercase tracking-wide text-gray-500">Em atendimento</p>
++                <p className="mt-1 text-2xl font-bold text-blue-600">{funnelCounts.ativa}</p>
++              </div>
++              <div className="rounded-lg border bg-white p-4">
++                <p className="text-xs uppercase tracking-wide text-gray-500">Aguardando retorno</p>
++                <p className="mt-1 text-2xl font-bold text-amber-600">{funnelCounts.aguardando}</p>
++              </div>
++              <div className="rounded-lg border bg-white p-4">
++                <p className="text-xs uppercase tracking-wide text-gray-500">Concluidas</p>
++                <p className="mt-1 text-2xl font-bold text-emerald-600">{funnelCounts.arquivada}</p>
++              </div>
++              <div className="rounded-lg border bg-white p-4 md:col-span-2">
++                <p className="text-xs uppercase tracking-wide text-gray-500">Mensagens hoje</p>
++                <p className="mt-1 text-2xl font-bold text-slate-900">{chatStats.mensagens_hoje}</p>
++              </div>
++              <div className="rounded-lg border bg-white p-4 md:col-span-2">
++                <p className="text-xs uppercase tracking-wide text-gray-500">Taxa de fechamento</p>
++                <p className="mt-1 text-2xl font-bold text-slate-900">{taxaFechamento}%</p>
++              </div>
++            </div>
++          )}
++        </CardContent>
++      </Card>
++
++      <Card>
++        <CardHeader>
++          <CardTitle className="flex items-center gap-2">
++            <Bot className="h-5 w-5 text-primary-600" />
++            Persona Viviane (handoff de agenda)
++          </CardTitle>
++        </CardHeader>
++        <CardContent className="grid gap-3 md:grid-cols-4">
++          <div className="rounded-lg border bg-white p-4">
++            <p className="text-xs uppercase tracking-wide text-gray-500">Pendentes</p>
++            <p className="mt-1 text-2xl font-bold text-amber-600">{handoffCounts.pending}</p>
++          </div>
++          <div className="rounded-lg border bg-white p-4">
++            <p className="text-xs uppercase tracking-wide text-gray-500">Enviados</p>
++            <p className="mt-1 text-2xl font-bold text-emerald-600">{handoffCounts.sent}</p>
++          </div>
++          <div className="rounded-lg border bg-white p-4">
++            <p className="text-xs uppercase tracking-wide text-gray-500">Falhas</p>
++            <p className="mt-1 text-2xl font-bold text-rose-600">{handoffCounts.failed}</p>
++          </div>
++          <div className="rounded-lg border bg-white p-4">
++            <p className="text-xs uppercase tracking-wide text-gray-500">Total handoff</p>
++            <p className="mt-1 text-2xl font-bold text-slate-900">{handoffCounts.total}</p>
++          </div>
++        </CardContent>
++      </Card>
++
+       <Card>
+         <CardHeader>
+           <CardTitle className="flex items-center justify-between">
+@@ -176,13 +354,55 @@ export default function WhatsAppPage() {
+             <Button variant="outline" onClick={handleDesconectar} disabled={actionLoading || !conectado}>
+               Desconectar
+             </Button>
+-            <Button variant="ghost" onClick={carregarStatus} disabled={actionLoading}>
++            <Button variant="ghost" onClick={() => Promise.all([carregarStatus(), carregarCrm()])} disabled={actionLoading}>
+               Atualizar status
+             </Button>
+           </div>
+         </CardContent>
+       </Card>
+ 
++      <Card>
++        <CardHeader>
++          <CardTitle className="flex items-center justify-between">
++            <span className="flex items-center gap-2">
++              <UserRound className="h-5 w-5 text-primary-600" />
++              Ultimas conversas em atendimento
++            </span>
++            <Button asChild variant="outline" size="sm">
++              <Link href="/whatsapp/conversas">
++                <Send className="mr-2 h-4 w-4" />
++                Abrir central de conversas
++              </Link>
++            </Button>
++          </CardTitle>
++        </CardHeader>
++        <CardContent>
++          {crmLoading ? (
++            <div className="flex items-center gap-2 text-sm text-gray-500">
++              <RefreshCw className="h-4 w-4 animate-spin" />
++              Carregando conversas...
++            </div>
++          ) : conversasRecentes.length === 0 ? (
++            <p className="text-sm text-gray-500">Nenhuma conversa ativa encontrada.</p>
++          ) : (
++            <div className="space-y-2">
++              {conversasRecentes.map((conversa) => (
++                <div key={conversa.id} className="flex items-center justify-between rounded-md border bg-white p-3">
++                  <div>
++                    <p className="font-medium text-slate-900">{conversa.nome_contato || 'Contato sem nome'}</p>
++                    <p className="text-xs text-gray-500">{formatarNumero(conversa.numero_telefone)}</p>
++                  </div>
++                  <div className="text-right">
++                    <Badge variant="outline">{conversa.status}</Badge>
++                    <p className="mt-1 text-xs text-gray-500">{formatarData(conversa.ultima_mensagem_em)}</p>
++                  </div>
++                </div>
++              ))}
++            </div>
++          )}
++        </CardContent>
++      </Card>
++
+       <Card>
+         <CardHeader>
+           <CardTitle className="flex items-center gap-2">
+@@ -204,6 +424,26 @@ export default function WhatsAppPage() {
+           )}
+         </CardContent>
+       </Card>
++
++      <Card>
++        <CardHeader>
++          <CardTitle className="flex items-center gap-2">
++            <CircleCheckBig className="h-5 w-5 text-primary-600" />
++            Governanca de personas
++          </CardTitle>
++        </CardHeader>
++        <CardContent className="space-y-2 text-sm text-gray-700">
++          <p>
++            <strong>Fabio:</strong> decisor e operador.
++          </p>
++          <p>
++            <strong>VIVA:</strong> assistente interna para dados/agenda/campanhas.
++          </p>
++          <p>
++            <strong>Viviane:</strong> atendimento externo WhatsApp via handoff.
++          </p>
++        </CardContent>
++      </Card>
+     </div>
+   )
+ }
+diff --git a/frontend/src/components/layout/Sidebar.tsx b/frontend/src/components/layout/Sidebar.tsx
+index de2fecc..290b209 100644
+--- a/frontend/src/components/layout/Sidebar.tsx
++++ b/frontend/src/components/layout/Sidebar.tsx
+@@ -2,19 +2,15 @@
+ 
+ import Link from 'next/link'
+ import { usePathname } from 'next/navigation'
+-import { FileText, Users, Calendar, MessageCircle, LogOut, Bot, Megaphone } from 'lucide-react'
++import { LogOut } from 'lucide-react'
+ import { cn } from '@/lib/utils'
++import { APP_BRAND, DASHBOARD_NAV_ITEMS } from '@/components/layout/navigation'
+ 
+-const menuItems = [
+-  { href: '/viva', label: 'Chat IA VIVA', icon: Bot },
+-  { href: '/campanhas', label: 'Campanhas', icon: Megaphone },
+-  { href: '/contratos', label: 'Contratos', icon: FileText },
+-  { href: '/clientes', label: 'Clientes', icon: Users },
+-  { href: '/agenda', label: 'Agenda', icon: Calendar },
+-  { href: '/whatsapp', label: 'WhatsApp', icon: MessageCircle },
+-]
++type SidebarProps = {
++  onNavigate?: () => void
++}
+ 
+-export function Sidebar() {
++export function Sidebar({ onNavigate }: SidebarProps) {
+   const pathname = usePathname()
+ 
+   const handleLogout = () => {
+@@ -26,12 +22,12 @@ export function Sidebar() {
+   return (
+     <aside className="w-64 bg-primary-900 text-white min-h-screen flex flex-col">
+       <div className="p-6 border-b border-primary-800">
+-        <h1 className="text-xl font-bold">FC Soluções</h1>
+-        <p className="text-primary-400 text-sm">Financeiras</p>
++        <h1 className="text-xl font-bold">{APP_BRAND.name}</h1>
++        <p className="text-primary-400 text-sm">{APP_BRAND.tagline}</p>
+       </div>
+ 
+       <nav className="flex-1 p-4 space-y-2">
+-        {menuItems.map((item) => {
++        {DASHBOARD_NAV_ITEMS.map((item) => {
+           const Icon = item.icon
+           const isActive = pathname.startsWith(item.href)
+ 
+@@ -39,6 +35,7 @@ export function Sidebar() {
+             <Link
+               key={item.href}
+               href={item.href}
++              onClick={onNavigate}
+               className={cn(
+                 'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
+                 isActive

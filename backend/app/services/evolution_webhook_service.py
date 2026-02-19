@@ -5,11 +5,13 @@ Recebe mensagens do WhatsApp e integra com IA VIVA.
 import base64
 from datetime import datetime
 import logging
+import re
 from typing import Any, Dict, Optional
 
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.cliente import Cliente
 from app.models.whatsapp_conversa import (
     StatusConversa,
     TipoOrigem,
@@ -73,6 +75,7 @@ class EvolutionWebhookService:
             if not message_wrapper:
                 return True
 
+            remote_jid = self._extrair_remote_jid(message_wrapper, payload_data)
             numero = self._extrair_numero(message_wrapper, payload_data)
             if not numero:
                 return True
@@ -82,6 +85,7 @@ class EvolutionWebhookService:
                 if isinstance(message_wrapper.get("key"), dict)
                 else None
             )
+            push_name = self._extrair_push_name(message_wrapper, payload_data)
             message_content = self._extrair_conteudo_mensagem(message_wrapper)
 
             tipo_midia: Optional[str] = None
@@ -105,16 +109,33 @@ class EvolutionWebhookService:
             conversa = await self._get_ou_criar_conversa(
                 numero=numero,
                 instance_name=instance_name,
+                nome_contato=push_name,
                 db=db,
             )
             contexto_atual = conversa.contexto_ia if isinstance(conversa.contexto_ia, dict) else {}
+            contexto_atual = await self._refresh_lid_resolution_context(
+                db=db,
+                conversa=conversa,
+                push_name=push_name,
+                texto_usuario=texto,
+                remote_jid=remote_jid,
+                contexto_atual=contexto_atual,
+            )
             if contexto_atual.get("non_deliverable_number"):
-                logging.info(
-                    "Numero marcado como nao entregavel, ignorando resposta automatica. numero=%s instance=%s",
-                    numero,
-                    instance_name,
-                )
-                return True
+                if isinstance(remote_jid, str) and remote_jid.lower().endswith("@lid"):
+                    contexto = dict(contexto_atual)
+                    contexto.pop("non_deliverable_number", None)
+                    contexto.pop("non_deliverable_reason", None)
+                    contexto.pop("non_deliverable_at", None)
+                    conversa.contexto_ia = contexto
+                    await db.commit()
+                else:
+                    logging.info(
+                        "Numero marcado como nao entregavel, ignorando resposta automatica. numero=%s instance=%s",
+                        numero,
+                        instance_name,
+                    )
+                    return True
 
             msg_usuario = WhatsappMensagem(
                 conversa_id=conversa.id,
@@ -153,7 +174,14 @@ class EvolutionWebhookService:
                 )
 
             wa_service = WhatsAppService()
-            envio_result = await wa_service.send_text(numero=numero, mensagem=resposta_ia)
+            destino_envio = remote_jid or numero
+            preferred_number = self._pick_preferred_number_from_context(contexto_atual)
+            envio_result = await wa_service.send_text(
+                numero=destino_envio,
+                mensagem=resposta_ia,
+                context_push_name=push_name,
+                context_preferred_number=preferred_number,
+            )
             enviado = bool(envio_result.get("sucesso"))
             erro_envio = None if enviado else envio_result.get("erro")
 
@@ -166,7 +194,12 @@ class EvolutionWebhookService:
             )
             db.add(msg_ia)
 
-            if erro_envio and "\"exists\":false" in str(erro_envio).replace(" ", "").lower():
+            destino_utilizado = str(envio_result.get("destino") or destino_envio or "")
+            if (
+                erro_envio
+                and "\"exists\":false" in str(erro_envio).replace(" ", "").lower()
+                and "@lid" not in destino_utilizado.lower()
+            ):
                 contexto = dict(conversa.contexto_ia or {})
                 contexto["non_deliverable_number"] = True
                 contexto["non_deliverable_reason"] = "exists_false"
@@ -224,6 +257,12 @@ class EvolutionWebhookService:
         return None
 
     def _extrair_numero(self, message_wrapper: Dict[str, Any], payload_data: Dict[str, Any]) -> str:
+        remote_jid = self._extrair_remote_jid(message_wrapper, payload_data)
+        if not remote_jid:
+            return ""
+        return remote_jid.split("@")[0]
+
+    def _extrair_remote_jid(self, message_wrapper: Dict[str, Any], payload_data: Dict[str, Any]) -> str:
         key_data = message_wrapper.get("key") if isinstance(message_wrapper.get("key"), dict) else {}
         remote_jid = key_data.get("remoteJid")
 
@@ -233,7 +272,111 @@ class EvolutionWebhookService:
         if not isinstance(remote_jid, str) or "@" not in remote_jid:
             return ""
 
-        return remote_jid.split("@")[0]
+        return remote_jid
+
+    def _extrair_push_name(self, message_wrapper: Dict[str, Any], payload_data: Dict[str, Any]) -> Optional[str]:
+        for candidate in (
+            message_wrapper.get("pushName"),
+            payload_data.get("pushName") if isinstance(payload_data, dict) else None,
+        ):
+            if isinstance(candidate, str):
+                name = candidate.strip()
+                if name:
+                    return name
+        return None
+
+    def _normalize_digits(self, value: Any) -> str:
+        if not isinstance(value, str):
+            return ""
+        digits = "".join(ch for ch in value if ch.isdigit())
+        if len(digits) <= 11 and not digits.startswith("55"):
+            digits = "55" + digits
+        return digits
+
+    def _extract_phone_from_text(self, text: str) -> Optional[str]:
+        if not isinstance(text, str):
+            return None
+        normalized = text.lower()
+        if not any(token in normalized for token in ("whats", "whatsapp", "telefone", "celular", "fone", "numero")):
+            return None
+        candidates = re.findall(r"(?:\+?\d[\d\-\s\(\)]{9,}\d)", text)
+        for candidate in candidates:
+            normalized_digits = self._normalize_digits(candidate)
+            if 12 <= len(normalized_digits) <= 13:
+                return normalized_digits
+        return None
+
+    def _pick_preferred_number_from_context(self, context: Dict[str, Any]) -> Optional[str]:
+        if not isinstance(context, dict):
+            return None
+        direct = self._normalize_digits(str(context.get("resolved_whatsapp_number") or ""))
+        if direct:
+            return direct
+        lead = context.get("lead")
+        if isinstance(lead, dict):
+            lead_phone = self._normalize_digits(str(lead.get("telefone") or ""))
+            if lead_phone:
+                return lead_phone
+        return None
+
+    async def _resolve_phone_from_client_registry(
+        self,
+        db: AsyncSession,
+        push_name: Optional[str],
+    ) -> Optional[str]:
+        if not isinstance(push_name, str):
+            return None
+        name = push_name.strip()
+        if len(name) < 5:
+            return None
+        stmt = select(Cliente).where(Cliente.nome.ilike(name))
+        result = await db.execute(stmt)
+        matches = [item for item in result.scalars().all() if getattr(item, "telefone", None)]
+        if len(matches) != 1:
+            return None
+        return self._normalize_digits(str(matches[0].telefone or ""))
+
+    async def _refresh_lid_resolution_context(
+        self,
+        db: AsyncSession,
+        conversa: WhatsappConversa,
+        push_name: Optional[str],
+        texto_usuario: str,
+        remote_jid: str,
+        contexto_atual: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        if not isinstance(remote_jid, str) or not remote_jid.lower().endswith("@lid"):
+            return contexto_atual
+
+        contexto = dict(contexto_atual or {})
+        changed = False
+
+        extracted_from_text = self._extract_phone_from_text(texto_usuario)
+        if extracted_from_text and contexto.get("resolved_whatsapp_number") != extracted_from_text:
+            contexto["resolved_whatsapp_number"] = extracted_from_text
+            contexto["resolved_whatsapp_source"] = "user_text"
+            changed = True
+
+        if not contexto.get("resolved_whatsapp_number"):
+            from_lead = self._pick_preferred_number_from_context(contexto)
+            if from_lead:
+                contexto["resolved_whatsapp_number"] = from_lead
+                contexto["resolved_whatsapp_source"] = "lead_context"
+                changed = True
+
+        if not contexto.get("resolved_whatsapp_number"):
+            from_registry = await self._resolve_phone_from_client_registry(db=db, push_name=push_name)
+            if from_registry:
+                contexto["resolved_whatsapp_number"] = from_registry
+                contexto["resolved_whatsapp_source"] = "client_registry"
+                changed = True
+
+        if changed:
+            conversa.contexto_ia = contexto
+            await db.commit()
+            await db.refresh(conversa)
+
+        return contexto
 
     def _extrair_conteudo_mensagem(self, message_wrapper: Dict[str, Any]) -> Dict[str, Any]:
         raw_message = message_wrapper.get("message")
@@ -400,6 +543,7 @@ class EvolutionWebhookService:
         self,
         numero: str,
         instance_name: str,
+        nome_contato: Optional[str],
         db: AsyncSession,
     ) -> WhatsappConversa:
         """Busca conversa existente ou cria nova."""
@@ -416,11 +560,16 @@ class EvolutionWebhookService:
         if not conversa:
             conversa = WhatsappConversa(
                 numero_telefone=numero,
+                nome_contato=nome_contato,
                 instance_name=instance_name,
                 status=StatusConversa.ATIVA,
                 contexto_ia={},
             )
             db.add(conversa)
+            await db.commit()
+            await db.refresh(conversa)
+        elif nome_contato and conversa.nome_contato != nome_contato:
+            conversa.nome_contato = nome_contato
             await db.commit()
             await db.refresh(conversa)
 

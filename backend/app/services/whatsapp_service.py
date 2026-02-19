@@ -1,4 +1,6 @@
-﻿"""WhatsApp service - Integration with Evolution API."""
+"""WhatsApp service - Integration with Evolution API."""
+from datetime import datetime
+import unicodedata
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -327,7 +329,13 @@ class WhatsAppService:
                     "instance_name": self.instance_name,
                 }
 
-    async def send_text(self, numero: str, mensagem: str) -> Dict[str, Any]:
+    async def send_text(
+        self,
+        numero: str,
+        mensagem: str,
+        context_push_name: Optional[str] = None,
+        context_preferred_number: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Send text message."""
         mensagem = mensagem.strip() if isinstance(mensagem, str) else ""
         if not mensagem:
@@ -337,12 +345,22 @@ class WhatsAppService:
                 "instance_name": self.instance_name,
             }
 
-        numero = self._format_number(numero)
+        destino_original = str(numero or "").strip()
+        numero = self._format_number(destino_original)
 
         async with httpx.AsyncClient() as client:
             try:
                 instances = await self._fetch_instances(client)
                 instance = self._resolve_instance_name(instances)
+                numero_resolvido = await self._resolve_lid_number(
+                    client=client,
+                    instance=instance,
+                    numero=numero,
+                    context_push_name=context_push_name,
+                    context_preferred_number=context_preferred_number,
+                )
+                if numero_resolvido:
+                    numero = numero_resolvido
 
                 payload = {
                     "number": numero,
@@ -383,18 +401,24 @@ class WhatsAppService:
                         "sucesso": True,
                         "mensagem": "Mensagem enviada com sucesso",
                         "instance_name": instance,
+                        "destino": numero,
+                        "destino_original": destino_original,
                     }
 
                 return {
                     "sucesso": False,
                     "erro": f"Status {response.status_code}: {response.text}",
                     "instance_name": instance,
+                    "destino": numero,
+                    "destino_original": destino_original,
                 }
             except Exception as e:
                 return {
                     "sucesso": False,
                     "erro": str(e),
                     "instance_name": self.instance_name,
+                    "destino": numero,
+                    "destino_original": destino_original,
                 }
 
     async def send_document(
@@ -573,8 +597,247 @@ class WhatsAppService:
                     "instance_name": instance_name or self.instance_name,
                 }
 
+    async def _fetch_contacts(
+        self,
+        client: httpx.AsyncClient,
+        instance: str,
+    ) -> List[Dict[str, Any]]:
+        """Fetch contacts from Evolution chat module."""
+        try:
+            response = await self._request(
+                client,
+                "POST",
+                f"/chat/findContacts/{instance}",
+                json={},
+                timeout=20.0,
+            )
+            if response.status_code != 200:
+                return []
+            payload = response.json()
+            if isinstance(payload, list):
+                return [item for item in payload if isinstance(item, dict)]
+            return []
+        except Exception:
+            return []
+
+    def _normalizar_nome(self, nome: Optional[str]) -> str:
+        if not isinstance(nome, str):
+            return ""
+        value = unicodedata.normalize("NFKD", nome).encode("ascii", "ignore").decode("ascii")
+        return " ".join(value.lower().split())
+
+    def _extrair_numero_de_jid(self, jid: str) -> Optional[str]:
+        if not isinstance(jid, str) or "@" not in jid:
+            return None
+        numero = "".join(filter(str.isdigit, jid.split("@")[0]))
+        return numero if numero else None
+
+    def _is_plausible_phone_number(self, numero: str) -> bool:
+        if not isinstance(numero, str):
+            return False
+        if numero.lower().endswith("@lid"):
+            return False
+        digits = "".join(filter(str.isdigit, numero))
+        return 10 <= len(digits) <= 15
+
+    async def _check_whatsapp_number(
+        self,
+        client: httpx.AsyncClient,
+        instance: str,
+        numero: str,
+    ) -> Optional[str]:
+        """Validate candidate number with Evolution and return deliverable digits."""
+        formatted = self._format_number(numero)
+        if not self._is_plausible_phone_number(formatted):
+            return None
+        try:
+            response = await self._request(
+                client,
+                "POST",
+                f"/chat/whatsappNumbers/{instance}",
+                json={"numbers": [formatted]},
+                timeout=10.0,
+            )
+            if response.status_code != 200:
+                return None
+
+            payload = response.json()
+            if not isinstance(payload, list) or not payload:
+                return None
+            row = payload[0] if isinstance(payload[0], dict) else {}
+            if not row.get("exists"):
+                return None
+
+            numero_row = "".join(filter(str.isdigit, str(row.get("number") or "")))
+            if self._is_plausible_phone_number(numero_row):
+                return numero_row
+
+            jid_row = str(row.get("jid") or "")
+            from_jid = self._extrair_numero_de_jid(jid_row)
+            if from_jid and self._is_plausible_phone_number(from_jid):
+                return from_jid
+            return None
+        except Exception:
+            return None
+
+    async def _fetch_chats(
+        self,
+        client: httpx.AsyncClient,
+        instance: str,
+    ) -> List[Dict[str, Any]]:
+        """Fetch chats from Evolution chat module."""
+        try:
+            response = await self._request(
+                client,
+                "POST",
+                f"/chat/findChats/{instance}",
+                json={},
+                timeout=20.0,
+            )
+            if response.status_code != 200:
+                return []
+            payload = response.json()
+            if isinstance(payload, list):
+                return [item for item in payload if isinstance(item, dict)]
+            return []
+        except Exception:
+            return []
+
+    def _parse_iso_datetime(self, value: Any) -> Optional[datetime]:
+        if not isinstance(value, str) or not value.strip():
+            return None
+        text = value.strip().replace("Z", "+00:00")
+        try:
+            return datetime.fromisoformat(text)
+        except Exception:
+            return None
+
+    def _name_similarity_score(self, base_name: str, candidate_name: str) -> int:
+        base = self._normalizar_nome(base_name)
+        candidate = self._normalizar_nome(candidate_name)
+        if not base or not candidate:
+            return 0
+        if base == candidate:
+            return 100
+        if base in candidate or candidate in base:
+            return 80
+        base_tokens = {token for token in base.split(" ") if len(token) >= 3}
+        candidate_tokens = {token for token in candidate.split(" ") if len(token) >= 3}
+        if not base_tokens or not candidate_tokens:
+            return 0
+        overlap = len(base_tokens.intersection(candidate_tokens))
+        if overlap == 0:
+            return 0
+        return overlap * 20
+
+    async def _resolve_lid_number(
+        self,
+        client: httpx.AsyncClient,
+        instance: str,
+        numero: str,
+        context_push_name: Optional[str],
+        context_preferred_number: Optional[str],
+    ) -> Optional[str]:
+        """Try to map @lid identifier to a deliverable phone number."""
+        if not isinstance(numero, str) or not numero.lower().endswith("@lid"):
+            return None
+
+        candidate_numbers: List[str] = []
+        preferred = self._format_number(context_preferred_number or "")
+        if self._is_plausible_phone_number(preferred):
+            candidate_numbers.append(preferred)
+
+        contacts = await self._fetch_contacts(client, instance)
+        current_contact = next(
+            (
+                item
+                for item in contacts
+                if str(item.get("remoteJid", "")).lower() == numero.lower()
+            ),
+            None,
+        )
+        for alt_key in ("remoteJidAlt", "remoteJidAlternative", "jidAlt"):
+            if current_contact and isinstance(current_contact.get(alt_key), str):
+                numero_alt = self._extrair_numero_de_jid(current_contact.get(alt_key))
+                if numero_alt and self._is_plausible_phone_number(numero_alt):
+                    candidate_numbers.append(numero_alt)
+
+        nome_base = self._normalizar_nome(context_push_name or (current_contact or {}).get("pushName"))
+        if nome_base:
+            contact_matches = [
+                item
+                for item in contacts
+                if str(item.get("remoteJid", "")).endswith("@s.whatsapp.net")
+                and self._normalizar_nome(item.get("pushName")) == nome_base
+            ]
+            if len(contact_matches) == 1:
+                numero_match = self._extrair_numero_de_jid(contact_matches[0].get("remoteJid", ""))
+                if numero_match and self._is_plausible_phone_number(numero_match):
+                    candidate_numbers.append(numero_match)
+
+            chats = await self._fetch_chats(client, instance)
+            current_chat = next(
+                (
+                    item
+                    for item in chats
+                    if str(item.get("remoteJid", "")).lower() == numero.lower()
+                ),
+                None,
+            )
+            current_updated = self._parse_iso_datetime((current_chat or {}).get("updatedAt"))
+            ranked_candidates: List[Dict[str, Any]] = []
+            for chat in chats:
+                remote_jid = str(chat.get("remoteJid", ""))
+                if not remote_jid.endswith("@s.whatsapp.net"):
+                    continue
+                candidate_number = self._extrair_numero_de_jid(remote_jid)
+                if not candidate_number or not self._is_plausible_phone_number(candidate_number):
+                    continue
+                score = self._name_similarity_score(nome_base, str(chat.get("pushName") or ""))
+                if score <= 0:
+                    continue
+                updated = self._parse_iso_datetime(chat.get("updatedAt"))
+                recency_penalty = 0
+                if current_updated and updated:
+                    recency_penalty = int(abs((current_updated - updated).total_seconds()) // 600)
+                ranked_candidates.append(
+                    {
+                        "number": candidate_number,
+                        "score": score - recency_penalty,
+                        "updated": updated.isoformat() if updated else "",
+                    }
+                )
+            ranked_candidates.sort(
+                key=lambda item: (item.get("score", 0), item.get("updated", "")),
+                reverse=True,
+            )
+            for ranked in ranked_candidates[:5]:
+                candidate_numbers.append(str(ranked.get("number") or ""))
+
+        unique_candidates: List[str] = []
+        for candidate in candidate_numbers:
+            normalized = "".join(filter(str.isdigit, str(candidate or "")))
+            if not normalized or normalized in unique_candidates:
+                continue
+            unique_candidates.append(normalized)
+
+        fallback_candidate: Optional[str] = None
+        for candidate in unique_candidates:
+            checked = await self._check_whatsapp_number(client, instance, candidate)
+            if checked:
+                return checked
+            if not fallback_candidate and self._is_plausible_phone_number(candidate):
+                fallback_candidate = candidate
+
+        return fallback_candidate
+
     def _format_number(self, numero: str) -> str:
         """Format phone number for WhatsApp API."""
+        if not isinstance(numero, str):
+            return ""
+        numero = numero.strip()
+        if numero.lower().endswith("@lid"):
+            return numero
         if "@" in numero:
             numero = numero.split("@")[0]
         numero = "".join(filter(str.isdigit, numero))
@@ -583,3 +846,6 @@ class WhatsAppService:
         if len(numero) <= 11 and not numero.startswith("55"):
             numero = "55" + numero
         return numero
+
+
+

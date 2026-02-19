@@ -1,0 +1,223 @@
+name: fabio2
+services:
+  backend:
+    build:
+      context: C:\projetos\fabio2\backend
+      dockerfile: Dockerfile
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --reload
+    container_name: fabio2-backend
+    depends_on:
+      evolution-api:
+        condition: service_started
+        required: true
+      postgres:
+        condition: service_healthy
+        required: true
+      redis:
+        condition: service_healthy
+        required: true
+    environment:
+      CONTRATOS_TEMPLATES_DIR: /app/contratos/templates
+      CORS_ORIGINS: http://localhost:3000,http://frontend:3000
+      CUSTO_POR_IMAGEM_USD: "0.015"
+      DATABASE_URL: "<REDACTED>"
+      DEBUG: "true"
+      DEEPSEEK_API_KEY: "<REDACTED>"
+      ENVIRONMENT: development
+      EVOLUTION_API_KEY: "<REDACTED>"
+      EVOLUTION_API_URL: http://evolution-api:8080
+      FRONTEND_BASE_URL: http://localhost:3000
+      GOOGLE_API_KEY: "<REDACTED>"
+      GOOGLE_CALENDAR_CLIENT_ID: "<REDACTED>"
+      GOOGLE_CALENDAR_CLIENT_SECRET: "<REDACTED>"
+      GOOGLE_CALENDAR_DEFAULT_ID: "<REDACTED>"
+      GOOGLE_CALENDAR_SCOPE: https://www.googleapis.com/auth/calendar
+      GOOGLE_CALENDAR_SYNC_ENABLED: "true"
+      GOOGLE_CLIENT_ID: "<REDACTED>"
+      GOOGLE_CLIENT_SECRET: "<REDACTED>"
+      GOOGLE_GMAIL_CLIENT_ID: "<REDACTED>"
+      GOOGLE_GMAIL_CLIENT_SECRET: "<REDACTED>"
+      GOOGLE_REDIRECT_URI: http://localhost:8000/api/v1/google-calendar/callback
+      GOOGLE_SERVICE_ACCOUNT_EMAIL: "<REDACTED>"
+      GOOGLE_SERVICE_ACCOUNT_ID: "<REDACTED>"
+      MINIMAX_API_KEY: "<REDACTED>"
+      MINIMAX_BASE_URL: https://api.minimax.io
+      MINIMAX_GROUP_ID: "2022335301715759457"
+      MINIMAX_TTS_BITRATE: "128000"
+      MINIMAX_TTS_CHANNEL: "1"
+      MINIMAX_TTS_FORMAT: mp3
+      MINIMAX_TTS_MODEL: speech-2.8-hd
+      MINIMAX_TTS_PITCH: "2.0"
+      MINIMAX_TTS_SAMPLE_RATE: "32000"
+      MINIMAX_TTS_SPEED: "1.0"
+      MINIMAX_TTS_VOICE_ID: Portuguese_LovelyLady
+      MINIMAX_TTS_VOLUME: "3.64"
+      OLLAMA_API_KEY: "<REDACTED>"
+      OPENAI_API_KEY: "<REDACTED>"
+      OPENAI_API_MODEL: "<REDACTED>"
+      OPENROUTER_API_KEY: "<REDACTED>"
+      REDIS_URL: "<REDACTED>"
+      SECRET_KEY: "<REDACTED>"
+      STORAGE_LOCAL_PATH: /app/storage
+      STORAGE_MODE: local
+      TAXA_CAMBIO_BRL: "5.0"
+      TEST_VAR: test_value
+      VIVA_BRAIN_ROOT: /app/COFRE
+      VIVA_MEMORY_ENABLED: "true"
+      VIVA_MEMORY_FILE_LOG_ENABLED: "true"
+      VIVA_RULES_DIR: /app/viva_rules
+      ZAI_API_KEY: "<REDACTED>"
+    networks:
+      fabio2-network: null
+    ports:
+      - mode: ingress
+        target: 8000
+        published: "8000"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: C:\projetos\fabio2\backend
+        target: /app
+        bind: {}
+      - type: bind
+        source: C:\projetos\fabio2\agents
+        target: /app/agents
+        read_only: true
+        bind: {}
+      - type: bind
+        source: C:\projetos\fabio2\contratos
+        target: /app/contratos
+        read_only: true
+        bind: {}
+      - type: bind
+        source: C:\projetos\fabio2\frontend\src\app\viva\REGRAS
+        target: /app/viva_rules
+        bind: {}
+      - type: volume
+        source: backend_storage
+        target: /app/storage
+        volume: {}
+  evolution-api:
+    container_name: fabio2-evolution
+    depends_on:
+      postgres:
+        condition: service_started
+        required: true
+      redis:
+        condition: service_started
+        required: true
+    environment:
+      AUTHENTICATION_API_KEY: "<REDACTED>"
+      AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: "true"
+      CACHE_LOCAL_ENABLED: "false"
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_PREFIX_KEY: evolution-cache
+      CACHE_REDIS_SAVE_INSTANCES: "false"
+      CACHE_REDIS_TTL: "604800"
+      CACHE_REDIS_URI: redis://redis:6379/6
+      CONFIG_SESSION_PHONE_VERSION: 2.3000.1032141294
+      DATABASE_CONNECTION_URI: postgresql://fabio2_user:fabio2_pass@postgres:5432/evolution
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_SAVE_DATA_HISTORIC: "true"
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "true"
+      DATABASE_SAVE_MESSAGE_UPDATE: "true"
+      LOG_BAILEYS: error
+      REDIS_ENABLED: "true"
+      REDIS_PREFIX: evolution
+      REDIS_URI: redis://redis:6379/0
+      SERVER_URL: http://localhost:8080
+      STORAGE_LOCAL_ENABLED: "true"
+      STORAGE_LOCAL_PATH: /evolution/instances
+      WEBSOCKET_ENABLED: "true"
+    image: atendai/evolution-api:latest
+    networks:
+      fabio2-network: null
+    ports:
+      - mode: ingress
+        target: 8080
+        published: "8080"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: evolution_data
+        target: /evolution/instances
+        volume: {}
+  postgres:
+    container_name: fabio2-postgres
+    environment:
+      POSTGRES_DB: fabio2
+      POSTGRES_PASSWORD: "<REDACTED>"
+      POSTGRES_USER: fabio2_user
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U fabio2_user -d fabio2
+      timeout: 5s
+      interval: 5s
+      retries: 5
+    image: pgvector/pgvector:pg15
+    networks:
+      fabio2-network: null
+    ports:
+      - mode: ingress
+        target: 5432
+        published: "5432"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: postgres_data
+        target: /var/lib/postgresql/data
+        volume: {}
+  redis:
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+    container_name: fabio2-redis
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      timeout: 5s
+      interval: 5s
+      retries: 5
+    image: redis:7-alpine
+    networks:
+      fabio2-network: null
+    ports:
+      - mode: ingress
+        target: 6379
+        published: "6379"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: redis_data
+        target: /data
+        volume: {}
+networks:
+  fabio2-network:
+    name: fabio2_fabio2-network
+    driver: bridge
+volumes:
+  backend_storage:
+    name: fabio2_backend_storage
+  evolution_data:
+    name: fabio2_evolution_data
+  postgres_data:
+    name: fabio2_postgres_data
+  redis_data:
+    name: fabio2_redis_data

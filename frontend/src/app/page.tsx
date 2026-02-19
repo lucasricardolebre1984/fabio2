@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
 
@@ -50,62 +50,70 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="w-full max-w-md p-4">
-        <Card>
-          <CardHeader className="text-center">
-            <div className="mb-4">
-              <h1 className="text-3xl font-bold text-primary-700">FC Soluções</h1>
-              <p className="text-primary-500">Financeiras</p>
-            </div>
-            <CardTitle className="text-xl">Acesse sua conta</CardTitle>
-            <CardDescription>
-              Entre com suas credenciais para continuar
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
+    <>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded focus:bg-black focus:px-3 focus:py-2 focus:text-white"
+      >
+        Pular para o conteúdo principal
+      </a>
+      <main id="main-content" className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="w-full max-w-md p-4">
+          <Card>
+            <CardHeader className="text-center">
+              <div className="mb-4">
+                <h1 className="text-3xl font-bold text-primary-800">FC Soluções</h1>
+                <p className="text-primary-700">Financeiras</p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Senha</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-              {error && (
-                <div className="p-3 text-sm text-red-500 bg-red-50 rounded">
-                  {error}
+              <h2 className="text-xl font-semibold text-gray-900">Acesse sua conta</h2>
+              <p className="text-sm text-gray-600">
+                Entre com suas credenciais para continuar
+              </p>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
                 </div>
-              )}
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={loading}
-              >
-                {loading ? 'Entrando...' : 'Entrar'}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-        <p className="text-center text-sm text-gray-500 mt-4">
-          © 2026 FC Soluções Financeiras. Todos os direitos reservados.
-        </p>
-      </div>
-    </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Senha</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                {error && (
+                  <div role="alert" aria-live="assertive" className="rounded bg-red-50 p-3 text-sm text-red-700">
+                    {error}
+                  </div>
+                )}
+                <Button
+                  type="submit"
+                  className="w-full bg-primary-800 text-white hover:bg-primary-900"
+                  disabled={loading}
+                >
+                  {loading ? 'Entrando...' : 'Entrar'}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+          <p className="mt-4 text-center text-sm text-gray-700">
+            © 2026 FC Soluções Financeiras. Todos os direitos reservados.
+          </p>
+        </div>
+      </main>
+    </>
   )
 }

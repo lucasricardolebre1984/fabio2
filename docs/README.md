@@ -24,9 +24,10 @@ Escopo: estrutura ativa de documentacao institucional do SaaS FC Solucoes Financ
 
 ## Auditoria documental
 
-- Matriz menu -> API -> banco -> COFRE: `docs/AUDIT/menu-endpoint-matrix.md`
-- Auditoria de documentacao desta rodada: `docs/AUDIT/DOCS_AUDIT_2026-02-16.md`
-- Auditoria de qualidade web (perf/a11y/seo/best-practices + seguranca): `docs/AUDIT/WEB_QUALITY_AUDIT_2026-02-16.md`
+- Matriz menu -> API -> banco -> COFRE: `backend/COFRE/system/blindagem/audit/menu-endpoint-matrix.md`
+- Auditoria de documentacao desta rodada: `backend/COFRE/system/blindagem/audit/DOCS_AUDIT_2026-02-16.md`
+- Auditoria de qualidade web (perf/a11y/seo/best-practices + seguranca): `backend/COFRE/system/blindagem/audit/WEB_QUALITY_AUDIT_2026-02-16.md`
+- Consolidado de blindagem (auditoria + rollback): `backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md`
 
 ## Regra institucional de manutencao
 

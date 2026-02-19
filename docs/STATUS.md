@@ -46,9 +46,10 @@ Status geral: operacional em ambiente local, com pendencias criticas abertas em 
 
 ## Evidencias desta rodada
 
-- Matriz menu -> API -> banco -> COFRE: `docs/AUDIT/menu-endpoint-matrix.md`
-- Auditoria documental: `docs/AUDIT/DOCS_AUDIT_2026-02-16.md`
-- Auditoria de qualidade web: `docs/AUDIT/WEB_QUALITY_AUDIT_2026-02-16.md`
+- Matriz menu -> API -> banco -> COFRE: `backend/COFRE/system/blindagem/audit/menu-endpoint-matrix.md`
+- Auditoria documental: `backend/COFRE/system/blindagem/audit/DOCS_AUDIT_2026-02-16.md`
+- Auditoria de qualidade web: `backend/COFRE/system/blindagem/audit/WEB_QUALITY_AUDIT_2026-02-16.md`
+- Indice de blindagem e rollback: `backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md`
 - Refatoracao de dominio aplicada no orquestrador:
   - `backend/app/services/viva_domain_query_router_service.py`
   - consultas de contratos/clientes/campanhas/servicos extraidas do `viva_chat_orchestrator_service.py`

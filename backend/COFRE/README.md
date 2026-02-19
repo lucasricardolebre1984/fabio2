@@ -16,6 +16,10 @@
   - arquivos `*.jsonl` e assets sao runtime local (nao versionar)
 - `system/`
   - `endpoints_manifest.json`: catalogo canonico de modulos/capacidades/endpoints.
+  - `blindagem/`: trilha oficial de auditoria operacional e rollback.
+    - `blindagem/audit/*`: evidencias de auditoria tecnica.
+    - `blindagem/rollback/*`: patches de rollback versionados.
+    - `blindagem/BLINDAGEM_INDEX.md`: inventario unico da blindagem.
 
 ## Regras institucionais (anti-frankenstein)
 
@@ -24,6 +28,7 @@
 3. Nao commitar dados de runtime em `backend/COFRE/memories/`.
 4. Toda exclusao funcional no SaaS deve refletir no espelho COFRE quando aplicavel.
 5. Catalogo de capacidades/modulos vem de `backend/COFRE/system/endpoints_manifest.json`.
+6. Artefatos de blindagem (auditoria e rollback) ficam em `backend/COFRE/system/blindagem/`.
 
 ## Observacao de compatibilidade
 
