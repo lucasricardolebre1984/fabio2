@@ -78,6 +78,12 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
 - Fix de autenticacao da Evolution em producao:
   - Causa raiz: compose prod da Evolution sem `AUTHENTICATION_API_KEY`, gerando chave nao padronizada entre backend e Evolution.
   - Correcao: alinhamento com stack local (`AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}` + flags de websocket/cache).
+- Fix de stream OpenAI para modelos com parametros restritos:
+  - Causa raiz: `chat_stream` enviava `temperature` customizada para modelos que aceitam apenas valor padrao.
+  - Correcao: fallback automatico no stream para reenviar sem `temperature/max_completion_tokens` ao receber `400/422 unsupported_value`.
+- Fix de templates de contratos no deploy AWS:
+  - Causa raiz: backend em container sem acesso a `./contratos/templates`, caindo no fallback sem clausulas (`CLÁUSULAS NÃO CADASTRADAS`).
+  - Correcao: mount read-only de `./contratos` para `/app/contratos` no backend em `docker-compose.prod.yml` e `docker-compose-prod.yml`.
 
 ## Diretriz de deploy institucional
 

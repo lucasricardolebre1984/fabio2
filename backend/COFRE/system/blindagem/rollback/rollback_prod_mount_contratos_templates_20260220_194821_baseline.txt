@@ -1,0 +1,8 @@
+Rollback ID: rollback_prod_mount_contratos_templates_20260220_194821
+Purpose: Reverter mount de ./contratos para /app/contratos no backend (compose prod)
+Files:
+- docker-compose.prod.yml
+- docker-compose-prod.yml
+Recovery:
+1) git checkout -- docker-compose.prod.yml docker-compose-prod.yml
+2) docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build backend nginx

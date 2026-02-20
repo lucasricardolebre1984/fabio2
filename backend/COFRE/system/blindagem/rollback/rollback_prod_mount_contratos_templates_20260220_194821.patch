@@ -1,0 +1,24 @@
+diff --git a/docker-compose-prod.yml b/docker-compose-prod.yml
+index 88ceb29..011d3df 100644
+--- a/docker-compose-prod.yml
++++ b/docker-compose-prod.yml
+@@ -97,6 +97,7 @@ services:
+     volumes:
+       - backend_storage:/app/storage
+       - ./frontend/src/app/viva/REGRAS:/app/viva_rules:ro
++      - ./contratos:/app/contratos:ro
+     networks:
+       - fabio2-network
+     depends_on:
+diff --git a/docker-compose.prod.yml b/docker-compose.prod.yml
+index 88ceb29..011d3df 100644
+--- a/docker-compose.prod.yml
++++ b/docker-compose.prod.yml
+@@ -97,6 +97,7 @@ services:
+     volumes:
+       - backend_storage:/app/storage
+       - ./frontend/src/app/viva/REGRAS:/app/viva_rules:ro
++      - ./contratos:/app/contratos:ro
+     networks:
+       - fabio2-network
+     depends_on:

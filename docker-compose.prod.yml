@@ -97,6 +97,7 @@ services:
     volumes:
       - backend_storage:/app/storage
       - ./frontend/src/app/viva/REGRAS:/app/viva_rules:ro
+      - ./contratos:/app/contratos:ro
     networks:
       - fabio2-network
     depends_on:
