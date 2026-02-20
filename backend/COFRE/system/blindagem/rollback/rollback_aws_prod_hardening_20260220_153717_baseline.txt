@@ -1,0 +1,14 @@
+timestamp=20260220_153717
+branch=main
+head_before_commit=f293e12
+changed_files:
+ M backend/app/api/deps.py
+ M backend/app/api/v1/auth.py
+ M backend/app/core/security.py
+ M backend/requirements.txt
+ M docker-compose-prod.yml
+ M frontend/Dockerfile
+?? backend/COFRE/system/blindagem/rollback/rollback_pre_aws_go_live_20260220_144959.patch
+?? backend/COFRE/system/blindagem/rollback/rollback_pre_aws_go_live_20260220_144959_baseline.txt
+?? frontend/test-results/
+?? frontend/tmp-route-smoke.spec.ts

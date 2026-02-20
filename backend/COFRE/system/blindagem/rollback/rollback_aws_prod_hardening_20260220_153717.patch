@@ -1,0 +1,243 @@
+diff --git a/backend/app/api/deps.py b/backend/app/api/deps.py
+index 1346465..483b9e9 100644
+--- a/backend/app/api/deps.py
++++ b/backend/app/api/deps.py
+@@ -7,7 +7,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+ from sqlalchemy.ext.asyncio import AsyncSession
+ 
+ from app.db.session import get_db
+-from app.core.security_stub import decode_token
++from app.core.security import decode_token
+ from app.models.user import User
+ 
+ # Security scheme
+diff --git a/backend/app/api/v1/auth.py b/backend/app/api/v1/auth.py
+index 284215d..76e7693 100644
+--- a/backend/app/api/v1/auth.py
++++ b/backend/app/api/v1/auth.py
+@@ -5,7 +5,7 @@ from sqlalchemy import select
+ from sqlalchemy.ext.asyncio import AsyncSession
+ 
+ from app.api.deps import get_db, get_current_user
+-from app.core.security_stub import verify_password, create_token_pair, decode_token
++from app.core.security import verify_password, create_token_pair, decode_token
+ from app.models.user import User
+ from app.schemas.user import (
+     LoginRequest,
+diff --git a/backend/app/core/security.py b/backend/app/core/security.py
+index bab0b2e..a0fad3b 100644
+--- a/backend/app/core/security.py
++++ b/backend/app/core/security.py
+@@ -1,70 +1,66 @@
+-"""
+-STUB temporário para security - bcrypt com problemas no Windows
+-Usar apenas para desenvolvimento local!
+-"""
++"""Security helpers for password hashing and JWT tokens."""
+ from datetime import datetime, timedelta, timezone
+ from typing import Optional, Tuple
++
+ from jose import JWTError, jwt
++from passlib.context import CryptContext
++
+ from app.config import settings
+ 
+-# Stub simples para desenvolvimento
+-# Em produção, usar bcrypt real
++pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
++
+ 
+ def verify_password(plain_password: str, hashed_password: str) -> bool:
+-    """Verify password - DEV MODE: comparação direta para teste"""
+-    # MODO DESENVOLVIMENTO: aceita senha "1234" para qualquer hash
+-    DEV_PASSWORD = "1234"
+-    
+-    if plain_password == DEV_PASSWORD:
+-        return True
+-    return False
++    """Verify a plaintext password against a bcrypt hash."""
++    if not plain_password or not hashed_password:
++        return False
++
++    try:
++        return pwd_context.verify(plain_password, hashed_password)
++    except Exception:
++        return False
++
+ 
+ def get_password_hash(password: str) -> str:
+-    """Hash password - DEV MODE: retorna hash fixo"""
+-    # Retorna hash pré-computado de "1234"
+-    return "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW"
++    """Generate bcrypt hash for a plaintext password."""
++    return pwd_context.hash(password)
++
+ 
+ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+     """Create a JWT access token."""
+     to_encode = data.copy()
+-    
+     if expires_delta:
+         expire = datetime.now(timezone.utc) + expires_delta
+     else:
+-        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+-    
++        expire = datetime.now(timezone.utc) + timedelta(
++            minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
++        )
+     to_encode.update({"exp": expire, "type": "access"})
+-    
+-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+-    return encoded_jwt
++    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
++
+ 
+ def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+     """Create a JWT refresh token."""
+     to_encode = data.copy()
+-    
+     if expires_delta:
+         expire = datetime.now(timezone.utc) + expires_delta
+     else:
+         expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+-    
+     to_encode.update({"exp": expire, "type": "refresh"})
+-    
+-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+-    return encoded_jwt
++    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
++
+ 
+ def decode_token(token: str) -> Optional[dict]:
+     """Decode and validate a JWT token."""
+     try:
+-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+-        return payload
++        return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+     except JWTError:
+         return None
+ 
++
+ def create_token_pair(user_id: str) -> Tuple[str, str, int]:
+     """Create both access and refresh tokens."""
+     access_token = create_access_token({"sub": user_id})
+     refresh_token = create_refresh_token({"sub": user_id})
+-    
+     expires_in = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+-    
+     return access_token, refresh_token, expires_in
+diff --git a/backend/requirements.txt b/backend/requirements.txt
+index 6cfba1f..05c9ee4 100644
+--- a/backend/requirements.txt
++++ b/backend/requirements.txt
+@@ -22,6 +22,7 @@ redis==5.0.1
+ # ====================================================================
+ python-jose[cryptography]==3.3.0
+ passlib[bcrypt]==1.7.4
++bcrypt==3.2.2
+ python-dotenv==1.0.0
+ 
+ # ====================================================================
+diff --git a/docker-compose-prod.yml b/docker-compose-prod.yml
+index 5a381a5..30ee290 100644
+--- a/docker-compose-prod.yml
++++ b/docker-compose-prod.yml
+@@ -36,14 +36,19 @@ services:
+     container_name: fabio2-backend
+     restart: unless-stopped
+     environment:
+-      - DATABASE_URL=postgresql+asyncpg://${DB_USER:-fabio2_prod}:${DB_PASSWORD:-change_me}@postgres:5432/${DB_NAME:-fabio2_prod}
++      - ENVIRONMENT=production
++      - DEBUG=false
++      - DATABASE_URL=postgresql+asyncpg://${DB_USER:-fabio2_user}:${DB_PASSWORD:-fabio2_pass}@postgres:5432/${DB_NAME:-fabio2}
+       - REDIS_URL=redis://redis:6379/0
+       - SECRET_KEY=${SECRET_KEY:-change_me_min_32_chars}
+       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost}
+       - EVOLUTION_API_URL=http://evolution-api:8080
+-      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-change_me}
++      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-default_key_change_in_production}
++      - WA_INSTANCE_NAME=${WA_INSTANCE_NAME:-fc-solucoes}
++      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+       - STORAGE_MODE=local
+       - STORAGE_LOCAL_PATH=/app/storage
++      - VIVA_BRAIN_ROOT=/app/COFRE
+     volumes:
+       - backend_storage:/app/storage
+     networks:
+@@ -59,13 +64,13 @@ services:
+     container_name: fabio2-postgres
+     restart: unless-stopped
+     environment:
+-      POSTGRES_USER: fabio2_prod
+-      POSTGRES_PASSWORD: ${DB_PASSWORD:-change_me}
+-      POSTGRES_DB: fabio2_prod
++      POSTGRES_USER: ${DB_USER:-fabio2_user}
++      POSTGRES_PASSWORD: ${DB_PASSWORD:-fabio2_pass}
++      POSTGRES_DB: ${DB_NAME:-fabio2}
+     volumes:
+       - postgres_data:/var/lib/postgresql/data
+     healthcheck:
+-      test: ["CMD-SHELL", "pg_isready -U fabio2_prod -d fabio2_prod"]
++      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-fabio2_user} -d ${DB_NAME:-fabio2}"]
+       interval: 5s
+       timeout: 5s
+       retries: 5
+@@ -91,7 +96,7 @@ services:
+     environment:
+       - DATABASE_ENABLED=true
+       - DATABASE_PROVIDER=postgresql
+-      - DATABASE_CONNECTION_URI=postgresql://${DB_USER:-fabio2_prod}:${DB_PASSWORD:-change_me}@postgres:5432/evolution
++      - DATABASE_CONNECTION_URI=postgresql://${DB_USER:-fabio2_user}:${DB_PASSWORD:-fabio2_pass}@postgres:5432/evolution
+       - DATABASE_SAVE_DATA_INSTANCE=true
+       - DATABASE_SAVE_DATA_NEW_MESSAGE=true
+       - DATABASE_SAVE_MESSAGE_UPDATE=true
+diff --git a/frontend/Dockerfile b/frontend/Dockerfile
+index f55550a..27f0b6a 100644
+--- a/frontend/Dockerfile
++++ b/frontend/Dockerfile
+@@ -2,34 +2,26 @@ FROM node:20-alpine AS builder
+ 
+ WORKDIR /app
+ 
+-# Copy config files
+-COPY package*.json tsconfig.json next.config.js tailwind.config.ts components.json postcss.config.js ./
++# Copy config and source files required for Next build.
++COPY package*.json tsconfig.json next.config.js tailwind.config.ts postcss.config.js ./
+ COPY src ./src
+ COPY public ./public
+ 
+-# Install ALL dependencies (including devDependencies for build)
++# Install dependencies and force standalone output for container runtime.
+ RUN npm ci
+-
+-# Build the application
++ENV NEXT_OUTPUT_STANDALONE=1
+ RUN npm run build
+ 
+-# Production stage
+-FROM node:20-alpine
++FROM node:20-alpine AS runner
+ 
+ WORKDIR /app
++ENV NODE_ENV=production
++ENV PORT=3000
++ENV HOSTNAME=0.0.0.0
+ 
+-# Copy package files
+-COPY package*.json ./
+-
+-# Install only production dependencies
+-RUN npm ci --only=production
+-
+-# Copy built application from builder stage
+-COPY --from=builder /app/.next ./.next
+ COPY --from=builder /app/public ./public
++COPY --from=builder /app/.next/standalone ./
++COPY --from=builder /app/.next/static ./.next/static
+ 
+-# Expose port
+ EXPOSE 3000
+-
+-# Start the application
+-CMD ["node", ".next/standalone/server.js"]
++CMD ["node", "server.js"]

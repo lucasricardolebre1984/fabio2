@@ -1,7 +1,7 @@
 ﻿# STATUS do projeto - FC Solucoes Financeiras
 
 Data: 2026-02-20
-Status geral: operacional em ambiente local, com WhatsApp/VIVA/Viviane funcionais e layout de contratos estabilizado para homologacao final; permanecem pendencias tecnicas de seguranca e suite de testes.
+Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA/Viviane funcionais e layout de contratos estabilizado para homologacao final; permanecem pendencias de CI externo, hardening e publicacao AWS.
 
 ## Fonte de verdade ativa
 
@@ -28,7 +28,7 @@ Status geral: operacional em ambiente local, com WhatsApp/VIVA/Viviane funcionai
 - Gate 5 Voz/TTS: Parcial
 - Gate 6 Google Calendar: Parcial
 - Gate 7 Testes: Nao concluido
-- Gate 8 Build/Deploy: Parcial
+- Gate 8 Build/Deploy: Parcial (stack prod-like validada; pendente go-live EC2 com dominio/SSL)
 - Gate 9 Documentacao/Rollback final: Consolidado para rodada de contratos/logo
 
 ## Pendencias criticas abertas
@@ -41,7 +41,6 @@ Status geral: operacional em ambiente local, com WhatsApp/VIVA/Viviane funcionai
 - BUG-116: vulnerabilidades criticas/altas no frontend (`next`, `axios`)
 - BUG-117: `npm run type-check` quebrando por dependencia de `.next/types`
 - BUG-118: suite backend com falhas em auth/contratos/viva (`pytest`)
-- BUG-119: `security_stub` ainda ativo no fluxo real de autenticacao
 - BUG-120: CORS amplo no backend (`allow_methods=*`, `allow_headers=*`)
 
 ## Evidencias desta rodada
@@ -58,6 +57,12 @@ Status geral: operacional em ambiente local, com WhatsApp/VIVA/Viviane funcionai
   - `backend/COFRE/system/blindagem/audit/CONTRATOS_LOGO_LAYOUT_2026-02-20.md`
   - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317_pre_fix_baseline.txt`
   - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317.patch`
+- Hardening de deploy AWS/producao:
+  - `docs/AWS_EC2_GO_LIVE_1PAGINA_2026-02-20.md`
+  - `backend/COFRE/system/blindagem/rollback/rollback_pre_aws_go_live_20260220_144959_baseline.txt`
+  - `backend/COFRE/system/blindagem/rollback/rollback_pre_aws_go_live_20260220_144959.patch`
+  - `backend/COFRE/system/blindagem/rollback/rollback_aws_prod_hardening_20260220_153717_baseline.txt`
+  - `backend/COFRE/system/blindagem/rollback/rollback_aws_prod_hardening_20260220_153717.patch`
 
 ## Diretriz de deploy institucional
 

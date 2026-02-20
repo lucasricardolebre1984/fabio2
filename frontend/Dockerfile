@@ -2,34 +2,26 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy config files
-COPY package*.json tsconfig.json next.config.js tailwind.config.ts components.json postcss.config.js ./
+# Copy config and source files required for Next build.
+COPY package*.json tsconfig.json next.config.js tailwind.config.ts postcss.config.js ./
 COPY src ./src
 COPY public ./public
 
-# Install ALL dependencies (including devDependencies for build)
+# Install dependencies and force standalone output for container runtime.
 RUN npm ci
-
-# Build the application
+ENV NEXT_OUTPUT_STANDALONE=1
 RUN npm run build
 
-# Production stage
-FROM node:20-alpine
+FROM node:20-alpine AS runner
 
 WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 
-# Copy package files
-COPY package*.json ./
-
-# Install only production dependencies
-RUN npm ci --only=production
-
-# Copy built application from builder stage
-COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 
-# Expose port
 EXPOSE 3000
-
-# Start the application
-CMD ["node", ".next/standalone/server.js"]
+CMD ["node", "server.js"]

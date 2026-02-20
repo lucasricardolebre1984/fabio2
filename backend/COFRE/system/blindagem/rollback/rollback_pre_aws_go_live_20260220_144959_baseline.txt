@@ -1,0 +1,19 @@
+ROLLBACK INSTITUCIONAL - PRE AWS GO LIVE
+Data: 2026-02-20 14:50:28
+Branch: main
+Head: f293e12
+Origin: https://github.com/lucasricardolebre1984/fabio2.git
+
+Estado git no baseline:
+- working tree limpo
+
+Rollback rapido para baseline:
+git fetch origin
+git checkout main
+git reset --hard f293e12
+
+Rollback por revert (se houver commits novos):
+git revert <hash_do_commit>
+
+Observacao:
+- Este baseline foi criado antes da rodada de validacao/deploy AWS.

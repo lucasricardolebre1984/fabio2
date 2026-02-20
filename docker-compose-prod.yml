@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   nginx:
     image: nginx:alpine
@@ -36,14 +34,19 @@ services:
     container_name: fabio2-backend
     restart: unless-stopped
     environment:
-      - DATABASE_URL=postgresql+asyncpg://${DB_USER:-fabio2_prod}:${DB_PASSWORD:-change_me}@postgres:5432/${DB_NAME:-fabio2_prod}
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - DATABASE_URL=postgresql+asyncpg://${DB_USER:-fabio2_user}:${DB_PASSWORD:-fabio2_pass}@postgres:5432/${DB_NAME:-fabio2}
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=${SECRET_KEY:-change_me_min_32_chars}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost}
       - EVOLUTION_API_URL=http://evolution-api:8080
-      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-change_me}
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-default_key_change_in_production}
+      - WA_INSTANCE_NAME=${WA_INSTANCE_NAME:-fc-solucoes}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - STORAGE_MODE=local
       - STORAGE_LOCAL_PATH=/app/storage
+      - VIVA_BRAIN_ROOT=/app/COFRE
     volumes:
       - backend_storage:/app/storage
     networks:
@@ -59,13 +62,13 @@ services:
     container_name: fabio2-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: fabio2_prod
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-change_me}
-      POSTGRES_DB: fabio2_prod
+      POSTGRES_USER: ${DB_USER:-fabio2_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-fabio2_pass}
+      POSTGRES_DB: ${DB_NAME:-fabio2}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U fabio2_prod -d fabio2_prod"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-fabio2_user} -d ${DB_NAME:-fabio2}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -91,7 +94,7 @@ services:
     environment:
       - DATABASE_ENABLED=true
       - DATABASE_PROVIDER=postgresql
-      - DATABASE_CONNECTION_URI=postgresql://${DB_USER:-fabio2_prod}:${DB_PASSWORD:-change_me}@postgres:5432/evolution
+      - DATABASE_CONNECTION_URI=postgresql://${DB_USER:-fabio2_user}:${DB_PASSWORD:-fabio2_pass}@postgres:5432/evolution
       - DATABASE_SAVE_DATA_INSTANCE=true
       - DATABASE_SAVE_DATA_NEW_MESSAGE=true
       - DATABASE_SAVE_MESSAGE_UPDATE=true

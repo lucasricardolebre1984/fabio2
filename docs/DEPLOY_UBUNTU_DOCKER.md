@@ -19,14 +19,12 @@ Etapas macro
 
 ## Arquivos de Compose (Fonte de Verdade)
 
-Existem múltiplos arquivos no repositório. Para produção, use:
+Para producao, use:
 
-- **Canônico:** `docker-compose.prod.yml`  
-- **Local:** `docker-compose.local.yml`  
-- **Desenvolvimento:** `docker-compose.yml`  
-- **Legado:** `docker-compose-prod.yml` (mantido apenas para referência; preferir `docker-compose.prod.yml`)
-
-**Observação:** a consolidação definitiva dos arquivos será feita na Etapa 3.
+- **Canônico:** `docker-compose.prod.yml`
+- **Alias equivalente:** `docker-compose-prod.yml` (mesmo conteudo)
+- **Local:** `docker-compose.local.yml`
+- **Desenvolvimento:** `docker-compose.yml`
 
 ---
 
@@ -85,23 +83,17 @@ git clone https://github.com/lucasricardolebre1984/fabio2.git
 cd fabio2
 ```
 
-3. Preparar Nginx (baseado no nginx.conf existente)
-```
-mkdir -p nginx
-cp nginx.conf nginx/nginx.conf
-```
-
-4. Criar `.env.prod` com as variáveis de produção
+3. Criar `.env.prod` com as variáveis de produção
 ```
 nano .env.prod
 ```
 
-5. Subir stack completa
+4. Subir stack completa
 ```
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 ```
 
-6. Verificar serviços
+5. Verificar serviços
 ```
 docker ps
 curl http://localhost/health
