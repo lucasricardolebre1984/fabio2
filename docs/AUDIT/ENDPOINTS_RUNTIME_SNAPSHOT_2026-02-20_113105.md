@@ -1,0 +1,77 @@
+# Endpoints Runtime Snapshot - 2026-02-20_113105
+
+- Fonte: http://localhost:8000/openapi.json
+- Total de rotas: 70
+
+| Metodo(s) | Path |
+|---|---|
+| GET | $(@{path=/; methods=GET}.path) |
+| GET,POST | $(@{path=/api/v1/agenda; methods=GET,POST}.path) |
+| DELETE,GET,PUT | $(@{path=/api/v1/agenda/{evento_id}; methods=DELETE,GET,PUT}.path) |
+| PATCH | $(@{path=/api/v1/agenda/{evento_id}/concluir; methods=PATCH}.path) |
+| GET | $(@{path=/api/v1/agenda/hoje; methods=GET}.path) |
+| POST | $(@{path=/api/v1/auth/login; methods=POST}.path) |
+| POST | $(@{path=/api/v1/auth/logout; methods=POST}.path) |
+| GET | $(@{path=/api/v1/auth/me; methods=GET}.path) |
+| POST | $(@{path=/api/v1/auth/refresh; methods=POST}.path) |
+| GET,POST | $(@{path=/api/v1/clientes; methods=GET,POST}.path) |
+| DELETE,GET,PUT | $(@{path=/api/v1/clientes/{cliente_id}; methods=DELETE,GET,PUT}.path) |
+| GET | $(@{path=/api/v1/clientes/{cliente_id}/contratos; methods=GET}.path) |
+| GET | $(@{path=/api/v1/clientes/{cliente_id}/historico; methods=GET}.path) |
+| POST | $(@{path=/api/v1/clientes/deduplicar-documentos; methods=POST}.path) |
+| GET | $(@{path=/api/v1/clientes/documento/{documento}; methods=GET}.path) |
+| POST | $(@{path=/api/v1/clientes/sincronizar-contratos; methods=POST}.path) |
+| GET | $(@{path=/api/v1/cofre/memories/{table_name}/tail; methods=GET}.path) |
+| GET | $(@{path=/api/v1/cofre/memories/status; methods=GET}.path) |
+| POST | $(@{path=/api/v1/cofre/memories/sync-db-tables; methods=POST}.path) |
+| GET | $(@{path=/api/v1/cofre/memories/tables; methods=GET}.path) |
+| GET | $(@{path=/api/v1/cofre/system/manifest; methods=GET}.path) |
+| GET | $(@{path=/api/v1/cofre/system/schema-status; methods=GET}.path) |
+| GET,POST | $(@{path=/api/v1/contratos; methods=GET,POST}.path) |
+| DELETE,GET,PUT | $(@{path=/api/v1/contratos/{contrato_id}; methods=DELETE,GET,PUT}.path) |
+| POST | $(@{path=/api/v1/contratos/{contrato_id}/enviar; methods=POST}.path) |
+| GET | $(@{path=/api/v1/contratos/{contrato_id}/pdf; methods=GET}.path) |
+| GET | $(@{path=/api/v1/contratos/templates; methods=GET}.path) |
+| GET | $(@{path=/api/v1/contratos/templates/{template_id}; methods=GET}.path) |
+| GET | $(@{path=/api/v1/google-calendar/callback; methods=GET}.path) |
+| GET | $(@{path=/api/v1/google-calendar/connect-url; methods=GET}.path) |
+| POST | $(@{path=/api/v1/google-calendar/disconnect; methods=POST}.path) |
+| GET | $(@{path=/api/v1/google-calendar/status; methods=GET}.path) |
+| POST | $(@{path=/api/v1/google-calendar/sync/agenda/{evento_id}; methods=POST}.path) |
+| POST | $(@{path=/api/v1/viva/audio/speak; methods=POST}.path) |
+| POST | $(@{path=/api/v1/viva/audio/transcribe; methods=POST}.path) |
+| GET,POST | $(@{path=/api/v1/viva/campanhas; methods=GET,POST}.path) |
+| DELETE,GET | $(@{path=/api/v1/viva/campanhas/{campanha_id}; methods=DELETE,GET}.path) |
+| POST | $(@{path=/api/v1/viva/campanhas/reset-all; methods=POST}.path) |
+| POST | $(@{path=/api/v1/viva/campanhas/reset-patterns; methods=POST}.path) |
+| GET | $(@{path=/api/v1/viva/capabilities; methods=GET}.path) |
+| POST | $(@{path=/api/v1/viva/chat; methods=POST}.path) |
+| POST | $(@{path=/api/v1/viva/chat/session/new; methods=POST}.path) |
+| GET | $(@{path=/api/v1/viva/chat/sessions; methods=GET}.path) |
+| GET | $(@{path=/api/v1/viva/chat/snapshot; methods=GET}.path) |
+| POST | $(@{path=/api/v1/viva/chat/stream; methods=POST}.path) |
+| GET | $(@{path=/api/v1/viva/handoff; methods=GET}.path) |
+| POST | $(@{path=/api/v1/viva/handoff/process-due; methods=POST}.path) |
+| POST | $(@{path=/api/v1/viva/handoff/schedule; methods=POST}.path) |
+| POST | $(@{path=/api/v1/viva/image/generate; methods=POST}.path) |
+| GET | $(@{path=/api/v1/viva/modules/status; methods=GET}.path) |
+| GET | $(@{path=/api/v1/viva/persona/status; methods=GET}.path) |
+| GET | $(@{path=/api/v1/viva/status; methods=GET}.path) |
+| GET | $(@{path=/api/v1/viva/tts/status; methods=GET}.path) |
+| POST | $(@{path=/api/v1/viva/video/generate; methods=POST}.path) |
+| GET | $(@{path=/api/v1/viva/video/result/{task_id}; methods=GET}.path) |
+| POST | $(@{path=/api/v1/viva/vision; methods=POST}.path) |
+| POST | $(@{path=/api/v1/viva/vision/upload; methods=POST}.path) |
+| GET,POST | $(@{path=/api/v1/webhook/evolution; methods=GET,POST}.path) |
+| GET | $(@{path=/api/v1/whatsapp-chat/conversas; methods=GET}.path) |
+| GET | $(@{path=/api/v1/whatsapp-chat/conversas/{conversa_id}; methods=GET}.path) |
+| POST | $(@{path=/api/v1/whatsapp-chat/conversas/{conversa_id}/arquivar; methods=POST}.path) |
+| POST | $(@{path=/api/v1/whatsapp-chat/conversas/{conversa_id}/bind-number; methods=POST}.path) |
+| GET | $(@{path=/api/v1/whatsapp-chat/conversas/{conversa_id}/mensagens; methods=GET}.path) |
+| GET | $(@{path=/api/v1/whatsapp-chat/status; methods=GET}.path) |
+| POST | $(@{path=/api/v1/whatsapp/conectar; methods=POST}.path) |
+| POST | $(@{path=/api/v1/whatsapp/desconectar; methods=POST}.path) |
+| POST | $(@{path=/api/v1/whatsapp/enviar-arquivo; methods=POST}.path) |
+| POST | $(@{path=/api/v1/whatsapp/enviar-texto; methods=POST}.path) |
+| GET | $(@{path=/api/v1/whatsapp/status; methods=GET}.path) |
+| GET | $(@{path=/health; methods=GET}.path) |

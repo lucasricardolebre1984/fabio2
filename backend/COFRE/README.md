@@ -1,11 +1,12 @@
-# COFRE da VIVA (canonico)
+# COFRE da VIVA + VIVIANE (canonico)
 
-`COFRE` e a raiz unica de persona, skills e trilha de memorias da VIVA.
+`COFRE` e a raiz unica de persona, skills e trilha de memorias da VIVA e da Viviane.
 
 ## Estrutura canonica
 
 - `persona-skills/`
-  - `AGENT.md`: prompt mestre institucional.
+  - `AGENT.md`: prompt mestre institucional da VIVA interna (chat SaaS).
+  - `VIVIANE.md`: prompt oficial da Viviane (WhatsApp externo).
   - `skill-generate-campanha-neutra.md`
   - `skill-interpretar-contratos.md`
   - `skill-memoria-cofre.md`
@@ -23,7 +24,7 @@
 
 ## Regras institucionais (anti-frankenstein)
 
-1. Persona e skills oficiais existem somente em `backend/COFRE/persona-skills/`.
+1. Personas e skills oficiais existem somente em `backend/COFRE/persona-skills/`.
 2. Nao criar persona paralela fora do COFRE.
 3. Nao commitar dados de runtime em `backend/COFRE/memories/`.
 4. Toda exclusao funcional no SaaS deve refletir no espelho COFRE quando aplicavel.

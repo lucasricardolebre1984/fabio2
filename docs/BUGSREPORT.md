@@ -1,4 +1,4 @@
-﻿# BUGSREPORT - Registro de Bugs
+# BUGSREPORT - Registro de Bugs
 
 > **Projeto:** FC SoluÃ§Ãµes Financeiras SaaS  
 > **Ãšltima AtualizaÃ§Ã£o:** 2026-02-16 (auditoria gate 1-9 + memoria/persona + conversa real)
@@ -105,6 +105,7 @@
 | BUG-121 | Alta | VIVA/Agenda NLU | Comando com "coloque na agenda ... verifique se Google Calendar ..." caia em consulta e nao criava evento | Resolvido |
 | BUG-122 | Alta | WhatsApp/Webhook | Conversas recebidas com `@lid` eram marcadas como nao entregaveis (`exists:false`) e bloqueavam resposta automatica da VIVA | Resolvido |
 | BUG-123 | Alta | VIVA/Agenda NLU | Comando natural sem data explicita (`viva marque ... as 17 horas`) falhava com pedido de data/hora e quebrava fluxo operacional | Resolvido |
+| BUG-124 | Critica | Viviane/WhatsApp | Fluxo comercial repetia perguntas de nome/cidade/transferencia, perdia contexto e gerava cancelamento de lead no handoff humano | Resolvido |
 
 ---
 
@@ -2385,3 +2386,23 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
 - validacao tecnica:
   - `pytest backend/tests/test_whatsapp_lid_resolution.py backend/tests/test_viva_domain_intents.py -q` => `17 passed`.
   - validacao real de resolucao para `223927414591688@lid` retornou numero entregavel (`5516981903443`) sem bind manual.
+
+### BUG-124: Viviane repetia perguntas e perdia lead no handoff
+**Data:** 2026-02-20  
+**Severidade:** Critica  
+**Descricao:** No WhatsApp externo, a Viviane repetia coleta de nome/cidade e confirmacao de transferencia mesmo com dados ja informados, causando friccao e desistencias.
+**Esperado:** Conversa natural sem loop, com memoria de contexto e transferencia humana sem retrabalho.
+**Status:** Resolvido  
+
+### Atualizacao 2026-02-20 (BUG-124 - anti-loop nome/cidade/handoff)
+- backend:
+  - `backend/app/services/viva_ia_service.py`
+  - `backend/COFRE/persona-skills/VIVIANE.md`
+- ajustes aplicados:
+  - extracao de nome mais natural (`fala com Glauco`, `me chama de ...`, `Nome, ...`);
+  - captura de cidade por resposta curta quando contexto espera cidade (ex.: `Ribeirao Preto`);
+  - estado de handoff (`requested`/`in_progress`) para evitar repetir "posso transferir?";
+  - transferencia humana passa a ser objetiva: sem pedir de novo dados ja coletados;
+  - persona Viviane separada no COFRE com arquivo dedicado.
+- validacao tecnica:
+  - `pytest backend/tests/test_viviane_humanizacao.py -q`.

@@ -6,6 +6,11 @@ def test_disengage_intent_detected():
     assert service._is_disengage_intent("vc e muito insistente nao quero mais vou procurar outra empresa")
 
 
+def test_viviane_persona_loaded_from_cofre_file():
+    service = VivaIAService()
+    assert "OBJETIVO PRINCIPAL" in service.base_system_prompt
+
+
 def test_who_am_i_reply_contains_known_data():
     service = VivaIAService()
     lead = {
@@ -47,6 +52,16 @@ def test_extract_name_from_short_turn_with_question():
     assert service._extrair_nome("Ricardo qual o seu ?") == "Ricardo"
 
 
+def test_extract_name_from_fala_com_pattern():
+    service = VivaIAService()
+    assert service._extrair_nome("Tudo otimo, fala com Glauco") == "Glauco"
+
+
+def test_extract_name_from_comma_prefix():
+    service = VivaIAService()
+    assert service._extrair_nome("Glauco, disse logo ai em cima") == "Glauco"
+
+
 def test_social_identity_question_detected():
     service = VivaIAService()
     assert service._is_social_identity_question("sou o Ricardo e você?")
@@ -66,3 +81,19 @@ def test_decompression_reply_offers_human_handoff():
     )
     assert "Sem problema" in reply
     assert "atendimento humano" in reply
+
+
+def test_extract_city_from_short_reply_when_context_expects_city():
+    service = VivaIAService()
+    city = service._extrair_cidade_resposta_curta(
+        texto_original="Ribeirao Preto",
+        contexto={"handoff_status": "requested"},
+    )
+    assert city == "Ribeirao Preto"
+
+
+def test_handoff_start_reply_avoids_repeat_loop():
+    service = VivaIAService()
+    reply = service._build_handoff_start_reply({"nome": "Glauco"})
+    assert "Vou te transferir agora" in reply
+    assert "Nao precisa repetir" in reply

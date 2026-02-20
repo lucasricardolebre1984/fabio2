@@ -1,0 +1,426 @@
+diff --git a/backend/COFRE/README.md b/backend/COFRE/README.md
+index 8913454..8512220 100644
+--- a/backend/COFRE/README.md
++++ b/backend/COFRE/README.md
+@@ -1,11 +1,12 @@
+-# COFRE da VIVA (canonico)
++# COFRE da VIVA + VIVIANE (canonico)
+ 
+-`COFRE` e a raiz unica de persona, skills e trilha de memorias da VIVA.
++`COFRE` e a raiz unica de persona, skills e trilha de memorias da VIVA e da Viviane.
+ 
+ ## Estrutura canonica
+ 
+ - `persona-skills/`
+-  - `AGENT.md`: prompt mestre institucional.
++  - `AGENT.md`: prompt mestre institucional da VIVA interna (chat SaaS).
++  - `VIVIANE.md`: prompt oficial da Viviane (WhatsApp externo).
+   - `skill-generate-campanha-neutra.md`
+   - `skill-interpretar-contratos.md`
+   - `skill-memoria-cofre.md`
+@@ -23,7 +24,7 @@
+ 
+ ## Regras institucionais (anti-frankenstein)
+ 
+-1. Persona e skills oficiais existem somente em `backend/COFRE/persona-skills/`.
++1. Personas e skills oficiais existem somente em `backend/COFRE/persona-skills/`.
+ 2. Nao criar persona paralela fora do COFRE.
+ 3. Nao commitar dados de runtime em `backend/COFRE/memories/`.
+ 4. Toda exclusao funcional no SaaS deve refletir no espelho COFRE quando aplicavel.
+diff --git a/backend/COFRE/persona-skills/AGENT.md b/backend/COFRE/persona-skills/AGENT.md
+index 9312a18..33c56a7 100644
+--- a/backend/COFRE/persona-skills/AGENT.md
++++ b/backend/COFRE/persona-skills/AGENT.md
+@@ -1,9 +1,13 @@
+-﻿# AGENT.md - VIVA ORQUESTRADOR UNICO
++# AGENT.md - VIVA ORQUESTRADOR INTERNO
+ 
+ Versao: 2.0
+ Escopo: chat interno da VIVA no SaaS
+ Fonte canonica: este arquivo
+ 
++Nota de dominio:
++- Persona WhatsApp externa (Viviane) e canonica em COFRE/persona-skills/VIVIANE.md.
++- Este arquivo governa somente a VIVA interna do painel SaaS.
++
+ ## 1) Identidade
+ Voce e VIVA, assistente principal do Fabio no SaaS.
+ Voce representa a empresa em tom institucional, objetivo e pratico.
+@@ -108,4 +112,5 @@ Gatilhos diretos para campanha:
+ 
+ ## 7) Governanca
+ - Este AGENT.md so pode ser alterado com supervisao explicita do Fabio ou Lucas (criador do sistema).
+-- Nao criar persona paralela fora deste arquivo.
++- Nao criar persona paralela fora de `backend/COFRE/persona-skills/`.
++
+diff --git a/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md b/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
+index 571ed62..47ddca4 100644
+--- a/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
++++ b/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
+@@ -32,6 +32,10 @@ Este arquivo centraliza os artefatos institucionais de blindagem para homologaca
+ - `backend/COFRE/system/blindagem/audit/WHATSAPP_LID_DELIVERY_BUG_2026-02-20.md`
+ - `backend/COFRE/system/blindagem/audit/EVOLUTION_LID_FIX_2026-02-20.md`
+ - `backend/COFRE/system/blindagem/audit/PERSONA_VIVIANE_SCOPE_2026-02-20.md`
++- `backend/COFRE/system/blindagem/audit/ENDPOINTS_RUNTIME_SNAPSHOT_2026-02-20_113105.md`
++- `backend/COFRE/system/blindagem/audit/endpoints-runtime-2026-02-20_113105.json`
++- `backend/COFRE/system/blindagem/audit/playwright-whatsapp-conversas-2026-02-20.json`
++- `backend/COFRE/system/blindagem/audit/VIVIANE_WHATSAPP_NO_LOOP_HOTFIX_2026-02-20.md`
+ 
+ ## Rollbacks
+ - `backend/COFRE/system/blindagem/rollback/rollback_gate2_cca7e3d.patch`
+diff --git a/backend/app/services/viva_ia_service.py b/backend/app/services/viva_ia_service.py
+index efdb6bf..7700794 100644
+--- a/backend/app/services/viva_ia_service.py
++++ b/backend/app/services/viva_ia_service.py
+@@ -4,6 +4,8 @@ Integracao com OpenAI para atendimento de WhatsApp.
+ """
+ from datetime import datetime, timezone
+ import logging
++import os
++from pathlib import Path
+ import re
+ import unicodedata
+ from typing import Dict, List, Optional
+@@ -21,7 +23,7 @@ class VivaIAService:
+     """VIVA - atendimento comercial humanizado da Rezeta no WhatsApp."""
+ 
+     def __init__(self) -> None:
+-        self.base_system_prompt = """Voce e Viviane, consultora de negocios da Rezeta.
++        default_prompt = """Voce e Viviane, consultora de negocios da Rezeta.
+ Nunca use linguagem robotica e nunca abra conversa dizendo que e IA.
+ 
+ MODO DE OPERACAO: B
+@@ -70,6 +72,7 @@ ESCALA PARA HUMANO:
+ - servico complexo em fechamento;
+ - assunto fora do catalogo oficial.
+ """
++        self.base_system_prompt = self._load_viviane_persona_prompt(default_prompt)
+ 
+         self.identity_replies = [
+             "Sou a Viviane, consultora da Rezeta, e vou cuidar do seu atendimento.",
+@@ -81,6 +84,13 @@ ESCALA PARA HUMANO:
+         self.handoff_keywords = {
+             "quero falar com atendente",
+             "falar com humano",
++            "falar com humana",
++            "falar com atendente",
++            "atendente humano",
++            "atendente humana",
++            "atendimento humano",
++            "me transfere para atendente",
++            "me passa para atendente",
+             "falar com gerente",
+             "reclamacao",
+             "reclamar",
+@@ -181,6 +191,33 @@ ESCALA PARA HUMANO:
+             "baixa": ("sem pressa", "quando der", "pode ser depois"),
+         }
+ 
++    def _load_viviane_persona_prompt(self, fallback: str) -> str:
++        persona_file = self._resolve_viviane_persona_file()
++        if not persona_file:
++            return fallback
++        try:
++            content = persona_file.read_text(encoding="utf-8").strip()
++            return content or fallback
++        except Exception as exc:
++            logging.warning("Nao foi possivel ler persona Viviane em %s: %s", persona_file, exc)
++            return fallback
++
++    def _resolve_viviane_persona_file(self) -> Optional[Path]:
++        env_path = os.getenv("VIVIANE_PERSONA_FILE")
++        candidates: List[Path] = []
++        if env_path:
++            candidates.append(Path(env_path))
++        candidates.extend(
++            [
++                Path("/app/COFRE/persona-skills/VIVIANE.md"),
++                Path(__file__).resolve().parents[3] / "backend" / "COFRE" / "persona-skills" / "VIVIANE.md",
++            ]
++        )
++        for path in candidates:
++            if path.exists():
++                return path
++        return None
++
+     async def processar_mensagem(
+         self,
+         numero: str,
+@@ -202,7 +239,12 @@ ESCALA PARA HUMANO:
+                 contexto["fase"] = "aguardando_nome"
+         contexto.setdefault("conversation_mode", "qualificacao")
+ 
+-        self._atualizar_dados_lead(lead=lead, texto_original=mensagem, texto_normalizado=texto)
++        self._atualizar_dados_lead(
++            lead=lead,
++            texto_original=mensagem,
++            texto_normalizado=texto,
++            contexto=contexto,
++        )
+         service_info = viva_knowledge_service.find_service_from_message(mensagem)
+         servico_inferido: Optional[str] = None
+         if service_info:
+@@ -233,16 +275,25 @@ ESCALA PARA HUMANO:
+                 "Se mudar de ideia, eu te atendo por aqui sem burocracia."
+             )
+ 
++        handoff_status = str(contexto.get("handoff_status") or "").strip().lower()
++        if handoff_status in {"requested", "in_progress"}:
++            contexto["lead"] = lead
++            contexto["handoff_status"] = "in_progress"
++            contexto["conversation_mode"] = "descompressao"
++            contexto["handoff_last_update"] = datetime.now(timezone.utc).isoformat()
++            conversa.contexto_ia = contexto
++            await db.commit()
++            return self._build_handoff_in_progress_reply(lead=lead)
++
+         if self._deve_escalar_para_humano(texto):
+             contexto["lead"] = lead
+             contexto["ultima_escala"] = datetime.now(timezone.utc).isoformat()
++            contexto["handoff_status"] = "requested"
++            contexto["handoff_started_at"] = datetime.now(timezone.utc).isoformat()
+             contexto["conversation_mode"] = "descompressao"
+             conversa.contexto_ia = contexto
+             await db.commit()
+-            return (
+-                "Perfeito, vou te encaminhar para atendimento humano agora. "
+-                "Se puder, me resume em uma frase o que precisa para agilizar."
+-            )
++            return self._build_handoff_start_reply(lead=lead)
+ 
+         fase = contexto.get("fase", "inicio")
+ 
+@@ -528,7 +579,12 @@ ESCALA PARA HUMANO:
+             r"aqui\s+[eé]\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+             r"aqui\s+[eé]\s+o\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+             r"aqui\s+[eé]\s+a\s+([a-zA-ZÀ-ÿ\s]{2,50})",
++            r"fala com\s+([a-zA-ZÀ-ÿ\s]{2,50})",
++            r"pode falar com\s+([a-zA-ZÀ-ÿ\s]{2,50})",
++            r"me chama de\s+([a-zA-ZÀ-ÿ\s]{2,50})",
++            r"pode me chamar de\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+             r"^\s*([a-zA-ZÀ-ÿ]{2,30})\s+(?:qual|e voce|e você|e o seu|e o seu nome)",
++            r"^\s*([a-zA-ZÀ-ÿ]{2,30})\s*[,;]\s*.*$",
+             r"^\s*([a-zA-ZÀ-ÿ]{2,30})\s*$",
+         ]
+         for padrao in padroes:
+@@ -568,6 +624,15 @@ ESCALA PARA HUMANO:
+             "noite",
+             "ola",
+             "oi",
++            "fala",
++            "com",
++            "aqui",
++            "disse",
++            "logo",
++            "acima",
++            "cima",
++            "vc",
++            "voce",
+         }
+         if any(self._remover_acentos(p).lower() in proibidos for p in palavras):
+             return None
+@@ -675,6 +740,7 @@ ESCALA PARA HUMANO:
+         lead: Dict[str, str],
+         texto_original: str,
+         texto_normalizado: str,
++        contexto: Optional[Dict[str, object]] = None,
+     ) -> None:
+         phone_match = re.search(r"(\+?55)?\s*\(?\d{2}\)?\s*9?\d{4}-?\d{4}", texto_original)
+         if phone_match and not lead.get("telefone"):
+@@ -691,6 +757,16 @@ ESCALA PARA HUMANO:
+                     lead["cidade"] = city.title()
+                     break
+ 
++        if not str(lead.get("cidade") or "").strip():
++            city_guess = self._extrair_cidade_resposta_curta(
++                texto_original=texto_original,
++                contexto=contexto,
++            )
++            if city_guess:
++                nome_existente = str(lead.get("nome") or "").strip()
++                if self._remover_acentos(city_guess).lower() != self._remover_acentos(nome_existente).lower():
++                    lead["cidade"] = city_guess
++
+         if "urgencia" in texto_normalizado and "urgencia" not in lead:
+             lead["urgencia"] = "nao informada"
+ 
+@@ -700,6 +776,96 @@ ESCALA PARA HUMANO:
+                     lead["urgencia"] = label
+                     break
+ 
++    def _extrair_cidade_resposta_curta(
++        self,
++        texto_original: str,
++        contexto: Optional[Dict[str, object]] = None,
++    ) -> Optional[str]:
++        if not texto_original:
++            return None
++
++        contexto = contexto or {}
++        last_missing = str(contexto.get("last_missing_field") or "").strip().lower()
++        handoff_status = str(contexto.get("handoff_status") or "").strip().lower()
++        expected_city = last_missing == "cidade" or handoff_status in {"requested", "in_progress"}
++        if not expected_city:
++            return None
++
++        cleaned = re.sub(r"[^A-Za-zÀ-ÿ\s-]", " ", texto_original)
++        cleaned = re.sub(r"\s+", " ", cleaned).strip(" .,-")
++        if not cleaned:
++            return None
++
++        normalized = self._normalizar(cleaned)
++        blocked_terms = (
++            "cpf",
++            "cnpj",
++            "pf",
++            "pj",
++            "urgente",
++            "imediato",
++            "sim",
++            "nao",
++            "não",
++            "ok",
++            "quero",
++            "preciso",
++            "transferir",
++            "atendente",
++            "humano",
++            "bom dia",
++            "boa tarde",
++            "boa noite",
++            "oi",
++            "ola",
++            "olá",
++        )
++        if any(term in normalized for term in blocked_terms):
++            return None
++
++        if not re.fullmatch(r"[A-Za-zÀ-ÿ]{2,}(?:\s+[A-Za-zÀ-ÿ]{2,}){0,3}", cleaned):
++            return None
++
++        words = cleaned.split(" ")
++        if len(words) > 4:
++            return None
++
++        return " ".join(word.capitalize() for word in words)
++
++    def _build_handoff_start_reply(self, lead: Dict[str, str]) -> str:
++        nome = str(lead.get("nome") or "").strip()
++        greeting = f"Perfeito, {nome}." if nome else "Perfeito."
++        return (
++            f"{greeting} Vou te transferir agora para um especialista humano. "
++            "Nao precisa repetir as informacoes que voce ja passou. "
++            "Se quiser agilizar, pode complementar so cidade e urgencia; se preferir, o especialista confirma direto."
++        )
++
++    def _build_handoff_in_progress_reply(self, lead: Dict[str, str]) -> str:
++        nome = str(lead.get("nome") or "").strip()
++        cidade = str(lead.get("cidade") or "").strip()
++        urgencia = str(lead.get("urgencia") or "").strip()
++        prefix = f"{nome}, " if nome else ""
++
++        missing_optional: List[str] = []
++        if not cidade:
++            missing_optional.append("cidade")
++        if not urgencia:
++            missing_optional.append("urgencia")
++
++        if missing_optional:
++            pendencia = " e ".join(missing_optional)
++            return (
++                f"{prefix}transferencia em andamento com especialista humano. "
++                "Nao precisa repetir o historico. "
++                f"Se quiser, me manda so {pendencia}; se nao, seguimos assim mesmo."
++            )
++
++        return (
++            f"{prefix}transferencia em andamento com especialista humano. "
++            "Nao precisa repetir informacoes; seu resumo ja foi encaminhado."
++        )
++
+     def _lead_missing_fields(self, lead: Dict[str, str]) -> List[str]:
+         required = ["nome", "telefone", "servico", "cidade", "urgencia"]
+         return [field for field in required if not str(lead.get(field, "")).strip()]
+diff --git a/backend/tests/test_viviane_humanizacao.py b/backend/tests/test_viviane_humanizacao.py
+index 0895f33..134ae1d 100644
+--- a/backend/tests/test_viviane_humanizacao.py
++++ b/backend/tests/test_viviane_humanizacao.py
+@@ -47,6 +47,16 @@ def test_extract_name_from_short_turn_with_question():
+     assert service._extrair_nome("Ricardo qual o seu ?") == "Ricardo"
+ 
+ 
++def test_extract_name_from_fala_com_pattern():
++    service = VivaIAService()
++    assert service._extrair_nome("Tudo otimo, fala com Glauco") == "Glauco"
++
++
++def test_extract_name_from_comma_prefix():
++    service = VivaIAService()
++    assert service._extrair_nome("Glauco, disse logo ai em cima") == "Glauco"
++
++
+ def test_social_identity_question_detected():
+     service = VivaIAService()
+     assert service._is_social_identity_question("sou o Ricardo e você?")
+@@ -66,3 +76,19 @@ def test_decompression_reply_offers_human_handoff():
+     )
+     assert "Sem problema" in reply
+     assert "atendimento humano" in reply
++
++
++def test_extract_city_from_short_reply_when_context_expects_city():
++    service = VivaIAService()
++    city = service._extrair_cidade_resposta_curta(
++        texto_original="Ribeirao Preto",
++        contexto={"handoff_status": "requested"},
++    )
++    assert city == "Ribeirao Preto"
++
++
++def test_handoff_start_reply_avoids_repeat_loop():
++    service = VivaIAService()
++    reply = service._build_handoff_start_reply({"nome": "Glauco"})
++    assert "Vou te transferir agora" in reply
++    assert "Nao precisa repetir" in reply
+diff --git a/docs/BUGSREPORT.md b/docs/BUGSREPORT.md
+index e31472d..ab38e67 100644
+--- a/docs/BUGSREPORT.md
++++ b/docs/BUGSREPORT.md
+@@ -1,4 +1,4 @@
+-﻿# BUGSREPORT - Registro de Bugs
++# BUGSREPORT - Registro de Bugs
+ 
+ > **Projeto:** FC SoluÃ§Ãµes Financeiras SaaS  
+ > **Ãšltima AtualizaÃ§Ã£o:** 2026-02-16 (auditoria gate 1-9 + memoria/persona + conversa real)
+@@ -105,6 +105,7 @@
+ | BUG-121 | Alta | VIVA/Agenda NLU | Comando com "coloque na agenda ... verifique se Google Calendar ..." caia em consulta e nao criava evento | Resolvido |
+ | BUG-122 | Alta | WhatsApp/Webhook | Conversas recebidas com `@lid` eram marcadas como nao entregaveis (`exists:false`) e bloqueavam resposta automatica da VIVA | Resolvido |
+ | BUG-123 | Alta | VIVA/Agenda NLU | Comando natural sem data explicita (`viva marque ... as 17 horas`) falhava com pedido de data/hora e quebrava fluxo operacional | Resolvido |
++| BUG-124 | Critica | Viviane/WhatsApp | Fluxo comercial repetia perguntas de nome/cidade/transferencia, perdia contexto e gerava cancelamento de lead no handoff humano | Resolvido |
+ 
+ ---
+ 
+@@ -2385,3 +2386,23 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
+ - validacao tecnica:
+   - `pytest backend/tests/test_whatsapp_lid_resolution.py backend/tests/test_viva_domain_intents.py -q` => `17 passed`.
+   - validacao real de resolucao para `223927414591688@lid` retornou numero entregavel (`5516981903443`) sem bind manual.
++
++### BUG-124: Viviane repetia perguntas e perdia lead no handoff
++**Data:** 2026-02-20  
++**Severidade:** Critica  
++**Descricao:** No WhatsApp externo, a Viviane repetia coleta de nome/cidade e confirmacao de transferencia mesmo com dados ja informados, causando friccao e desistencias.
++**Esperado:** Conversa natural sem loop, com memoria de contexto e transferencia humana sem retrabalho.
++**Status:** Resolvido  
++
++### Atualizacao 2026-02-20 (BUG-124 - anti-loop nome/cidade/handoff)
++- backend:
++  - `backend/app/services/viva_ia_service.py`
++  - `backend/COFRE/persona-skills/VIVIANE.md`
++- ajustes aplicados:
++  - extracao de nome mais natural (`fala com Glauco`, `me chama de ...`, `Nome, ...`);
++  - captura de cidade por resposta curta quando contexto espera cidade (ex.: `Ribeirao Preto`);
++  - estado de handoff (`requested`/`in_progress`) para evitar repetir "posso transferir?";
++  - transferencia humana passa a ser objetiva: sem pedir de novo dados ja coletados;
++  - persona Viviane separada no COFRE com arquivo dedicado.
++- validacao tecnica:
++  - `pytest backend/tests/test_viviane_humanizacao.py -q`.

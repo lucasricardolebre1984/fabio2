@@ -1,0 +1,7 @@
+{
+  "route": "http://localhost:3000/whatsapp/conversas",
+  "tool": "npx playwright screenshot",
+  "status": "ok",
+  "evidence": "C:/projetos/fabio2/docs/AUDIT/playwright-whatsapp-conversas-2026-02-20.png",
+  "checkedAt": "2026-02-20T11:33:55.3992678-03:00"
+}

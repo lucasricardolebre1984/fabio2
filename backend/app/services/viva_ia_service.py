@@ -4,6 +4,8 @@ Integracao com OpenAI para atendimento de WhatsApp.
 """
 from datetime import datetime, timezone
 import logging
+import os
+from pathlib import Path
 import re
 import unicodedata
 from typing import Dict, List, Optional
@@ -21,7 +23,7 @@ class VivaIAService:
     """VIVA - atendimento comercial humanizado da Rezeta no WhatsApp."""
 
     def __init__(self) -> None:
-        self.base_system_prompt = """Voce e Viviane, consultora de negocios da Rezeta.
+        default_prompt = """Voce e Viviane, consultora de negocios da Rezeta.
 Nunca use linguagem robotica e nunca abra conversa dizendo que e IA.
 
 MODO DE OPERACAO: B
@@ -70,6 +72,7 @@ ESCALA PARA HUMANO:
 - servico complexo em fechamento;
 - assunto fora do catalogo oficial.
 """
+        self.base_system_prompt = self._load_viviane_persona_prompt(default_prompt)
 
         self.identity_replies = [
             "Sou a Viviane, consultora da Rezeta, e vou cuidar do seu atendimento.",
@@ -81,6 +84,13 @@ ESCALA PARA HUMANO:
         self.handoff_keywords = {
             "quero falar com atendente",
             "falar com humano",
+            "falar com humana",
+            "falar com atendente",
+            "atendente humano",
+            "atendente humana",
+            "atendimento humano",
+            "me transfere para atendente",
+            "me passa para atendente",
             "falar com gerente",
             "reclamacao",
             "reclamar",
@@ -181,6 +191,33 @@ ESCALA PARA HUMANO:
             "baixa": ("sem pressa", "quando der", "pode ser depois"),
         }
 
+    def _load_viviane_persona_prompt(self, fallback: str) -> str:
+        persona_file = self._resolve_viviane_persona_file()
+        if not persona_file:
+            return fallback
+        try:
+            content = persona_file.read_text(encoding="utf-8").strip()
+            return content or fallback
+        except Exception as exc:
+            logging.warning("Nao foi possivel ler persona Viviane em %s: %s", persona_file, exc)
+            return fallback
+
+    def _resolve_viviane_persona_file(self) -> Optional[Path]:
+        env_path = os.getenv("VIVIANE_PERSONA_FILE")
+        candidates: List[Path] = []
+        if env_path:
+            candidates.append(Path(env_path))
+        candidates.extend(
+            [
+                Path("/app/COFRE/persona-skills/VIVIANE.md"),
+                Path(__file__).resolve().parents[3] / "backend" / "COFRE" / "persona-skills" / "VIVIANE.md",
+            ]
+        )
+        for path in candidates:
+            if path.exists():
+                return path
+        return None
+
     async def processar_mensagem(
         self,
         numero: str,
@@ -202,7 +239,12 @@ ESCALA PARA HUMANO:
                 contexto["fase"] = "aguardando_nome"
         contexto.setdefault("conversation_mode", "qualificacao")
 
-        self._atualizar_dados_lead(lead=lead, texto_original=mensagem, texto_normalizado=texto)
+        self._atualizar_dados_lead(
+            lead=lead,
+            texto_original=mensagem,
+            texto_normalizado=texto,
+            contexto=contexto,
+        )
         service_info = viva_knowledge_service.find_service_from_message(mensagem)
         servico_inferido: Optional[str] = None
         if service_info:
@@ -233,16 +275,25 @@ ESCALA PARA HUMANO:
                 "Se mudar de ideia, eu te atendo por aqui sem burocracia."
             )
 
+        handoff_status = str(contexto.get("handoff_status") or "").strip().lower()
+        if handoff_status in {"requested", "in_progress"}:
+            contexto["lead"] = lead
+            contexto["handoff_status"] = "in_progress"
+            contexto["conversation_mode"] = "descompressao"
+            contexto["handoff_last_update"] = datetime.now(timezone.utc).isoformat()
+            conversa.contexto_ia = contexto
+            await db.commit()
+            return self._build_handoff_in_progress_reply(lead=lead)
+
         if self._deve_escalar_para_humano(texto):
             contexto["lead"] = lead
             contexto["ultima_escala"] = datetime.now(timezone.utc).isoformat()
+            contexto["handoff_status"] = "requested"
+            contexto["handoff_started_at"] = datetime.now(timezone.utc).isoformat()
             contexto["conversation_mode"] = "descompressao"
             conversa.contexto_ia = contexto
             await db.commit()
-            return (
-                "Perfeito, vou te encaminhar para atendimento humano agora. "
-                "Se puder, me resume em uma frase o que precisa para agilizar."
-            )
+            return self._build_handoff_start_reply(lead=lead)
 
         fase = contexto.get("fase", "inicio")
 
@@ -528,7 +579,12 @@ ESCALA PARA HUMANO:
             r"aqui\s+[eé]\s+([a-zA-ZÀ-ÿ\s]{2,50})",
             r"aqui\s+[eé]\s+o\s+([a-zA-ZÀ-ÿ\s]{2,50})",
             r"aqui\s+[eé]\s+a\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+            r"fala com\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+            r"pode falar com\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+            r"me chama de\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+            r"pode me chamar de\s+([a-zA-ZÀ-ÿ\s]{2,50})",
             r"^\s*([a-zA-ZÀ-ÿ]{2,30})\s+(?:qual|e voce|e você|e o seu|e o seu nome)",
+            r"^\s*([a-zA-ZÀ-ÿ]{2,30})\s*[,;]\s*.*$",
             r"^\s*([a-zA-ZÀ-ÿ]{2,30})\s*$",
         ]
         for padrao in padroes:
@@ -568,6 +624,15 @@ ESCALA PARA HUMANO:
             "noite",
             "ola",
             "oi",
+            "fala",
+            "com",
+            "aqui",
+            "disse",
+            "logo",
+            "acima",
+            "cima",
+            "vc",
+            "voce",
         }
         if any(self._remover_acentos(p).lower() in proibidos for p in palavras):
             return None
@@ -675,6 +740,7 @@ ESCALA PARA HUMANO:
         lead: Dict[str, str],
         texto_original: str,
         texto_normalizado: str,
+        contexto: Optional[Dict[str, object]] = None,
     ) -> None:
         phone_match = re.search(r"(\+?55)?\s*\(?\d{2}\)?\s*9?\d{4}-?\d{4}", texto_original)
         if phone_match and not lead.get("telefone"):
@@ -691,6 +757,16 @@ ESCALA PARA HUMANO:
                     lead["cidade"] = city.title()
                     break
 
+        if not str(lead.get("cidade") or "").strip():
+            city_guess = self._extrair_cidade_resposta_curta(
+                texto_original=texto_original,
+                contexto=contexto,
+            )
+            if city_guess:
+                nome_existente = str(lead.get("nome") or "").strip()
+                if self._remover_acentos(city_guess).lower() != self._remover_acentos(nome_existente).lower():
+                    lead["cidade"] = city_guess
+
         if "urgencia" in texto_normalizado and "urgencia" not in lead:
             lead["urgencia"] = "nao informada"
 
@@ -699,6 +775,96 @@ ESCALA PARA HUMANO:
                 if any(word in texto_normalizado for word in keywords):
                     lead["urgencia"] = label
                     break
+
+    def _extrair_cidade_resposta_curta(
+        self,
+        texto_original: str,
+        contexto: Optional[Dict[str, object]] = None,
+    ) -> Optional[str]:
+        if not texto_original:
+            return None
+
+        contexto = contexto or {}
+        last_missing = str(contexto.get("last_missing_field") or "").strip().lower()
+        handoff_status = str(contexto.get("handoff_status") or "").strip().lower()
+        expected_city = last_missing == "cidade" or handoff_status in {"requested", "in_progress"}
+        if not expected_city:
+            return None
+
+        cleaned = re.sub(r"[^A-Za-zÀ-ÿ\s-]", " ", texto_original)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip(" .,-")
+        if not cleaned:
+            return None
+
+        normalized = self._normalizar(cleaned)
+        blocked_terms = (
+            "cpf",
+            "cnpj",
+            "pf",
+            "pj",
+            "urgente",
+            "imediato",
+            "sim",
+            "nao",
+            "não",
+            "ok",
+            "quero",
+            "preciso",
+            "transferir",
+            "atendente",
+            "humano",
+            "bom dia",
+            "boa tarde",
+            "boa noite",
+            "oi",
+            "ola",
+            "olá",
+        )
+        if any(term in normalized for term in blocked_terms):
+            return None
+
+        if not re.fullmatch(r"[A-Za-zÀ-ÿ]{2,}(?:\s+[A-Za-zÀ-ÿ]{2,}){0,3}", cleaned):
+            return None
+
+        words = cleaned.split(" ")
+        if len(words) > 4:
+            return None
+
+        return " ".join(word.capitalize() for word in words)
+
+    def _build_handoff_start_reply(self, lead: Dict[str, str]) -> str:
+        nome = str(lead.get("nome") or "").strip()
+        greeting = f"Perfeito, {nome}." if nome else "Perfeito."
+        return (
+            f"{greeting} Vou te transferir agora para um especialista humano. "
+            "Nao precisa repetir as informacoes que voce ja passou. "
+            "Se quiser agilizar, pode complementar so cidade e urgencia; se preferir, o especialista confirma direto."
+        )
+
+    def _build_handoff_in_progress_reply(self, lead: Dict[str, str]) -> str:
+        nome = str(lead.get("nome") or "").strip()
+        cidade = str(lead.get("cidade") or "").strip()
+        urgencia = str(lead.get("urgencia") or "").strip()
+        prefix = f"{nome}, " if nome else ""
+
+        missing_optional: List[str] = []
+        if not cidade:
+            missing_optional.append("cidade")
+        if not urgencia:
+            missing_optional.append("urgencia")
+
+        if missing_optional:
+            pendencia = " e ".join(missing_optional)
+            return (
+                f"{prefix}transferencia em andamento com especialista humano. "
+                "Nao precisa repetir o historico. "
+                f"Se quiser, me manda so {pendencia}; se nao, seguimos assim mesmo."
+            )
+
+        return (
+            f"{prefix}transferencia em andamento com especialista humano. "
+            "Nao precisa repetir informacoes; seu resumo ja foi encaminhado."
+        )
 
     def _lead_missing_fields(self, lead: Dict[str, str]) -> List[str]:
         required = ["nome", "telefone", "servico", "cidade", "urgencia"]
