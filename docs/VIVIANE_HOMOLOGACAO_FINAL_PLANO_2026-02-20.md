@@ -11,6 +11,7 @@
 - Resposta outbound voltou a chegar no WhatsApp com `@lid` (Evolution v2.3.7).
 - Fluxo de handoff humano foi blindado para evitar repeticao de transferencia.
 - Extracao de nome e cidade ficou mais natural em respostas curtas.
+- Naturalidade conversational reforcada (humor + empatia + sem preco espontaneo).
 - Persona Viviane foi separada em arquivo dedicado no COFRE:
   - `backend/COFRE/persona-skills/VIVIANE.md`
 
@@ -56,4 +57,3 @@
 - Entrega WhatsApp validada em numeros diferentes (sem hardcode).
 - Documentacao atualizada em `docs/` e `backend/COFRE/`.
 - Rollback patch versionado em `backend/COFRE/system/blindagem/rollback/`.
-

@@ -75,10 +75,10 @@ ESCALA PARA HUMANO:
         self.base_system_prompt = self._load_viviane_persona_prompt(default_prompt)
 
         self.identity_replies = [
-            "Sou a Viviane, consultora da Rezeta, e vou cuidar do seu atendimento.",
-            "Aqui e a Viviane, da Rezeta. Me conta seu objetivo que eu te ajudo.",
-            "Sou a Viviane, consultora de negocios da Rezeta. Vamos resolver isso juntas.",
-            "Viviane falando, da Rezeta. Pode me explicar seu caso que eu te oriento.",
+            "Justa pergunta. Eu sou a Viviane, consultora da Rezeta, e vou te atender no seu ritmo.",
+            "Sou a Viviane, da Rezeta. Se eu acelerar demais, me avisa que ajusto na hora.",
+            "Viviane aqui. A ideia e te ajudar sem enrolacao e sem pressa.",
+            "Eu sou a Viviane, consultora comercial da Rezeta. Seguimos de forma simples e natural.",
         ]
 
         self.handoff_keywords = {
@@ -255,8 +255,13 @@ ESCALA PARA HUMANO:
                 lead["servico"] = servico_inferido
 
         if self._eh_pergunta_identidade_ia(texto):
-            resposta = self._resposta_identidade_variada(contexto)
+            resposta = self._resposta_identidade_variada(
+                contexto=contexto,
+                texto=texto,
+                lead=lead,
+            )
             contexto["lead"] = lead
+            contexto["conversation_mode"] = "descompressao"
             conversa.contexto_ia = contexto
             await db.commit()
             return resposta
@@ -351,6 +356,13 @@ ESCALA PARA HUMANO:
                 return f"Oi, {nome}! Tudo bem? Estou por aqui para te ajudar no que voce precisar."
             return "Oi! Tudo bem? Estou por aqui para te ajudar no que voce precisar."
 
+        if self._is_money_humor_intent(texto) and not self._is_price_question(texto):
+            contexto["lead"] = lead
+            contexto["conversation_mode"] = "descompressao"
+            conversa.contexto_ia = contexto
+            await db.commit()
+            return self._build_money_humor_reply(lead=lead)
+
         if self._is_price_question(texto):
             known_service = service_info or viva_knowledge_service.find_service_from_message(str(lead.get("servico") or ""))
             if known_service:
@@ -429,6 +441,7 @@ ESCALA PARA HUMANO:
             faltantes=faltantes,
             lead=lead,
             missing_field_streak=int(contexto.get("missing_field_streak") or 0),
+            asked_price=self._is_price_question(texto),
         )
 
     def _normalizar(self, texto: str) -> str:
@@ -471,7 +484,21 @@ ESCALA PARA HUMANO:
         )
         return any(pattern in texto for pattern in patterns)
 
-    def _resposta_identidade_variada(self, contexto: Dict[str, object]) -> str:
+    def _resposta_identidade_variada(
+        self,
+        contexto: Dict[str, object],
+        texto: str = "",
+        lead: Optional[Dict[str, str]] = None,
+    ) -> str:
+        if self._is_style_feedback_about_speed_or_price(texto):
+            nome = str((lead or {}).get("nome") or "").strip()
+            prefix = f"{nome}, " if nome else ""
+            return (
+                f"{prefix}voce tem razao: eu fui direta demais agora. "
+                "Vamos no seu ritmo e sem preco por enquanto. "
+                "Quer que eu te explique primeiro como funciona em 2 passos?"
+            )
+
         index = int(contexto.get("identity_reply_index", 0) or 0)
         resposta = self.identity_replies[index % len(self.identity_replies)]
         contexto["identity_reply_index"] = index + 1
@@ -527,6 +554,37 @@ ESCALA PARA HUMANO:
             "preço",
             "valor do",
             "valor da",
+        )
+        return any(pattern in texto for pattern in patterns)
+
+    def _is_style_feedback_about_speed_or_price(self, texto: str) -> bool:
+        if not texto:
+            return False
+        patterns = (
+            "nao perguntei preco",
+            "não perguntei preço",
+            "nao perguntei valor",
+            "não perguntei valor",
+            "falou rapido demais",
+            "falou rápido demais",
+            "muito rapido",
+            "muito rápido",
+            "respondeu rapido",
+            "respondeu rápido",
+            "parece robo",
+            "parece robô",
+        )
+        return any(pattern in texto for pattern in patterns)
+
+    def _is_money_humor_intent(self, texto: str) -> bool:
+        if not texto:
+            return False
+        patterns = (
+            "ficar rico",
+            "ficar milionario",
+            "ficar milionário",
+            "ficar bilionario",
+            "ficar bilionário",
         )
         return any(pattern in texto for pattern in patterns)
 
@@ -650,10 +708,13 @@ ESCALA PARA HUMANO:
         faltantes: List[str],
         lead: Dict[str, str],
         missing_field_streak: int = 0,
+        asked_price: bool = False,
     ) -> str:
         """Garante resposta textual valida para envio no WhatsApp."""
         texto = resposta.strip() if isinstance(resposta, str) else ""
         if texto and self._resposta_modelo_valida(texto):
+            if not asked_price:
+                texto = self._remover_preco_nao_solicitado(texto)
             return texto
 
         if faltantes:
@@ -686,6 +747,53 @@ ESCALA PARA HUMANO:
         return (
             "Perfeito, recebi sua mensagem. "
             "Me conta em uma frase seu objetivo para eu te orientar agora."
+        )
+
+    def _remover_preco_nao_solicitado(self, texto: str) -> str:
+        if not texto:
+            return texto
+
+        parts = re.split(r"(?<=[.!?])\s+", texto.strip())
+        if len(parts) <= 1:
+            return texto if not self._sentenca_tem_preco(texto) else (
+                "Perfeito. Primeiro te explico como funciona e, se voce quiser, depois te passo os valores."
+            )
+
+        filtered = [part for part in parts if not self._sentenca_tem_preco(part)]
+        if len(filtered) == len(parts):
+            return texto
+        if not filtered:
+            return "Perfeito. Primeiro te explico como funciona e, se voce quiser, depois te passo os valores."
+        ajustado = " ".join(filtered).strip()
+        if ajustado and not ajustado.endswith((".", "!", "?")):
+            ajustado += "."
+        return ajustado
+
+    def _sentenca_tem_preco(self, trecho: str) -> bool:
+        if not trecho:
+            return False
+        lower = trecho.lower()
+        if re.search(r"r\$\s*\d", lower):
+            return True
+        if re.search(r"\b\d{1,3}(?:\.\d{3})*,\d{2}\b", lower):
+            return True
+        clues = (
+            "faixa inicial",
+            "valor inicial",
+            "custa",
+            "preco",
+            "preço",
+            "investimento",
+        )
+        return any(clue in lower for clue in clues)
+
+    def _build_money_humor_reply(self, lead: Dict[str, str]) -> str:
+        nome = str(lead.get("nome") or "").strip()
+        prefix = f"{nome}, " if nome else ""
+        return (
+            f"{prefix}boa meta. "
+            "Nao existe milagre, mas da para organizar seu nome e melhorar seu caminho de credito. "
+            "Quer que eu te explique em 2 passos, sem falar de preco agora?"
         )
 
     def _build_decompression_reply(self, lead: Dict[str, str], faltantes: List[str]) -> str:
@@ -940,6 +1048,8 @@ ESCALA PARA HUMANO:
             "- Para servicos simples (Limpa Nome, Score, Rating), pode conduzir venda direta.\n"
             "- Para servicos complexos, orientar e encaminhar fechamento humano no momento certo.\n"
             "- Diagnostico 360 deve ser sugerido como primeiro passo, salvo excecao de servico simples.\n"
+            "- Nao mencionar preco espontaneamente; so informar preco quando o cliente pedir valor/preco/custa.\n"
+            "- Se o cliente usar humor (ex.: 'ficar rico'), responda com leveza e empatia antes de qualificar.\n"
             "- Responda primeiro ao que o cliente perguntou agora; depois conduza o proximo passo.\n"
             "- Se a mesma pendencia ja foi solicitada 2+ vezes, nao insistir de forma repetitiva."
         )

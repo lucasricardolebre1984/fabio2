@@ -11,6 +11,17 @@ def test_viviane_persona_loaded_from_cofre_file():
     assert "OBJETIVO PRINCIPAL" in service.base_system_prompt
 
 
+def test_identity_reply_acknowledges_price_feedback_naturally():
+    service = VivaIAService()
+    reply = service._resposta_identidade_variada(
+        contexto={},
+        texto="voce e um robo? falou rapido e eu nao perguntei preco",
+        lead={"nome": "Lucas"},
+    )
+    assert "voce tem razao" in reply.lower()
+    assert "sem preco" in reply.lower()
+
+
 def test_who_am_i_reply_contains_known_data():
     service = VivaIAService()
     lead = {
@@ -97,3 +108,23 @@ def test_handoff_start_reply_avoids_repeat_loop():
     reply = service._build_handoff_start_reply({"nome": "Glauco"})
     assert "Vou te transferir agora" in reply
     assert "Nao precisa repetir" in reply
+
+
+def test_money_humor_reply_does_not_force_price():
+    service = VivaIAService()
+    reply = service._build_money_humor_reply({"nome": "Lucas"})
+    assert "boa meta" in reply.lower()
+    assert "sem falar de preco" in reply.lower()
+    assert "R$" not in reply
+
+
+def test_unsolicited_price_is_removed_from_model_text():
+    service = VivaIAService()
+    text = (
+        "Perfeito, isso ajuda no seu objetivo. "
+        "A faixa inicial e R$ 1.380,00 para esse servico. "
+        "Quer que eu te explique em 2 passos?"
+    )
+    cleaned = service._remover_preco_nao_solicitado(text)
+    assert "R$" not in cleaned
+    assert "2 passos" in cleaned

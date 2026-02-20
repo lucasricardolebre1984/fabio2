@@ -106,6 +106,7 @@
 | BUG-122 | Alta | WhatsApp/Webhook | Conversas recebidas com `@lid` eram marcadas como nao entregaveis (`exists:false`) e bloqueavam resposta automatica da VIVA | Resolvido |
 | BUG-123 | Alta | VIVA/Agenda NLU | Comando natural sem data explicita (`viva marque ... as 17 horas`) falhava com pedido de data/hora e quebrava fluxo operacional | Resolvido |
 | BUG-124 | Critica | Viviane/WhatsApp | Fluxo comercial repetia perguntas de nome/cidade/transferencia, perdia contexto e gerava cancelamento de lead no handoff humano | Resolvido |
+| BUG-125 | Alta | Viviane/WhatsApp UX | Tom muito rigido: resposta com preco espontaneo e baixa empatia em perguntas sociais ("voce e robo?", "ficar rico"), gerando desconforto e risco de abandono | Resolvido |
 
 ---
 
@@ -2406,3 +2407,24 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
   - persona Viviane separada no COFRE com arquivo dedicado.
 - validacao tecnica:
   - `pytest backend/tests/test_viviane_humanizacao.py -q`.
+
+### BUG-125: Viviane com tom rigido e preco espontaneo
+**Data:** 2026-02-20  
+**Severidade:** Alta  
+**Descricao:** Em cenarios reais, a Viviane podia responder de forma dura/automatica, antecipar preco sem pergunta do cliente e falhar na empatia em frases sociais/humor.
+**Esperado:** Conversa natural, humana e adaptativa, com preco apenas sob demanda.
+**Status:** Resolvido  
+
+### Atualizacao 2026-02-20 (BUG-125 - naturalidade e controle de preco)
+- backend:
+  - `backend/app/services/viva_ia_service.py`
+  - `backend/COFRE/persona-skills/VIVIANE.md`
+  - `backend/tests/test_viviane_humanizacao.py`
+- ajustes aplicados:
+  - resposta de identidade com empatia quando cliente reclamar de tom rapido/robotico;
+  - comportamento com humor de objetivo financeiro (`ficar rico`) com leveza e sem travar fluxo;
+  - bloqueio de preco espontaneo no pos-processamento de resposta do modelo;
+  - regra de prompt reforcada: preco somente quando cliente pedir;
+  - testes de regressao para naturalidade e remocao de preco nao solicitado.
+- validacao tecnica:
+  - `PYTHONPATH=C:\projetos\fabio2\backend pytest tests/test_viviane_humanizacao.py -q` => `17 passed`.
