@@ -42,7 +42,7 @@ export default function LoginPage() {
       } else if (status) {
         setError(detail || `Falha no login (HTTP ${status})`)
       } else {
-        setError('Falha de conexao com o backend. Verifique a API em http://localhost:8000')
+        setError('Falha de conexao com o backend. Verifique NEXT_PUBLIC_API_URL e o proxy HTTPS.')
       }
     } finally {
       setLoading(false)

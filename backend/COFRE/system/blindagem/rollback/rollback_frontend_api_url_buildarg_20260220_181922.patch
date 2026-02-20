@@ -1,0 +1,86 @@
+diff --git a/docker-compose-prod.yml b/docker-compose-prod.yml
+index dc24051..1c9c90d 100644
+--- a/docker-compose-prod.yml
++++ b/docker-compose-prod.yml
+@@ -17,6 +17,8 @@ services:
+     build:
+       context: ./frontend
+       dockerfile: Dockerfile
++      args:
++        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://127.0.0.1:8000/api/v1}
+     container_name: fabio2-frontend
+     restart: unless-stopped
+     environment:
+diff --git a/docker-compose.prod.yml b/docker-compose.prod.yml
+index dc24051..1c9c90d 100644
+--- a/docker-compose.prod.yml
++++ b/docker-compose.prod.yml
+@@ -17,6 +17,8 @@ services:
+     build:
+       context: ./frontend
+       dockerfile: Dockerfile
++      args:
++        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://127.0.0.1:8000/api/v1}
+     container_name: fabio2-frontend
+     restart: unless-stopped
+     environment:
+diff --git a/docs/AWS_EC2_GO_LIVE_1PAGINA_2026-02-20.md b/docs/AWS_EC2_GO_LIVE_1PAGINA_2026-02-20.md
+index 8cd70df..57fffba 100644
+--- a/docs/AWS_EC2_GO_LIVE_1PAGINA_2026-02-20.md
++++ b/docs/AWS_EC2_GO_LIVE_1PAGINA_2026-02-20.md
+@@ -27,6 +27,10 @@ WA_INSTANCE_NAME=fc-solucoes
+ OPENAI_API_KEY=troque_openai
+ ```
+ 
++Observacao importante (frontend Next.js):
++- `NEXT_PUBLIC_API_URL` e embutida no build do frontend.
++- Sempre que alterar essa variavel, rode rebuild do frontend (`--build`) para aplicar no bundle.
++
+ ## 3) Deploy copy/paste (Ubuntu)
+ 
+ ```bash
+@@ -91,4 +95,3 @@ Uso rapido:
+ ```bash
+ git apply --reverse backend/COFRE/system/blindagem/rollback/rollback_aws_prod_hardening_20260220_153717.patch
+ ```
+-
+diff --git a/docs/STATUS.md b/docs/STATUS.md
+index c2d5754..c933a90 100644
+--- a/docs/STATUS.md
++++ b/docs/STATUS.md
+@@ -66,6 +66,9 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
+ - Fix de build Linux/EC2 (frontend):
+   - Causa raiz: regra `lib/` no `.gitignore` ignorava `frontend/src/lib/api.ts`, `frontend/src/lib/utils.ts` e `frontend/src/lib/constants.ts`.
+   - Correcao: excecao explicita no `.gitignore` para `frontend/src/lib/**` e versionamento desses arquivos.
++- Fix de endpoint frontend em producao (HTTPS):
++  - Causa raiz: `NEXT_PUBLIC_API_URL` nao era passado no build Docker do frontend e o bundle caia em fallback local.
++  - Correcao: `ARG/ENV NEXT_PUBLIC_API_URL` no `frontend/Dockerfile`, `build.args` no `docker-compose.prod.yml` e `docker-compose-prod.yml`, e mensagem de erro de login sem `localhost` fixo.
+ 
+ ## Diretriz de deploy institucional
+ 
+diff --git a/frontend/Dockerfile b/frontend/Dockerfile
+index 27f0b6a..1a6b9fc 100644
+--- a/frontend/Dockerfile
++++ b/frontend/Dockerfile
+@@ -9,6 +9,8 @@ COPY public ./public
+ 
+ # Install dependencies and force standalone output for container runtime.
+ RUN npm ci
++ARG NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api/v1
++ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ ENV NEXT_OUTPUT_STANDALONE=1
+ RUN npm run build
+ 
+diff --git a/frontend/src/app/page.tsx b/frontend/src/app/page.tsx
+index 279ec4b..41dc32d 100644
+--- a/frontend/src/app/page.tsx
++++ b/frontend/src/app/page.tsx
+@@ -42,7 +42,7 @@ export default function LoginPage() {
+       } else if (status) {
+         setError(detail || `Falha no login (HTTP ${status})`)
+       } else {
+-        setError('Falha de conexao com o backend. Verifique a API em http://localhost:8000')
++        setError('Falha de conexao com o backend. Verifique NEXT_PUBLIC_API_URL e o proxy HTTPS.')
+       }
+     } finally {
+       setLoading(false)

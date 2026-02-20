@@ -27,6 +27,10 @@ WA_INSTANCE_NAME=fc-solucoes
 OPENAI_API_KEY=troque_openai
 ```
 
+Observacao importante (frontend Next.js):
+- `NEXT_PUBLIC_API_URL` e embutida no build do frontend.
+- Sempre que alterar essa variavel, rode rebuild do frontend (`--build`) para aplicar no bundle.
+
 ## 3) Deploy copy/paste (Ubuntu)
 
 ```bash
@@ -91,4 +95,3 @@ Uso rapido:
 ```bash
 git apply --reverse backend/COFRE/system/blindagem/rollback/rollback_aws_prod_hardening_20260220_153717.patch
 ```
-

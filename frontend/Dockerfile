@@ -9,6 +9,8 @@ COPY public ./public
 
 # Install dependencies and force standalone output for container runtime.
 RUN npm ci
+ARG NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/api/v1
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NEXT_OUTPUT_STANDALONE=1
 RUN npm run build
 

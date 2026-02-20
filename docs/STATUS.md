@@ -66,6 +66,9 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
 - Fix de build Linux/EC2 (frontend):
   - Causa raiz: regra `lib/` no `.gitignore` ignorava `frontend/src/lib/api.ts`, `frontend/src/lib/utils.ts` e `frontend/src/lib/constants.ts`.
   - Correcao: excecao explicita no `.gitignore` para `frontend/src/lib/**` e versionamento desses arquivos.
+- Fix de endpoint frontend em producao (HTTPS):
+  - Causa raiz: `NEXT_PUBLIC_API_URL` nao era passado no build Docker do frontend e o bundle caia em fallback local.
+  - Correcao: `ARG/ENV NEXT_PUBLIC_API_URL` no `frontend/Dockerfile`, `build.args` no `docker-compose.prod.yml` e `docker-compose-prod.yml`, e mensagem de erro de login sem `localhost` fixo.
 
 ## Diretriz de deploy institucional
 
