@@ -37,6 +37,7 @@ Este arquivo centraliza os artefatos institucionais de blindagem para homologaca
 - `backend/COFRE/system/blindagem/audit/playwright-whatsapp-conversas-2026-02-20.json`
 - `backend/COFRE/system/blindagem/audit/VIVIANE_WHATSAPP_NO_LOOP_HOTFIX_2026-02-20.md`
 - `backend/COFRE/system/blindagem/audit/VIVIANE_NATURALIDADE_2026-02-20.md`
+- `backend/COFRE/system/blindagem/audit/CONTRATOS_LOGO_LAYOUT_2026-02-20.md`
 
 ## Rollbacks
 - `backend/COFRE/system/blindagem/rollback/rollback_gate2_cca7e3d.patch`
@@ -45,6 +46,8 @@ Este arquivo centraliza os artefatos institucionais de blindagem para homologaca
 - `backend/COFRE/system/blindagem/rollback/rollback_viviane_persona_natural_20260219_181200.patch`
 - `backend/COFRE/system/blindagem/rollback/rollback_viviane_no_loop_20260220_113720.patch`
 - `backend/COFRE/system/blindagem/rollback/rollback_viviane_naturalidade_20260220_115739.patch`
+- `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317_pre_fix_baseline.txt`
+- `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317.patch`
 
 ## Regra
 - Novos relatorios de auditoria devem entrar em `backend/COFRE/system/blindagem/audit/`.

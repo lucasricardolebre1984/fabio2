@@ -22,6 +22,10 @@ Escopo: estrutura ativa de documentacao institucional do SaaS FC Solucoes Financ
 - `docs/RUNBOOK.md`
 - `docs/DECISIONS.md`
 
+## Manuais operacionais
+
+- `docs/CONTRATOS_LAYOUT_LOGO_MANUAL_AGENTES.md` (ajuste seguro do cabecalho institucional de contratos)
+
 ## Auditoria documental
 
 - Matriz menu -> API -> banco -> COFRE: `backend/COFRE/system/blindagem/audit/menu-endpoint-matrix.md`

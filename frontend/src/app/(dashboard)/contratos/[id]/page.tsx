@@ -353,7 +353,14 @@ export default function VisualizarContratoPage() {
         <div className="-mx-10 -mt-10 mb-8 bg-[#1e3a5f] px-8 py-5 text-white">
           <div className="flex items-center gap-4">
             <div className="flex-shrink-0">
-              <Image src="/logo2.png" alt="FC Soluções Financeiras" width={140} height={92} className="h-[92px] w-auto object-contain" priority />
+              <Image
+                src="/logo2-tight.png"
+                alt="FC Soluções Financeiras"
+                width={92}
+                height={92}
+                className="h-[92px] w-[92px] object-contain"
+                priority
+              />
             </div>
             <div className="flex-1">
               <h1 className="text-[2rem] font-bold tracking-wide">F C Soluções Financeiras</h1>

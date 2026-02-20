@@ -1,7 +1,7 @@
 ﻿# STATUS do projeto - FC Solucoes Financeiras
 
-Data: 2026-02-16
-Status geral: operacional em ambiente local, com pendencias criticas abertas em seguranca, dependencia frontend e regressao de testes backend.
+Data: 2026-02-20
+Status geral: operacional em ambiente local, com WhatsApp/VIVA/Viviane funcionais e layout de contratos estabilizado para homologacao final; permanecem pendencias tecnicas de seguranca e suite de testes.
 
 ## Fonte de verdade ativa
 
@@ -12,7 +12,7 @@ Status geral: operacional em ambiente local, com pendencias criticas abertas em 
 
 ## Estado dos modulos
 
-- Contratos: operacional
+- Contratos: operacional e layout institucional ajustado (logo proporcional sem ampliar faixa azul)
 - Clientes: operacional
 - Agenda: operacional no modulo web, com ajuste de saudacao da VIVA em validacao (BUG-104)
 - Campanhas: operacional com persistencia, ainda com pendencia de aderencia semantica (BUG-015/BUG-099)
@@ -29,7 +29,7 @@ Status geral: operacional em ambiente local, com pendencias criticas abertas em 
 - Gate 6 Google Calendar: Parcial
 - Gate 7 Testes: Nao concluido
 - Gate 8 Build/Deploy: Parcial
-- Gate 9 Documentacao/Rollback final: Em consolidacao nesta rodada
+- Gate 9 Documentacao/Rollback final: Consolidado para rodada de contratos/logo
 
 ## Pendencias criticas abertas
 
@@ -53,10 +53,15 @@ Status geral: operacional em ambiente local, com pendencias criticas abertas em 
 - Refatoracao de dominio aplicada no orquestrador:
   - `backend/app/services/viva_domain_query_router_service.py`
   - consultas de contratos/clientes/campanhas/servicos extraidas do `viva_chat_orchestrator_service.py`
+- Ajuste final do layout de contratos (logo):
+  - `docs/CONTRATOS_LAYOUT_LOGO_MANUAL_AGENTES.md`
+  - `backend/COFRE/system/blindagem/audit/CONTRATOS_LOGO_LAYOUT_2026-02-20.md`
+  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317_pre_fix_baseline.txt`
+  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317.patch`
 
 ## Diretriz de deploy institucional
 
 - Alvo principal: Ubuntu AWS virgem (stack Docker)
 - Nao usar Vercel como alvo institucional desta operacao
 
-Atualizado em: 2026-02-16
+Atualizado em: 2026-02-20

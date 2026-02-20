@@ -1,0 +1,246 @@
+diff --git a/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md b/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
+index 706f53c..e42b262 100644
+--- a/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
++++ b/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
+@@ -37,6 +37,7 @@ Este arquivo centraliza os artefatos institucionais de blindagem para homologaca
+ - `backend/COFRE/system/blindagem/audit/playwright-whatsapp-conversas-2026-02-20.json`
+ - `backend/COFRE/system/blindagem/audit/VIVIANE_WHATSAPP_NO_LOOP_HOTFIX_2026-02-20.md`
+ - `backend/COFRE/system/blindagem/audit/VIVIANE_NATURALIDADE_2026-02-20.md`
++- `backend/COFRE/system/blindagem/audit/CONTRATOS_LOGO_LAYOUT_2026-02-20.md`
+ 
+ ## Rollbacks
+ - `backend/COFRE/system/blindagem/rollback/rollback_gate2_cca7e3d.patch`
+@@ -45,6 +46,8 @@ Este arquivo centraliza os artefatos institucionais de blindagem para homologaca
+ - `backend/COFRE/system/blindagem/rollback/rollback_viviane_persona_natural_20260219_181200.patch`
+ - `backend/COFRE/system/blindagem/rollback/rollback_viviane_no_loop_20260220_113720.patch`
+ - `backend/COFRE/system/blindagem/rollback/rollback_viviane_naturalidade_20260220_115739.patch`
++- `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317_pre_fix_baseline.txt`
++- `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317.patch`
+ 
+ ## Regra
+ - Novos relatorios de auditoria devem entrar em `backend/COFRE/system/blindagem/audit/`.
+diff --git a/backend/app/services/pdf_service_playwright.py b/backend/app/services/pdf_service_playwright.py
+index ac9bdf5..bdd795b 100644
+--- a/backend/app/services/pdf_service_playwright.py
++++ b/backend/app/services/pdf_service_playwright.py
+@@ -24,8 +24,11 @@ class PDFService:
+     @staticmethod
+     def _load_logo_data_uri() -> Optional[str]:
+         possible_paths = [
++            Path("C:/projetos/fabio2/contratos/logo2-tight.png"),
+             Path("C:/projetos/fabio2/contratos/logo2.png"),
++            Path(__file__).resolve().parents[3] / "contratos" / "logo2-tight.png",
+             Path(__file__).resolve().parents[3] / "contratos" / "logo2.png",
++            Path(__file__).resolve().parents[2] / "contratos" / "logo2-tight.png",
+             Path(__file__).resolve().parents[2] / "contratos" / "logo2.png",
+             Path("C:/projetos/fabio2/contratos/logo2.jpeg"),
+         ]
+diff --git a/docs/BUGSREPORT.md b/docs/BUGSREPORT.md
+index f304c5b..5c0e9bc 100644
+--- a/docs/BUGSREPORT.md
++++ b/docs/BUGSREPORT.md
+@@ -2428,3 +2428,31 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
+   - testes de regressao para naturalidade e remocao de preco nao solicitado.
+ - validacao tecnica:
+   - `PYTHONPATH=C:\projetos\fabio2\backend pytest tests/test_viviane_humanizacao.py -q` => `17 passed`.
++
++### BUG-126: Logo do cabecalho de contratos desproporcional ao texto na faixa azul
++**Data:** 2026-02-20  
++**Severidade:** Media  
++**Descricao:** Na rota `/contratos/{id}`, a balanca com `FC` estava pequena/desproporcional em relacao ao texto "F C Solucoes Financeiras". Tentativas com zoom aumentavam artefatos sem resolver de forma limpa.
++**Esperado:** aumentar a percepcao da balanca/FC sem aumentar a faixa azul e sem alterar o tamanho do titulo ao lado.
++**Status:** Resolvido
++
++### Atualizacao 2026-02-20 (BUG-126 - logo proporcional sem crescer faixa)
++- frontend:
++  - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`
++  - `frontend/public/logo2-tight.png`
++  - `frontend/src/lib/pdf.ts`
++- backend:
++  - `backend/app/services/pdf_service_playwright.py`
++  - `contratos/logo2-tight.png`
++- docs/blindagem:
++  - `docs/CONTRATOS_LAYOUT_LOGO_MANUAL_AGENTES.md`
++  - `backend/COFRE/system/blindagem/audit/CONTRATOS_LOGO_LAYOUT_2026-02-20.md`
++  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317_pre_fix_baseline.txt`
++  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317.patch`
++- ajustes aplicados:
++  - criado asset recortado `logo2-tight.png` para remover margem transparente da marca;
++  - preview de contrato passou a usar `logo2-tight.png` em `92x92`, sem `scale` e sem clipping;
++  - PDF frontend e PDF backend alinham para `logo2-tight` mantendo altura da faixa (sem crescimento do header).
++- validacao tecnica:
++  - `npm run lint -- --file "src/app/(dashboard)/contratos/[id]/page.tsx" --file "src/lib/pdf.ts"` => OK;
++  - `python -m py_compile backend/app/services/pdf_service_playwright.py` => OK.
+diff --git a/docs/DECISIONS.md b/docs/DECISIONS.md
+index b9b797b..748445f 100644
+--- a/docs/DECISIONS.md
++++ b/docs/DECISIONS.md
+@@ -1176,3 +1176,31 @@ O backend ja entregava `overlay.formato` no metadata da imagem de campanha, mas
+ 
+ ### Data
+ 2026-02-14
++
++## DECISAO-036: logo institucional de contratos com asset recortado (sem ampliar faixa azul)
++
++### Contexto
++Na validacao final da rota `/contratos/{id}`, a logo da balanca (com `FC`) ficou visualmente pequena em relacao ao texto do cabecalho. Aumentar apenas escala via CSS gerava clipping/artefato e risco de crescer a faixa azul, o que foi vetado.
++
++### Decisao
++- Adotar asset recortado `logo2-tight.png` para remover margem transparente e ganhar presenca visual sem alterar altura do header.
++- Aplicar no preview de contratos:
++  - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`
++- Alinhar os dois fluxos de PDF para o mesmo principio:
++  - `frontend/src/lib/pdf.ts`
++  - `backend/app/services/pdf_service_playwright.py`
++  - `contratos/logo2-tight.png` para fallback do backend.
++
++### Impacto
++- A balanca/FC fica proporcional ao texto do cabecalho.
++- A faixa azul nao cresce e o layout institucional permanece estavel.
++- Preview/PDF frontend/PDF backend ficam consistentes entre si.
++
++### Rollback
++- Baseline pre-fix:
++  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317_pre_fix_baseline.txt`
++- Patch completo da rodada:
++  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317.patch`
++
++### Data
++2026-02-20
+diff --git a/docs/README.md b/docs/README.md
+index 6b8859f..11666b9 100644
+--- a/docs/README.md
++++ b/docs/README.md
+@@ -22,6 +22,10 @@ Escopo: estrutura ativa de documentacao institucional do SaaS FC Solucoes Financ
+ - `docs/RUNBOOK.md`
+ - `docs/DECISIONS.md`
+ 
++## Manuais operacionais
++
++- `docs/CONTRATOS_LAYOUT_LOGO_MANUAL_AGENTES.md` (ajuste seguro do cabecalho institucional de contratos)
++
+ ## Auditoria documental
+ 
+ - Matriz menu -> API -> banco -> COFRE: `backend/COFRE/system/blindagem/audit/menu-endpoint-matrix.md`
+diff --git a/docs/SESSION.md b/docs/SESSION.md
+index 66399a9..24d8045 100644
+--- a/docs/SESSION.md
++++ b/docs/SESSION.md
+@@ -1,8 +1,8 @@
+ ﻿# SESSION - contexto da rodada atual
+ 
+-Data da rodada: 2026-02-16
++Data da rodada: 2026-02-20
+ Branch: main
+-Status: consolidacao de arquitetura COFRE + correcao institucional da documentacao ativa + auditoria completa de qualidade web.
++Status: consolidacao final de homologacao local (WhatsApp/VIVA/Viviane) + ajuste cirurgico de layout de contratos com rollback institucional.
+ 
+ ## Objetivo da rodada
+ 
+@@ -30,6 +30,18 @@ Status: consolidacao de arquitetura COFRE + correcao institucional da documentac
+ - Refatoracao de estrutura por dominio:
+   - criado `backend/app/services/viva_domain_query_router_service.py`;
+   - orquestrador VIVA passou a delegar consultas de contratos/clientes/campanhas/servicos para esse router.
++- Ajuste final de logo em contratos sem ampliar faixa azul:
++  - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`
++  - `frontend/public/logo2-tight.png`
++  - `frontend/src/lib/pdf.ts`
++  - `backend/app/services/pdf_service_playwright.py`
++  - `contratos/logo2-tight.png`
++- Documentacao operacional para agentes:
++  - `docs/CONTRATOS_LAYOUT_LOGO_MANUAL_AGENTES.md`
++- Blindagem/rollback da rodada:
++  - `backend/COFRE/system/blindagem/audit/CONTRATOS_LOGO_LAYOUT_2026-02-20.md`
++  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317_pre_fix_baseline.txt`
++  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317.patch`
+ 
+ ## Novos bugs abertos nesta auditoria
+ 
+@@ -44,4 +56,4 @@ Status: consolidacao de arquitetura COFRE + correcao institucional da documentac
+ O historico tecnico antigo permanece preservado em arquivos de rollback e em documentos no VAULT.
+ Este arquivo passa a registrar apenas o contexto corrente de sessao.
+ 
+-Atualizado em: 2026-02-16
++Atualizado em: 2026-02-20
+diff --git a/docs/STATUS.md b/docs/STATUS.md
+index 65fba83..7c773c9 100644
+--- a/docs/STATUS.md
++++ b/docs/STATUS.md
+@@ -1,7 +1,7 @@
+ ﻿# STATUS do projeto - FC Solucoes Financeiras
+ 
+-Data: 2026-02-16
+-Status geral: operacional em ambiente local, com pendencias criticas abertas em seguranca, dependencia frontend e regressao de testes backend.
++Data: 2026-02-20
++Status geral: operacional em ambiente local, com WhatsApp/VIVA/Viviane funcionais e layout de contratos estabilizado para homologacao final; permanecem pendencias tecnicas de seguranca e suite de testes.
+ 
+ ## Fonte de verdade ativa
+ 
+@@ -12,7 +12,7 @@ Status geral: operacional em ambiente local, com pendencias criticas abertas em
+ 
+ ## Estado dos modulos
+ 
+-- Contratos: operacional
++- Contratos: operacional e layout institucional ajustado (logo proporcional sem ampliar faixa azul)
+ - Clientes: operacional
+ - Agenda: operacional no modulo web, com ajuste de saudacao da VIVA em validacao (BUG-104)
+ - Campanhas: operacional com persistencia, ainda com pendencia de aderencia semantica (BUG-015/BUG-099)
+@@ -29,7 +29,7 @@ Status geral: operacional em ambiente local, com pendencias criticas abertas em
+ - Gate 6 Google Calendar: Parcial
+ - Gate 7 Testes: Nao concluido
+ - Gate 8 Build/Deploy: Parcial
+-- Gate 9 Documentacao/Rollback final: Em consolidacao nesta rodada
++- Gate 9 Documentacao/Rollback final: Consolidado para rodada de contratos/logo
+ 
+ ## Pendencias criticas abertas
+ 
+@@ -53,10 +53,15 @@ Status geral: operacional em ambiente local, com pendencias criticas abertas em
+ - Refatoracao de dominio aplicada no orquestrador:
+   - `backend/app/services/viva_domain_query_router_service.py`
+   - consultas de contratos/clientes/campanhas/servicos extraidas do `viva_chat_orchestrator_service.py`
++- Ajuste final do layout de contratos (logo):
++  - `docs/CONTRATOS_LAYOUT_LOGO_MANUAL_AGENTES.md`
++  - `backend/COFRE/system/blindagem/audit/CONTRATOS_LOGO_LAYOUT_2026-02-20.md`
++  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317_pre_fix_baseline.txt`
++  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317.patch`
+ 
+ ## Diretriz de deploy institucional
+ 
+ - Alvo principal: Ubuntu AWS virgem (stack Docker)
+ - Nao usar Vercel como alvo institucional desta operacao
+ 
+-Atualizado em: 2026-02-16
++Atualizado em: 2026-02-20
+diff --git a/frontend/src/app/(dashboard)/contratos/[id]/page.tsx b/frontend/src/app/(dashboard)/contratos/[id]/page.tsx
+index 328e8b0..f2d449b 100644
+--- a/frontend/src/app/(dashboard)/contratos/[id]/page.tsx
++++ b/frontend/src/app/(dashboard)/contratos/[id]/page.tsx
+@@ -353,7 +353,14 @@ export default function VisualizarContratoPage() {
+         <div className="-mx-10 -mt-10 mb-8 bg-[#1e3a5f] px-8 py-5 text-white">
+           <div className="flex items-center gap-4">
+             <div className="flex-shrink-0">
+-              <Image src="/logo2.png" alt="FC Soluções Financeiras" width={140} height={92} className="h-[92px] w-auto object-contain" priority />
++              <Image
++                src="/logo2-tight.png"
++                alt="FC Soluções Financeiras"
++                width={92}
++                height={92}
++                className="h-[92px] w-[92px] object-contain"
++                priority
++              />
+             </div>
+             <div className="flex-1">
+               <h1 className="text-[2rem] font-bold tracking-wide">F C Soluções Financeiras</h1>
+diff --git a/frontend/src/lib/pdf.ts b/frontend/src/lib/pdf.ts
+index f0b4333..94ebe83 100644
+--- a/frontend/src/lib/pdf.ts
++++ b/frontend/src/lib/pdf.ts
+@@ -252,7 +252,7 @@ export function generateContractPDF(contractData: any, templateData?: ContractTe
+         ? 'CNH - Cassação/Suspensão e Recurso de Multas'
+         : 'Bacen - Remoção SCR')
+ 
+-  const logoUrl = `${window.location.origin}/logo2.png`
++  const logoUrl = `${window.location.origin}/logo2-tight.png`
+   const clausesHtml = buildClausesHtml(contractData, templateData)
+ 
+   const html = `

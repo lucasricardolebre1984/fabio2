@@ -1,0 +1,22 @@
+ROLLBACK INSTITUCIONAL - PRE FIX BASELINE
+Data: 2026-02-20 13:14:04
+Branch: main
+Head: 28e5ca6
+
+Status git (pre-fix):
+?? backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317_pre_fix_baseline.txt
+?? test-results/
+
+Alvo da rodada:
+- Ajuste cirurgico do tamanho/proporcao do logo no layout de contratos.
+
+Evidencias de baseline:
+- frontend/src/app/(dashboard)/contratos/[id]/page.tsx -> <Image src="/logo2.png" alt="FC Soluções Financeiras" width={140} height={92} className="h-[92px] w-auto object-contain" priority />
+- frontend/src/lib/pdf.ts -> <img src="${logoUrl}" alt="FC Soluções Financeiras" style="height: 78px; width: auto; display: block;" />
+- backend/app/services/pdf_service_playwright.py -> width: 88px;
+
+Rollback operacional (se necessario apos patch):
+1) git restore --source=28e5ca6 -- 'frontend/src/app/(dashboard)/contratos/[id]/page.tsx'
+2) git restore --source=28e5ca6 -- 'frontend/src/lib/pdf.ts'
+3) git restore --source=28e5ca6 -- 'backend/app/services/pdf_service_playwright.py'
+4) Revalidar em /contratos/{id} e PDF frontend/backend

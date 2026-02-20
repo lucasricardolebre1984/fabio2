@@ -1,8 +1,8 @@
 ﻿# SESSION - contexto da rodada atual
 
-Data da rodada: 2026-02-16
+Data da rodada: 2026-02-20
 Branch: main
-Status: consolidacao de arquitetura COFRE + correcao institucional da documentacao ativa + auditoria completa de qualidade web.
+Status: consolidacao final de homologacao local (WhatsApp/VIVA/Viviane) + ajuste cirurgico de layout de contratos com rollback institucional.
 
 ## Objetivo da rodada
 
@@ -30,6 +30,18 @@ Status: consolidacao de arquitetura COFRE + correcao institucional da documentac
 - Refatoracao de estrutura por dominio:
   - criado `backend/app/services/viva_domain_query_router_service.py`;
   - orquestrador VIVA passou a delegar consultas de contratos/clientes/campanhas/servicos para esse router.
+- Ajuste final de logo em contratos sem ampliar faixa azul:
+  - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`
+  - `frontend/public/logo2-tight.png`
+  - `frontend/src/lib/pdf.ts`
+  - `backend/app/services/pdf_service_playwright.py`
+  - `contratos/logo2-tight.png`
+- Documentacao operacional para agentes:
+  - `docs/CONTRATOS_LAYOUT_LOGO_MANUAL_AGENTES.md`
+- Blindagem/rollback da rodada:
+  - `backend/COFRE/system/blindagem/audit/CONTRATOS_LOGO_LAYOUT_2026-02-20.md`
+  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317_pre_fix_baseline.txt`
+  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317.patch`
 
 ## Novos bugs abertos nesta auditoria
 
@@ -44,4 +56,4 @@ Status: consolidacao de arquitetura COFRE + correcao institucional da documentac
 O historico tecnico antigo permanece preservado em arquivos de rollback e em documentos no VAULT.
 Este arquivo passa a registrar apenas o contexto corrente de sessao.
 
-Atualizado em: 2026-02-16
+Atualizado em: 2026-02-20

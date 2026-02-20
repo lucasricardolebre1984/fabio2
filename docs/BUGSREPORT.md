@@ -2428,3 +2428,31 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
   - testes de regressao para naturalidade e remocao de preco nao solicitado.
 - validacao tecnica:
   - `PYTHONPATH=C:\projetos\fabio2\backend pytest tests/test_viviane_humanizacao.py -q` => `17 passed`.
+
+### BUG-126: Logo do cabecalho de contratos desproporcional ao texto na faixa azul
+**Data:** 2026-02-20  
+**Severidade:** Media  
+**Descricao:** Na rota `/contratos/{id}`, a balanca com `FC` estava pequena/desproporcional em relacao ao texto "F C Solucoes Financeiras". Tentativas com zoom aumentavam artefatos sem resolver de forma limpa.
+**Esperado:** aumentar a percepcao da balanca/FC sem aumentar a faixa azul e sem alterar o tamanho do titulo ao lado.
+**Status:** Resolvido
+
+### Atualizacao 2026-02-20 (BUG-126 - logo proporcional sem crescer faixa)
+- frontend:
+  - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`
+  - `frontend/public/logo2-tight.png`
+  - `frontend/src/lib/pdf.ts`
+- backend:
+  - `backend/app/services/pdf_service_playwright.py`
+  - `contratos/logo2-tight.png`
+- docs/blindagem:
+  - `docs/CONTRATOS_LAYOUT_LOGO_MANUAL_AGENTES.md`
+  - `backend/COFRE/system/blindagem/audit/CONTRATOS_LOGO_LAYOUT_2026-02-20.md`
+  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317_pre_fix_baseline.txt`
+  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317.patch`
+- ajustes aplicados:
+  - criado asset recortado `logo2-tight.png` para remover margem transparente da marca;
+  - preview de contrato passou a usar `logo2-tight.png` em `92x92`, sem `scale` e sem clipping;
+  - PDF frontend e PDF backend alinham para `logo2-tight` mantendo altura da faixa (sem crescimento do header).
+- validacao tecnica:
+  - `npm run lint -- --file "src/app/(dashboard)/contratos/[id]/page.tsx" --file "src/lib/pdf.ts"` => OK;
+  - `python -m py_compile backend/app/services/pdf_service_playwright.py` => OK.

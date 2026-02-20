@@ -24,8 +24,11 @@ class PDFService:
     @staticmethod
     def _load_logo_data_uri() -> Optional[str]:
         possible_paths = [
+            Path("C:/projetos/fabio2/contratos/logo2-tight.png"),
             Path("C:/projetos/fabio2/contratos/logo2.png"),
+            Path(__file__).resolve().parents[3] / "contratos" / "logo2-tight.png",
             Path(__file__).resolve().parents[3] / "contratos" / "logo2.png",
+            Path(__file__).resolve().parents[2] / "contratos" / "logo2-tight.png",
             Path(__file__).resolve().parents[2] / "contratos" / "logo2.png",
             Path("C:/projetos/fabio2/contratos/logo2.jpeg"),
         ]

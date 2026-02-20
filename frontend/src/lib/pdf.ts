@@ -252,7 +252,7 @@ export function generateContractPDF(contractData: any, templateData?: ContractTe
         ? 'CNH - Cassação/Suspensão e Recurso de Multas'
         : 'Bacen - Remoção SCR')
 
-  const logoUrl = `${window.location.origin}/logo2.png`
+  const logoUrl = `${window.location.origin}/logo2-tight.png`
   const clausesHtml = buildClausesHtml(contractData, templateData)
 
   const html = `

@@ -1176,3 +1176,31 @@ O backend ja entregava `overlay.formato` no metadata da imagem de campanha, mas 
 
 ### Data
 2026-02-14
+
+## DECISAO-036: logo institucional de contratos com asset recortado (sem ampliar faixa azul)
+
+### Contexto
+Na validacao final da rota `/contratos/{id}`, a logo da balanca (com `FC`) ficou visualmente pequena em relacao ao texto do cabecalho. Aumentar apenas escala via CSS gerava clipping/artefato e risco de crescer a faixa azul, o que foi vetado.
+
+### Decisao
+- Adotar asset recortado `logo2-tight.png` para remover margem transparente e ganhar presenca visual sem alterar altura do header.
+- Aplicar no preview de contratos:
+  - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`
+- Alinhar os dois fluxos de PDF para o mesmo principio:
+  - `frontend/src/lib/pdf.ts`
+  - `backend/app/services/pdf_service_playwright.py`
+  - `contratos/logo2-tight.png` para fallback do backend.
+
+### Impacto
+- A balanca/FC fica proporcional ao texto do cabecalho.
+- A faixa azul nao cresce e o layout institucional permanece estavel.
+- Preview/PDF frontend/PDF backend ficam consistentes entre si.
+
+### Rollback
+- Baseline pre-fix:
+  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317_pre_fix_baseline.txt`
+- Patch completo da rodada:
+  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317.patch`
+
+### Data
+2026-02-20
