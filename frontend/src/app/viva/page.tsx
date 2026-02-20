@@ -321,8 +321,8 @@ export default function VivaChatPage() {
   const sendFromVoiceRef = useRef<(text: string) => void>(() => {})
   const startContinuousConversationRef = useRef<() => void>(() => {})
 
-  const INPUT_MIN_HEIGHT = 44
-  const INPUT_MAX_HEIGHT = 120
+  const INPUT_MIN_HEIGHT = 56
+  const INPUT_MAX_HEIGHT = 160
 
   const formatSessionLabel = (session: ChatSessionSummary) => {
     const dt = new Date(session.last_message_at || session.updated_at || session.created_at)
@@ -1746,9 +1746,9 @@ export default function VivaChatPage() {
 
   return (
     <>
-      <div className="-m-4 md:-m-8 flex h-[calc(100dvh-4rem)] min-h-0 overflow-hidden">
+      <div className="flex h-[calc(100dvh-4rem)] min-h-0">
       {/* Menu Lateral */}
-      <div className={`bg-gray-50 border-r transition-all duration-300 ${menuAberto ? 'w-52' : 'w-0 overflow-hidden'}`}>
+      <div className={`bg-gray-50 border-r transition-all duration-300 ${menuAberto ? 'w-56' : 'w-0 overflow-hidden'}`}>
         <div className="p-4">
           <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
             Conversa
@@ -1782,7 +1782,7 @@ export default function VivaChatPage() {
       {/* Ãrea Principal do Chat */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-3 py-2 border-b bg-white">
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-white">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMenuAberto(!menuAberto)}
@@ -1809,7 +1809,7 @@ export default function VivaChatPage() {
                 if (!target) return
                 void loadSessionSnapshot(target)
               }}
-              className="h-9 min-w-[180px] sm:min-w-[230px] rounded-md border bg-white px-3 text-sm text-gray-700"
+              className="h-9 min-w-[230px] rounded-md border bg-white px-3 text-sm text-gray-700"
               disabled={loadingSessions || chatSessions.length === 0}
               title="Recuperar sessao anterior"
             >
@@ -1913,8 +1913,8 @@ export default function VivaChatPage() {
         ) : (
         <>
         {/* Área de mensagens */}
-        <ScrollArea className="flex-1 px-2 sm:px-3" ref={scrollAreaRef}>
-          <div className="w-full px-1 sm:px-3 py-4 space-y-4">
+        <ScrollArea className="flex-1 px-3 sm:px-4" ref={scrollAreaRef}>
+          <div className="max-w-5xl mx-auto py-4 sm:py-6 space-y-5">
 
             {mensagens.map((msg) => (
               <div
@@ -1935,7 +1935,7 @@ export default function VivaChatPage() {
                 </div>
 
                 {/* Mensagem */}
-                <div className={`group relative max-w-[94%] xl:max-w-[88%] ${
+                <div className={`group relative max-w-[88%] lg:max-w-[82%] ${
                   msg.tipo === 'usuario' ? 'items-end' : 'items-start'
                 }`}>
                   <div className={`px-4 py-3 rounded-2xl ${
@@ -2077,8 +2077,8 @@ export default function VivaChatPage() {
         )}
 
         {/* Input area */}
-        <div className="px-3 py-2 border-t bg-white">
-          <div className="w-full px-1 sm:px-3">
+        <div className="px-4 py-3 border-t bg-white">
+          <div className="max-w-5xl mx-auto">
             <div className="flex gap-2 items-end">
               {/* BotÃµes de anexo */}
               <div className="flex gap-1">
@@ -2107,14 +2107,14 @@ export default function VivaChatPage() {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Digite sua mensagem para a VIVA..."
-                className="flex-1 px-4 py-2 border rounded-xl resize-none text-sm leading-5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 px-4 py-3 border rounded-xl resize-none text-base leading-6 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 rows={2}
                 style={{ minHeight: `${INPUT_MIN_HEIGHT}px`, maxHeight: `${INPUT_MAX_HEIGHT}px` }}
               />
               <Button
                 onClick={() => { void handleSend() }}
                 disabled={(!input.trim() && anexos.length === 0) || loading}
-                className="px-4 h-10"
+                className="px-4 h-12"
               >
                 <Send className="w-5 h-5" />
               </Button>
