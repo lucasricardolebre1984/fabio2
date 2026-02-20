@@ -107,6 +107,7 @@
 | BUG-123 | Alta | VIVA/Agenda NLU | Comando natural sem data explicita (`viva marque ... as 17 horas`) falhava com pedido de data/hora e quebrava fluxo operacional | Resolvido |
 | BUG-124 | Critica | Viviane/WhatsApp | Fluxo comercial repetia perguntas de nome/cidade/transferencia, perdia contexto e gerava cancelamento de lead no handoff humano | Resolvido |
 | BUG-125 | Alta | Viviane/WhatsApp UX | Tom muito rigido: resposta com preco espontaneo e baixa empatia em perguntas sociais ("voce e robo?", "ficar rico"), gerando desconforto e risco de abandono | Resolvido |
+| BUG-126 | Media | VIVA/UI Chat Layout | Area util do chat em `/viva` estava subaproveitada (input alto e largura limitada), reduzindo leitura e produtividade operacional | Resolvido |
 
 ---
 
@@ -2428,3 +2429,26 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
   - testes de regressao para naturalidade e remocao de preco nao solicitado.
 - validacao tecnica:
   - `PYTHONPATH=C:\projetos\fabio2\backend pytest tests/test_viviane_humanizacao.py -q` => `17 passed`.
+
+### BUG-126: Subaproveitamento de espaco na aba de chat `/viva`
+**Data:** 2026-02-20  
+**Severidade:** Media  
+**Descricao:** A tela de chat perdia area util com largura central restrita e campo de digitacao alto demais, reduzindo a quantidade de contexto visivel por tela.
+**Esperado:** Mais area de leitura de conversa e input mais compacto em 100% de zoom.
+**Status:** Resolvido  
+
+### Atualizacao 2026-02-20 (BUG-126 - tuning cirurgico do layout)
+- frontend:
+  - `frontend/src/app/viva/page.tsx`
+- ajustes aplicados:
+  - altura da area principal com `100dvh` e `min-h-0` para melhor aproveitamento vertical;
+  - menu lateral reduzido (`w-64` -> `w-56`);
+  - header mais compacto (`px-6 py-4` -> `px-4 py-3`);
+  - largura da coluna de mensagens expandida (`max-w-3xl` -> `max-w-5xl`);
+  - largura de bolha aumentada (`max-w-[80%]` -> `max-w-[88%]` com limite responsivo);
+  - input mais compacto (`rows 3 -> 2`, `INPUT_MIN_HEIGHT 88 -> 56`, `INPUT_MAX_HEIGHT 220 -> 160`);
+  - rodape de aviso com menor altura visual.
+- evidencias:
+  - `docs/AUDIT/playwright-viva-layout-2026-02-20.png`
+- rollback institucional pre-change:
+  - `backend/COFRE/system/blindagem/rollback/ROLLBACK_VIVA_CHAT_LAYOUT_20260220_120200.md`

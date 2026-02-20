@@ -1,0 +1,7 @@
+{
+  "tool": "npx playwright screenshot",
+  "route": "http://localhost:3000/viva",
+  "checkedAt": "2026-02-20T12:09:04.3872267-03:00",
+  "status": "ok",
+  "evidence": "C:/projetos/fabio2/docs/AUDIT/playwright-viva-layout-2026-02-20.png"
+}
