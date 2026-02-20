@@ -63,6 +63,9 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
   - `backend/COFRE/system/blindagem/rollback/rollback_pre_aws_go_live_20260220_144959.patch`
   - `backend/COFRE/system/blindagem/rollback/rollback_aws_prod_hardening_20260220_153717_baseline.txt`
   - `backend/COFRE/system/blindagem/rollback/rollback_aws_prod_hardening_20260220_153717.patch`
+- Fix de build Linux/EC2 (frontend):
+  - Causa raiz: regra `lib/` no `.gitignore` ignorava `frontend/src/lib/api.ts`, `frontend/src/lib/utils.ts` e `frontend/src/lib/constants.ts`.
+  - Correcao: excecao explicita no `.gitignore` para `frontend/src/lib/**` e versionamento desses arquivos.
 
 ## Diretriz de deploy institucional
 
