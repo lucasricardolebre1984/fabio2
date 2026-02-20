@@ -7,6 +7,7 @@ import logging
 import re
 import unicodedata
 from typing import Dict, List, Optional
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -280,7 +281,7 @@ ESCALA PARA HUMANO:
                 await db.commit()
                 return (
                     "Sou a Viviane, consultora de negocios da Rezeta. "
-                    "Para seguir seu atendimento certinho, me diz seu nome."
+                    "Como voce prefere que eu te chame?"
                 )
             return "Me diz seu nome, por favor, para eu seguir com seu atendimento."
 
@@ -389,7 +390,7 @@ ESCALA PARA HUMANO:
         return digits
 
     def _saudacao_horario(self) -> str:
-        hora = datetime.now().hour
+        hora = datetime.now(ZoneInfo("America/Sao_Paulo")).hour
         if hora < 12:
             return "Bom dia"
         if hora < 18:
@@ -459,6 +460,8 @@ ESCALA PARA HUMANO:
             "como voce se chama",
             "como você se chama",
             "e o seu",
+            "com quem eu falo",
+            "quem fala",
         )
         return any(pattern in texto for pattern in patterns)
 
@@ -517,12 +520,14 @@ ESCALA PARA HUMANO:
             return None
 
         padroes = [
-            r"meu nome e\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+            r"meu nome\s+[eé]\s+([a-zA-ZÀ-ÿ\s]{2,50})",
             r"eu sou\s+([a-zA-ZÀ-ÿ\s]{2,50})",
             r"sou o\s+([a-zA-ZÀ-ÿ\s]{2,50})",
             r"sou a\s+([a-zA-ZÀ-ÿ\s]{2,50})",
             r"sou\s+([a-zA-ZÀ-ÿ\s]{2,50})",
-            r"aqui e\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+            r"aqui\s+[eé]\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+            r"aqui\s+[eé]\s+o\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+            r"aqui\s+[eé]\s+a\s+([a-zA-ZÀ-ÿ\s]{2,50})",
             r"^\s*([a-zA-ZÀ-ÿ]{2,30})\s+(?:qual|e voce|e você|e o seu|e o seu nome)",
             r"^\s*([a-zA-ZÀ-ÿ]{2,30})\s*$",
         ]
@@ -530,11 +535,12 @@ ESCALA PARA HUMANO:
             match = re.search(padrao, texto, flags=re.IGNORECASE)
             if match:
                 candidato = re.sub(
-                    r"\b(e\s+voce|e\s+você|qual\s+o\s+seu(?:\s+nome)?|qual\s+o\s+seu)\b.*$",
+                    r"\b(e\s+voce|e\s+você|qual\s+o\s+seu(?:\s+nome)?|qual\s+o\s+seu|com\s+quem\s+eu\s+falo)\b.*$",
                     "",
                     match.group(1),
                     flags=re.IGNORECASE,
                 )
+                candidato = re.sub(r"^\s*(o|a)\s+", "", candidato, flags=re.IGNORECASE)
                 return self._limpar_nome(candidato)
         return self._limpar_nome(texto)
 

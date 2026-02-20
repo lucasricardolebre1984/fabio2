@@ -1,8 +1,11 @@
-﻿# API - FC Soluções Financeiras
+# API - FC Soluções Financeiras
 
 > **Base URL:** `http://localhost:8000/api/v1`  
 > **Versão:** 1.0.0  
 > **Data:** 2026-02-13
+
+Snapshot runtime mais recente (homologacao):
+- `docs/API_ENDPOINTS_CATALOG_2026-02-20.md`
 
 ---
 
@@ -1006,3 +1009,4 @@ Quando o motivo de nao fechamento for financeiro, registrar no cliente:
 ### Fonte de regras/precos
 - `frontend/src/app/viva/REGRAS/Descrição_Detalhada_dos_Serviços_Rezeta_Brasil.md`
 - `frontend/src/app/viva/REGRAS/tabela_precos_ia_01_planilha1.csv`
+

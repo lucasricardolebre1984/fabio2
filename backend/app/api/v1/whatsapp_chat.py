@@ -19,10 +19,12 @@ from app.models.whatsapp_conversa import (
     WhatsappMensagem,
 )
 from app.schemas.whatsapp_chat import (
+    BindNumeroRequest,
     ConversaDetalheResponse,
     ConversaResponse,
     MensagemResponse,
 )
+from app.services.evolution_webhook_service import webhook_service
 
 router = APIRouter()
 
@@ -105,6 +107,51 @@ async def arquivar_conversa(
     conversa.status = StatusConversa.ARQUIVADA
     await db.commit()
     return {"status": "arquivada"}
+
+
+@router.post("/conversas/{conversa_id}/bind-number")
+async def bind_numero_real(
+    conversa_id: UUID,
+    payload: BindNumeroRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operador),
+):
+    """Vincula numero real para conversa @lid e dispara flush da fila pendente."""
+    _ = current_user
+
+    stmt = select(WhatsappConversa).where(WhatsappConversa.id == conversa_id)
+    result = await db.execute(stmt)
+    conversa = result.scalar_one_or_none()
+    if not conversa:
+        raise HTTPException(status_code=404, detail="Conversa nao encontrada")
+
+    digits = "".join(ch for ch in str(payload.numero_real or "") if ch.isdigit())
+    if len(digits) <= 11 and not digits.startswith("55"):
+        digits = "55" + digits
+    if len(digits) < 12 or len(digits) > 15:
+        raise HTTPException(status_code=400, detail="Numero invalido para bind")
+
+    contexto = dict(conversa.contexto_ia or {})
+    contexto["resolved_whatsapp_number"] = digits
+    contexto["resolved_whatsapp_source"] = "manual_bind"
+    contexto["needs_manual_bind"] = False
+    contexto["manual_bind_at"] = datetime.utcnow().isoformat()
+    contexto.pop("manual_bind_reason", None)
+    conversa.contexto_ia = contexto
+    await db.commit()
+    await db.refresh(conversa)
+
+    sent = await webhook_service._flush_pending_outbound_for_conversation(  # noqa: SLF001
+        db=db,
+        conversa=conversa,
+        push_name=conversa.nome_contato,
+        remote_jid=conversa.numero_telefone,
+    )
+    return {
+        "status": "bound",
+        "numero_real": digits,
+        "pending_sent": sent,
+    }
 
 
 @router.get("/status")

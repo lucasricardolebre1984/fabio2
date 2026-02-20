@@ -85,7 +85,7 @@ services:
       - fabio2-network
 
   evolution-api:
-    image: atendai/evolution-api:latest
+    image: evoapicloud/evolution-api:v2.3.7
     container_name: fabio2-evolution
     restart: unless-stopped
     environment:

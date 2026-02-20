@@ -1,0 +1,403 @@
+diff --git a/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md b/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
+index d2a3aa3..d040bdc 100644
+--- a/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
++++ b/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
+@@ -1,6 +1,6 @@
+ # BLINDAGEM - Indice Canonico (COFRE)
+ 
+-Atualizado em: 2026-02-19
++Atualizado em: 2026-02-20
+ 
+ Este arquivo centraliza os artefatos institucionais de blindagem para homologacao.
+ 
+@@ -27,6 +27,13 @@ Este arquivo centraliza os artefatos institucionais de blindagem para homologaca
+ - `backend/COFRE/system/blindagem/audit/HOMOLOG_PRE_AWS_2026-02-19.md`
+ - `backend/COFRE/system/blindagem/audit/VIVIANE_HUMANIZATION_2026-02-19.md`
+ - `backend/COFRE/system/blindagem/audit/VIVIANE_PERSONA_NATURAL_PATCH_2026-02-19.md`
++- `backend/COFRE/system/blindagem/audit/COFRE_DB_FOLDER_MAP_2026-02-20.md`
++- `backend/COFRE/system/blindagem/audit/COFRE_MEMORY_STATUS_2026-02-20.md`
++- `backend/COFRE/system/blindagem/audit/WHATSAPP_LID_DELIVERY_BUG_2026-02-20.md`
++- `backend/COFRE/system/blindagem/audit/EVOLUTION_LID_FIX_2026-02-20.md`
++- `backend/COFRE/system/blindagem/audit/ENDPOINTS_RUNTIME_COFRE_2026-02-20.md`
++- `backend/COFRE/system/blindagem/audit/PERSONA_VIVIANE_SCOPE_2026-02-20.md`
++- `docs/API_ENDPOINTS_CATALOG_2026-02-20.md`
+ 
+ ## Rollbacks
+ - `backend/COFRE/system/blindagem/rollback/rollback_gate2_cca7e3d.patch`
+diff --git a/backend/app/api/v1/whatsapp_chat.py b/backend/app/api/v1/whatsapp_chat.py
+index 5dd1a77..706e16e 100644
+--- a/backend/app/api/v1/whatsapp_chat.py
++++ b/backend/app/api/v1/whatsapp_chat.py
+@@ -19,10 +19,12 @@ from app.models.whatsapp_conversa import (
+     WhatsappMensagem,
+ )
+ from app.schemas.whatsapp_chat import (
++    BindNumeroRequest,
+     ConversaDetalheResponse,
+     ConversaResponse,
+     MensagemResponse,
+ )
++from app.services.evolution_webhook_service import webhook_service
+ 
+ router = APIRouter()
+ 
+@@ -107,6 +109,51 @@ async def arquivar_conversa(
+     return {"status": "arquivada"}
+ 
+ 
++@router.post("/conversas/{conversa_id}/bind-number")
++async def bind_numero_real(
++    conversa_id: UUID,
++    payload: BindNumeroRequest,
++    db: AsyncSession = Depends(get_db),
++    current_user: User = Depends(require_operador),
++):
++    """Vincula numero real para conversa @lid e dispara flush da fila pendente."""
++    _ = current_user
++
++    stmt = select(WhatsappConversa).where(WhatsappConversa.id == conversa_id)
++    result = await db.execute(stmt)
++    conversa = result.scalar_one_or_none()
++    if not conversa:
++        raise HTTPException(status_code=404, detail="Conversa nao encontrada")
++
++    digits = "".join(ch for ch in str(payload.numero_real or "") if ch.isdigit())
++    if len(digits) <= 11 and not digits.startswith("55"):
++        digits = "55" + digits
++    if len(digits) < 12 or len(digits) > 15:
++        raise HTTPException(status_code=400, detail="Numero invalido para bind")
++
++    contexto = dict(conversa.contexto_ia or {})
++    contexto["resolved_whatsapp_number"] = digits
++    contexto["resolved_whatsapp_source"] = "manual_bind"
++    contexto["needs_manual_bind"] = False
++    contexto["manual_bind_at"] = datetime.utcnow().isoformat()
++    contexto.pop("manual_bind_reason", None)
++    conversa.contexto_ia = contexto
++    await db.commit()
++    await db.refresh(conversa)
++
++    sent = await webhook_service._flush_pending_outbound_for_conversation(  # noqa: SLF001
++        db=db,
++        conversa=conversa,
++        push_name=conversa.nome_contato,
++        remote_jid=conversa.numero_telefone,
++    )
++    return {
++        "status": "bound",
++        "numero_real": digits,
++        "pending_sent": sent,
++    }
++
++
+ @router.get("/status")
+ async def status_whatsapp(
+     db: AsyncSession = Depends(get_db),
+diff --git a/backend/app/schemas/whatsapp_chat.py b/backend/app/schemas/whatsapp_chat.py
+index c2ad922..e5a544e 100644
+--- a/backend/app/schemas/whatsapp_chat.py
++++ b/backend/app/schemas/whatsapp_chat.py
+@@ -53,3 +53,7 @@ class ConversaCreate(BaseModel):
+ 
+ class EnviarMensagemRequest(BaseModel):
+     conteudo: str
++
++
++class BindNumeroRequest(BaseModel):
++    numero_real: str
+diff --git a/backend/app/services/evolution_webhook_service.py b/backend/app/services/evolution_webhook_service.py
+index 069da3c..62a7940 100644
+--- a/backend/app/services/evolution_webhook_service.py
++++ b/backend/app/services/evolution_webhook_service.py
+@@ -194,6 +194,14 @@ class EvolutionWebhookService:
+             )
+             enviado = bool(envio_result.get("sucesso"))
+             erro_envio = None if enviado else envio_result.get("erro")
++            if enviado:
++                contexto = dict(conversa.contexto_ia or {})
++                if contexto.get("needs_manual_bind"):
++                    contexto["needs_manual_bind"] = False
++                    contexto.pop("manual_bind_reason", None)
++                    contexto.pop("manual_bind_last_error", None)
++                    contexto["manual_bind_cleared_at"] = datetime.utcnow().isoformat()
++                    conversa.contexto_ia = contexto
+ 
+             msg_ia = WhatsappMensagem(
+                 conversa_id=conversa.id,
+@@ -224,6 +232,12 @@ class EvolutionWebhookService:
+                     push_name=push_name,
+                     erro=erro_envio,
+                 )
++                contexto = dict(conversa.contexto_ia or {})
++                contexto["needs_manual_bind"] = True
++                contexto["manual_bind_reason"] = "exists_false_lid"
++                contexto["manual_bind_last_error"] = str(erro_envio or "")[:500]
++                contexto["manual_bind_updated_at"] = datetime.utcnow().isoformat()
++                conversa.contexto_ia = contexto
+ 
+             await db.commit()
+ 
+@@ -448,6 +462,16 @@ class EvolutionWebhookService:
+         contexto = dict(contexto_atual or {})
+         changed = False
+         existing_resolved = self._normalize_digits(str(contexto.get("resolved_whatsapp_number") or ""))
++        existing_source = str(contexto.get("resolved_whatsapp_source") or "").strip().lower()
++
++        # Blindagem: nunca reutilizar vinculo herdado de conversa anterior (@lid pode reciclar IDs).
++        # Se vier de "prior_lid_binding", limpar e exigir evidencia atual (lid_meta/user_text/manual_bind).
++        if existing_source == "prior_lid_binding":
++            contexto.pop("resolved_whatsapp_number", None)
++            contexto.pop("resolved_whatsapp_source", None)
++            existing_resolved = ""
++            changed = True
++
+         if existing_resolved and not self._is_plausible_phone_digits(existing_resolved):
+             contexto.pop("resolved_whatsapp_number", None)
+             contexto.pop("resolved_whatsapp_source", None)
+@@ -473,19 +497,9 @@ class EvolutionWebhookService:
+                 contexto["resolved_whatsapp_source"] = "lid_meta"
+                 changed = True
+ 
+-        if not contexto.get("resolved_whatsapp_number"):
+-            from_lead = self._pick_preferred_number_from_context(contexto)
+-            if from_lead and self._is_plausible_phone_digits(from_lead):
+-                contexto["resolved_whatsapp_number"] = from_lead
+-                contexto["resolved_whatsapp_source"] = "lead_context"
+-                changed = True
+-
+-        if not contexto.get("resolved_whatsapp_number"):
+-            from_registry = await self._resolve_phone_from_client_registry(db=db, push_name=push_name)
+-            if from_registry and self._is_plausible_phone_digits(from_registry):
+-                contexto["resolved_whatsapp_number"] = from_registry
+-                contexto["resolved_whatsapp_source"] = "client_registry"
+-                changed = True
++        # Para @lid, evitar inferir telefone por lead interno/cadastro de cliente.
++        # Esse atalho pode enviar para numero antigo/incorreto e perder o lead real.
++        # Mantemos apenas fontes explicitas: texto do proprio cliente e metadados do evento.
+ 
+         if changed:
+             conversa.contexto_ia = contexto
+@@ -768,6 +782,11 @@ class EvolutionWebhookService:
+             kept.append(item)
+ 
+         contexto["pending_outbound"] = kept
++        if sent_count > 0 and contexto.get("needs_manual_bind") and not kept:
++            contexto["needs_manual_bind"] = False
++            contexto.pop("manual_bind_reason", None)
++            contexto.pop("manual_bind_last_error", None)
++            contexto["manual_bind_cleared_at"] = datetime.utcnow().isoformat()
+         conversa.contexto_ia = contexto
+         await db.commit()
+         return sent_count
+diff --git a/backend/app/services/viva_ia_service.py b/backend/app/services/viva_ia_service.py
+index b5c03cc..efdb6bf 100644
+--- a/backend/app/services/viva_ia_service.py
++++ b/backend/app/services/viva_ia_service.py
+@@ -7,6 +7,7 @@ import logging
+ import re
+ import unicodedata
+ from typing import Dict, List, Optional
++from zoneinfo import ZoneInfo
+ 
+ from sqlalchemy import select
+ from sqlalchemy.ext.asyncio import AsyncSession
+@@ -280,7 +281,7 @@ ESCALA PARA HUMANO:
+                 await db.commit()
+                 return (
+                     "Sou a Viviane, consultora de negocios da Rezeta. "
+-                    "Para seguir seu atendimento certinho, me diz seu nome."
++                    "Como voce prefere que eu te chame?"
+                 )
+             return "Me diz seu nome, por favor, para eu seguir com seu atendimento."
+ 
+@@ -389,7 +390,7 @@ ESCALA PARA HUMANO:
+         return digits
+ 
+     def _saudacao_horario(self) -> str:
+-        hora = datetime.now().hour
++        hora = datetime.now(ZoneInfo("America/Sao_Paulo")).hour
+         if hora < 12:
+             return "Bom dia"
+         if hora < 18:
+@@ -459,6 +460,8 @@ ESCALA PARA HUMANO:
+             "como voce se chama",
+             "como você se chama",
+             "e o seu",
++            "com quem eu falo",
++            "quem fala",
+         )
+         return any(pattern in texto for pattern in patterns)
+ 
+@@ -517,12 +520,14 @@ ESCALA PARA HUMANO:
+             return None
+ 
+         padroes = [
+-            r"meu nome e\s+([a-zA-ZÀ-ÿ\s]{2,50})",
++            r"meu nome\s+[eé]\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+             r"eu sou\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+             r"sou o\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+             r"sou a\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+             r"sou\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+-            r"aqui e\s+([a-zA-ZÀ-ÿ\s]{2,50})",
++            r"aqui\s+[eé]\s+([a-zA-ZÀ-ÿ\s]{2,50})",
++            r"aqui\s+[eé]\s+o\s+([a-zA-ZÀ-ÿ\s]{2,50})",
++            r"aqui\s+[eé]\s+a\s+([a-zA-ZÀ-ÿ\s]{2,50})",
+             r"^\s*([a-zA-ZÀ-ÿ]{2,30})\s+(?:qual|e voce|e você|e o seu|e o seu nome)",
+             r"^\s*([a-zA-ZÀ-ÿ]{2,30})\s*$",
+         ]
+@@ -530,11 +535,12 @@ ESCALA PARA HUMANO:
+             match = re.search(padrao, texto, flags=re.IGNORECASE)
+             if match:
+                 candidato = re.sub(
+-                    r"\b(e\s+voce|e\s+você|qual\s+o\s+seu(?:\s+nome)?|qual\s+o\s+seu)\b.*$",
++                    r"\b(e\s+voce|e\s+você|qual\s+o\s+seu(?:\s+nome)?|qual\s+o\s+seu|com\s+quem\s+eu\s+falo)\b.*$",
+                     "",
+                     match.group(1),
+                     flags=re.IGNORECASE,
+                 )
++                candidato = re.sub(r"^\s*(o|a)\s+", "", candidato, flags=re.IGNORECASE)
+                 return self._limpar_nome(candidato)
+         return self._limpar_nome(texto)
+ 
+diff --git a/backend/app/services/whatsapp_service.py b/backend/app/services/whatsapp_service.py
+index ea54fa6..bce9fc6 100644
+--- a/backend/app/services/whatsapp_service.py
++++ b/backend/app/services/whatsapp_service.py
+@@ -762,70 +762,11 @@ class WhatsAppService:
+                 if numero_alt and self._is_plausible_phone_number(numero_alt):
+                     candidate_numbers.append(numero_alt)
+ 
+-        nome_base = self._normalizar_nome(context_push_name or (current_contact or {}).get("pushName"))
+-        profile_pic_base = str((current_contact or {}).get("profilePicUrl") or "").strip()
+-        if profile_pic_base:
+-            same_pic_matches = [
+-                item
+-                for item in contacts
+-                if str(item.get("remoteJid", "")).endswith("@s.whatsapp.net")
+-                and str(item.get("profilePicUrl") or "").strip() == profile_pic_base
+-            ]
+-            if len(same_pic_matches) == 1:
+-                numero_match = self._extrair_numero_de_jid(same_pic_matches[0].get("remoteJid", ""))
+-                if numero_match and self._is_plausible_phone_number(numero_match):
+-                    candidate_numbers.append(numero_match)
+-
+-        if nome_base:
+-            contact_matches = [
+-                item
+-                for item in contacts
+-                if str(item.get("remoteJid", "")).endswith("@s.whatsapp.net")
+-                and self._normalizar_nome(item.get("pushName")) == nome_base
+-            ]
+-            if len(contact_matches) == 1:
+-                numero_match = self._extrair_numero_de_jid(contact_matches[0].get("remoteJid", ""))
+-                if numero_match and self._is_plausible_phone_number(numero_match):
+-                    candidate_numbers.append(numero_match)
+-
+-            chats = await self._fetch_chats(client, instance)
+-            current_chat = next(
+-                (
+-                    item
+-                    for item in chats
+-                    if str(item.get("remoteJid", "")).lower() == numero.lower()
+-                ),
+-                None,
+-            )
+-            current_updated = self._parse_iso_datetime((current_chat or {}).get("updatedAt"))
+-            ranked_candidates: List[Dict[str, Any]] = []
+-            for chat in chats:
+-                remote_jid = str(chat.get("remoteJid", ""))
+-                if not remote_jid.endswith("@s.whatsapp.net"):
+-                    continue
+-                candidate_number = self._extrair_numero_de_jid(remote_jid)
+-                if not candidate_number or not self._is_plausible_phone_number(candidate_number):
+-                    continue
+-                score = self._name_similarity_score(nome_base, str(chat.get("pushName") or ""))
+-                if score <= 0:
+-                    continue
+-                updated = self._parse_iso_datetime(chat.get("updatedAt"))
+-                recency_penalty = 0
+-                if current_updated and updated:
+-                    recency_penalty = int(abs((current_updated - updated).total_seconds()) // 600)
+-                ranked_candidates.append(
+-                    {
+-                        "number": candidate_number,
+-                        "score": score - recency_penalty,
+-                        "updated": updated.isoformat() if updated else "",
+-                    }
+-                )
+-            ranked_candidates.sort(
+-                key=lambda item: (item.get("score", 0), item.get("updated", "")),
+-                reverse=True,
+-            )
+-            for ranked in ranked_candidates[:5]:
+-                candidate_numbers.append(str(ranked.get("number") or ""))
++        # Nao usar heuristica de nome/foto para converter @lid.
++        # Esse "chute" pode redirecionar mensagem para outro cliente com nome parecido.
++        # Para @lid, aceitamos apenas origem explicita/confiavel:
++        # - numero preferencial validado no contexto
++        # - metadado alternativo vindo do proprio evento/contato
+ 
+         unique_candidates: List[str] = []
+         for candidate in candidate_numbers:
+diff --git a/docker-compose-prod.yml b/docker-compose-prod.yml
+index ba1ad05..5a381a5 100644
+--- a/docker-compose-prod.yml
++++ b/docker-compose-prod.yml
+@@ -85,7 +85,7 @@ services:
+       - fabio2-network
+ 
+   evolution-api:
+-    image: atendai/evolution-api:latest
++    image: evoapicloud/evolution-api:v2.3.7
+     container_name: fabio2-evolution
+     restart: unless-stopped
+     environment:
+diff --git a/docker-compose.local.yml b/docker-compose.local.yml
+index ba654ac..5cb2028 100644
+--- a/docker-compose.local.yml
++++ b/docker-compose.local.yml
+@@ -30,7 +30,7 @@ services:
+       - redis_data:/data
+ 
+   evolution-api:
+-    image: atendai/evolution-api:latest
++    image: evoapicloud/evolution-api:v2.3.7
+     container_name: fabio2-evolution
+     restart: unless-stopped
+     ports:
+diff --git a/docker-compose.yml b/docker-compose.yml
+index 74f8b95..e98a760 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -48,7 +48,7 @@ services:
+   # Evolution API (WhatsApp)
+   # ==================================================================
+   evolution-api:
+-    image: atendai/evolution-api:latest
++    image: evoapicloud/evolution-api:v2.3.7
+     container_name: fabio2-evolution
+     restart: unless-stopped
+     ports:
+diff --git a/docs/API.md b/docs/API.md
+index 2f4c1a2..876a059 100644
+--- a/docs/API.md
++++ b/docs/API.md
+@@ -1,9 +1,12 @@
+-﻿# API - FC Soluções Financeiras
++# API - FC Soluções Financeiras
+ 
+ > **Base URL:** `http://localhost:8000/api/v1`  
+ > **Versão:** 1.0.0  
+ > **Data:** 2026-02-13
+ 
++Snapshot runtime mais recente (homologacao):
++- `docs/API_ENDPOINTS_CATALOG_2026-02-20.md`
++
+ ---
+ 
+ ## Autenticação
+@@ -1006,3 +1009,4 @@ Quando o motivo de nao fechamento for financeiro, registrar no cliente:
+ ### Fonte de regras/precos
+ - `frontend/src/app/viva/REGRAS/Descrição_Detalhada_dos_Serviços_Rezeta_Brasil.md`
+ - `frontend/src/app/viva/REGRAS/tabela_precos_ia_01_planilha1.csv`
++

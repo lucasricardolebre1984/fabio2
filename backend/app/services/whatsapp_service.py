@@ -762,70 +762,11 @@ class WhatsAppService:
                 if numero_alt and self._is_plausible_phone_number(numero_alt):
                     candidate_numbers.append(numero_alt)
 
-        nome_base = self._normalizar_nome(context_push_name or (current_contact or {}).get("pushName"))
-        profile_pic_base = str((current_contact or {}).get("profilePicUrl") or "").strip()
-        if profile_pic_base:
-            same_pic_matches = [
-                item
-                for item in contacts
-                if str(item.get("remoteJid", "")).endswith("@s.whatsapp.net")
-                and str(item.get("profilePicUrl") or "").strip() == profile_pic_base
-            ]
-            if len(same_pic_matches) == 1:
-                numero_match = self._extrair_numero_de_jid(same_pic_matches[0].get("remoteJid", ""))
-                if numero_match and self._is_plausible_phone_number(numero_match):
-                    candidate_numbers.append(numero_match)
-
-        if nome_base:
-            contact_matches = [
-                item
-                for item in contacts
-                if str(item.get("remoteJid", "")).endswith("@s.whatsapp.net")
-                and self._normalizar_nome(item.get("pushName")) == nome_base
-            ]
-            if len(contact_matches) == 1:
-                numero_match = self._extrair_numero_de_jid(contact_matches[0].get("remoteJid", ""))
-                if numero_match and self._is_plausible_phone_number(numero_match):
-                    candidate_numbers.append(numero_match)
-
-            chats = await self._fetch_chats(client, instance)
-            current_chat = next(
-                (
-                    item
-                    for item in chats
-                    if str(item.get("remoteJid", "")).lower() == numero.lower()
-                ),
-                None,
-            )
-            current_updated = self._parse_iso_datetime((current_chat or {}).get("updatedAt"))
-            ranked_candidates: List[Dict[str, Any]] = []
-            for chat in chats:
-                remote_jid = str(chat.get("remoteJid", ""))
-                if not remote_jid.endswith("@s.whatsapp.net"):
-                    continue
-                candidate_number = self._extrair_numero_de_jid(remote_jid)
-                if not candidate_number or not self._is_plausible_phone_number(candidate_number):
-                    continue
-                score = self._name_similarity_score(nome_base, str(chat.get("pushName") or ""))
-                if score <= 0:
-                    continue
-                updated = self._parse_iso_datetime(chat.get("updatedAt"))
-                recency_penalty = 0
-                if current_updated and updated:
-                    recency_penalty = int(abs((current_updated - updated).total_seconds()) // 600)
-                ranked_candidates.append(
-                    {
-                        "number": candidate_number,
-                        "score": score - recency_penalty,
-                        "updated": updated.isoformat() if updated else "",
-                    }
-                )
-            ranked_candidates.sort(
-                key=lambda item: (item.get("score", 0), item.get("updated", "")),
-                reverse=True,
-            )
-            for ranked in ranked_candidates[:5]:
-                candidate_numbers.append(str(ranked.get("number") or ""))
+        # Nao usar heuristica de nome/foto para converter @lid.
+        # Esse "chute" pode redirecionar mensagem para outro cliente com nome parecido.
+        # Para @lid, aceitamos apenas origem explicita/confiavel:
+        # - numero preferencial validado no contexto
+        # - metadado alternativo vindo do proprio evento/contato
 
         unique_candidates: List[str] = []
         for candidate in candidate_numbers:

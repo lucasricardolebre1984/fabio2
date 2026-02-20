@@ -194,6 +194,14 @@ class EvolutionWebhookService:
             )
             enviado = bool(envio_result.get("sucesso"))
             erro_envio = None if enviado else envio_result.get("erro")
+            if enviado:
+                contexto = dict(conversa.contexto_ia or {})
+                if contexto.get("needs_manual_bind"):
+                    contexto["needs_manual_bind"] = False
+                    contexto.pop("manual_bind_reason", None)
+                    contexto.pop("manual_bind_last_error", None)
+                    contexto["manual_bind_cleared_at"] = datetime.utcnow().isoformat()
+                    conversa.contexto_ia = contexto
 
             msg_ia = WhatsappMensagem(
                 conversa_id=conversa.id,
@@ -224,6 +232,12 @@ class EvolutionWebhookService:
                     push_name=push_name,
                     erro=erro_envio,
                 )
+                contexto = dict(conversa.contexto_ia or {})
+                contexto["needs_manual_bind"] = True
+                contexto["manual_bind_reason"] = "exists_false_lid"
+                contexto["manual_bind_last_error"] = str(erro_envio or "")[:500]
+                contexto["manual_bind_updated_at"] = datetime.utcnow().isoformat()
+                conversa.contexto_ia = contexto
 
             await db.commit()
 
@@ -448,6 +462,16 @@ class EvolutionWebhookService:
         contexto = dict(contexto_atual or {})
         changed = False
         existing_resolved = self._normalize_digits(str(contexto.get("resolved_whatsapp_number") or ""))
+        existing_source = str(contexto.get("resolved_whatsapp_source") or "").strip().lower()
+
+        # Blindagem: nunca reutilizar vinculo herdado de conversa anterior (@lid pode reciclar IDs).
+        # Se vier de "prior_lid_binding", limpar e exigir evidencia atual (lid_meta/user_text/manual_bind).
+        if existing_source == "prior_lid_binding":
+            contexto.pop("resolved_whatsapp_number", None)
+            contexto.pop("resolved_whatsapp_source", None)
+            existing_resolved = ""
+            changed = True
+
         if existing_resolved and not self._is_plausible_phone_digits(existing_resolved):
             contexto.pop("resolved_whatsapp_number", None)
             contexto.pop("resolved_whatsapp_source", None)
@@ -473,19 +497,9 @@ class EvolutionWebhookService:
                 contexto["resolved_whatsapp_source"] = "lid_meta"
                 changed = True
 
-        if not contexto.get("resolved_whatsapp_number"):
-            from_lead = self._pick_preferred_number_from_context(contexto)
-            if from_lead and self._is_plausible_phone_digits(from_lead):
-                contexto["resolved_whatsapp_number"] = from_lead
-                contexto["resolved_whatsapp_source"] = "lead_context"
-                changed = True
-
-        if not contexto.get("resolved_whatsapp_number"):
-            from_registry = await self._resolve_phone_from_client_registry(db=db, push_name=push_name)
-            if from_registry and self._is_plausible_phone_digits(from_registry):
-                contexto["resolved_whatsapp_number"] = from_registry
-                contexto["resolved_whatsapp_source"] = "client_registry"
-                changed = True
+        # Para @lid, evitar inferir telefone por lead interno/cadastro de cliente.
+        # Esse atalho pode enviar para numero antigo/incorreto e perder o lead real.
+        # Mantemos apenas fontes explicitas: texto do proprio cliente e metadados do evento.
 
         if changed:
             conversa.contexto_ia = contexto
@@ -768,6 +782,11 @@ class EvolutionWebhookService:
             kept.append(item)
 
         contexto["pending_outbound"] = kept
+        if sent_count > 0 and contexto.get("needs_manual_bind") and not kept:
+            contexto["needs_manual_bind"] = False
+            contexto.pop("manual_bind_reason", None)
+            contexto.pop("manual_bind_last_error", None)
+            contexto["manual_bind_cleared_at"] = datetime.utcnow().isoformat()
         conversa.contexto_ia = contexto
         await db.commit()
         return sent_count

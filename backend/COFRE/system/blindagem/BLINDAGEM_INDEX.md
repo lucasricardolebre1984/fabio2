@@ -1,6 +1,6 @@
 # BLINDAGEM - Indice Canonico (COFRE)
 
-Atualizado em: 2026-02-19
+Atualizado em: 2026-02-20
 
 Este arquivo centraliza os artefatos institucionais de blindagem para homologacao.
 
@@ -27,6 +27,11 @@ Este arquivo centraliza os artefatos institucionais de blindagem para homologaca
 - `backend/COFRE/system/blindagem/audit/HOMOLOG_PRE_AWS_2026-02-19.md`
 - `backend/COFRE/system/blindagem/audit/VIVIANE_HUMANIZATION_2026-02-19.md`
 - `backend/COFRE/system/blindagem/audit/VIVIANE_PERSONA_NATURAL_PATCH_2026-02-19.md`
+- `backend/COFRE/system/blindagem/audit/COFRE_DB_FOLDER_MAP_2026-02-20.md`
+- `backend/COFRE/system/blindagem/audit/COFRE_MEMORY_STATUS_2026-02-20.md`
+- `backend/COFRE/system/blindagem/audit/WHATSAPP_LID_DELIVERY_BUG_2026-02-20.md`
+- `backend/COFRE/system/blindagem/audit/EVOLUTION_LID_FIX_2026-02-20.md`
+- `backend/COFRE/system/blindagem/audit/PERSONA_VIVIANE_SCOPE_2026-02-20.md`
 
 ## Rollbacks
 - `backend/COFRE/system/blindagem/rollback/rollback_gate2_cca7e3d.patch`

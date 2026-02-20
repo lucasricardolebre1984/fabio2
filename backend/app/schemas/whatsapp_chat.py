@@ -53,3 +53,7 @@ class ConversaCreate(BaseModel):
 
 class EnviarMensagemRequest(BaseModel):
     conteudo: str
+
+
+class BindNumeroRequest(BaseModel):
+    numero_real: str
