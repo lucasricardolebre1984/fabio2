@@ -230,50 +230,66 @@ class OpenAIService:
             yield "Erro: mensagem invalida para chat OpenAI"
             return
 
-        payload: Dict[str, Any] = {
-            "model": self.model_chat,
-            "messages": normalized,
-            "temperature": temperature,
-            "max_completion_tokens": max_tokens,
-            "stream": True,
-        }
-
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                async with client.stream(
-                    "POST",
-                    f"{self.base_url}/chat/completions",
-                    headers=self._headers(),
-                    json=payload,
-                ) as response:
-                    if response.status_code != 200:
-                        error_text = await response.aread()
-                        yield f"Erro OpenAI stream ({response.status_code}): {error_text.decode()[:400]}"
-                        return
+                for with_optional_params in (True, False):
+                    payload: Dict[str, Any] = {
+                        "model": self.model_chat,
+                        "messages": normalized,
+                        "stream": True,
+                    }
+                    if with_optional_params:
+                        payload["temperature"] = temperature
+                        payload["max_completion_tokens"] = max_tokens
 
-                    async for line in response.aiter_lines():
-                        if not line.strip():
-                            continue
-                        
-                        if line.startswith("data: "):
-                            data_str = line[6:]  # Remove "data: " prefix
-                            
-                            if data_str == "[DONE]":
-                                break
-                            
-                            try:
-                                import json
-                                chunk_data = json.loads(data_str)
-                                choices = chunk_data.get("choices", [])
-                                
-                                if choices:
-                                    delta = choices[0].get("delta", {})
-                                    content = delta.get("content")
-                                    
-                                    if content:
-                                        yield content
-                            except json.JSONDecodeError:
+                    async with client.stream(
+                        "POST",
+                        f"{self.base_url}/chat/completions",
+                        headers=self._headers(),
+                        json=payload,
+                    ) as response:
+                        if response.status_code != 200:
+                            error_text = (await response.aread()).decode(errors="ignore")[:400]
+                            lower_error = error_text.lower()
+                            should_retry_without_optional = (
+                                with_optional_params
+                                and response.status_code in {400, 422}
+                                and (
+                                    "temperature" in lower_error
+                                    or "max_completion_tokens" in lower_error
+                                    or "unsupported_value" in lower_error
+                                )
+                            )
+                            if should_retry_without_optional:
                                 continue
+
+                            yield f"Erro OpenAI stream ({response.status_code}): {error_text}"
+                            return
+
+                        async for line in response.aiter_lines():
+                            if not line.strip():
+                                continue
+
+                            if line.startswith("data: "):
+                                data_str = line[6:]  # Remove "data: " prefix
+
+                                if data_str == "[DONE]":
+                                    break
+
+                                try:
+                                    import json
+                                    chunk_data = json.loads(data_str)
+                                    choices = chunk_data.get("choices", [])
+
+                                    if choices:
+                                        delta = choices[0].get("delta", {})
+                                        content = delta.get("content")
+
+                                        if content:
+                                            yield content
+                                except json.JSONDecodeError:
+                                    continue
+                        return
         except Exception as e:
             yield f"Erro no streaming: {str(e)}"
 
