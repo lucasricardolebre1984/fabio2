@@ -49,8 +49,10 @@ services:
       - STORAGE_MODE=local
       - STORAGE_LOCAL_PATH=/app/storage
       - VIVA_BRAIN_ROOT=/app/COFRE
+      - VIVA_RULES_DIR=/app/viva_rules
     volumes:
       - backend_storage:/app/storage
+      - ./frontend/src/app/viva/REGRAS:/app/viva_rules:ro
     networks:
       - fabio2-network
     depends_on:

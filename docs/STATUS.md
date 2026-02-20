@@ -69,6 +69,9 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
 - Fix de endpoint frontend em producao (HTTPS):
   - Causa raiz: `NEXT_PUBLIC_API_URL` nao era passado no build Docker do frontend e o bundle caia em fallback local.
   - Correcao: `ARG/ENV NEXT_PUBLIC_API_URL` no `frontend/Dockerfile`, `build.args` no `docker-compose.prod.yml` e `docker-compose-prod.yml`, e mensagem de erro de login sem `localhost` fixo.
+- Fix de regras/precos Viviane em producao:
+  - Causa raiz: backend em container sem acesso aos arquivos de regras/precos (`/app/viva_rules`).
+  - Correcao: mount read-only de `./frontend/src/app/viva/REGRAS` para `/app/viva_rules` e `VIVA_RULES_DIR=/app/viva_rules` no backend (compose prod).
 
 ## Diretriz de deploy institucional
 
