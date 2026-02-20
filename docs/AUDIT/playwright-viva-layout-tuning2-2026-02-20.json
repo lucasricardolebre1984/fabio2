@@ -1,0 +1,8 @@
+{
+  "route": "http://localhost:3000/viva",
+  "status": "ok",
+  "tool": "npx playwright screenshot",
+  "tuning": "layout-space-round-2",
+  "evidence": "C:/projetos/fabio2/docs/AUDIT/playwright-viva-layout-tuning2-2026-02-20.png",
+  "checkedAt": "2026-02-20T12:38:08.0710385-03:00"
+}

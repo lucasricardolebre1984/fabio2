@@ -40,6 +40,10 @@ Este arquivo centraliza os artefatos institucionais de blindagem para homologaca
 - `backend/COFRE/system/blindagem/audit/VIVA_CHAT_LAYOUT_SPACE_2026-02-20.md`
 - `backend/COFRE/system/blindagem/audit/playwright-viva-layout-2026-02-20.json`
 - `backend/COFRE/system/blindagem/audit/playwright-viva-layout-2026-02-20.png`
+- `backend/COFRE/system/blindagem/audit/playwright-viva-layout-tuning2-2026-02-20.json`
+- `backend/COFRE/system/blindagem/audit/playwright-viva-layout-tuning2-2026-02-20.png`
+- `backend/COFRE/system/blindagem/audit/playwright-viva-layout-tuning3-2026-02-20.json`
+- `backend/COFRE/system/blindagem/audit/playwright-viva-layout-tuning3-2026-02-20.png`
 
 ## Rollbacks
 - `backend/COFRE/system/blindagem/rollback/rollback_gate2_cca7e3d.patch`
@@ -50,6 +54,9 @@ Este arquivo centraliza os artefatos institucionais de blindagem para homologaca
 - `backend/COFRE/system/blindagem/rollback/rollback_viviane_naturalidade_20260220_115739.patch`
 - `backend/COFRE/system/blindagem/rollback/ROLLBACK_VIVA_CHAT_LAYOUT_20260220_120200.md`
 - `backend/COFRE/system/blindagem/rollback/rollback_viva_chat_layout_space_20260220_1209.patch`
+- `backend/COFRE/system/blindagem/rollback/ROLLBACK_VIVA_CHAT_LAYOUT_TUNING2_20260220_123800.md`
+- `backend/COFRE/system/blindagem/rollback/rollback_viva_chat_layout_tuning2_20260220_124500.patch`
+- `backend/COFRE/system/blindagem/rollback/rollback_viva_chat_layout_tuning3_pre_20260220_124900.patch`
 
 ## Regra
 - Novos relatorios de auditoria devem entrar em `backend/COFRE/system/blindagem/audit/`.
