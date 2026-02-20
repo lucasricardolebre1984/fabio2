@@ -1,0 +1,162 @@
+diff --git a/docker-compose-prod.yml b/docker-compose-prod.yml
+index 589eca4..88ceb29 100644
+--- a/docker-compose-prod.yml
++++ b/docker-compose-prod.yml
+@@ -46,6 +46,50 @@ services:
+       - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-default_key_change_in_production}
+       - WA_INSTANCE_NAME=${WA_INSTANCE_NAME:-fc-solucoes}
+       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
++      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
++      - OPENAI_API_MODEL=${OPENAI_API_MODEL:-gpt-5-mini}
++      - OPENAI_AUDIO_MODEL=${OPENAI_AUDIO_MODEL:-gpt-4o-mini-transcribe}
++      - OPENAI_TTS_MODEL=${OPENAI_TTS_MODEL:-tts-1}
++      - OPENAI_TTS_VOICE=${OPENAI_TTS_VOICE:-alloy}
++      - OPENAI_IMAGE_MODEL=${OPENAI_IMAGE_MODEL:-gpt-image-1}
++      - OPENAI_VISION_MODEL=${OPENAI_VISION_MODEL:-gpt-4o-mini}
++      - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
++      - OPENAI_TIMEOUT_SECONDS=${OPENAI_TIMEOUT_SECONDS:-60}
++      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
++      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
++      - ZAI_API_KEY=${ZAI_API_KEY:-}
++      - OLLAMA_API_KEY=${OLLAMA_API_KEY:-}
++      - VIVA_PROVIDER=${VIVA_PROVIDER:-openai}
++      - VIVA_MEMORY_ENABLED=${VIVA_MEMORY_ENABLED:-false}
++      - VIVA_MEMORY_FILE_LOG_ENABLED=${VIVA_MEMORY_FILE_LOG_ENABLED:-true}
++      - FRONTEND_BASE_URL=${FRONTEND_BASE_URL:-http://localhost:3000}
++      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
++      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
++      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
++      - GOOGLE_CALENDAR_CLIENT_ID=${GOOGLE_CALENDAR_CLIENT_ID:-}
++      - GOOGLE_CALENDAR_CLIENT_SECRET=${GOOGLE_CALENDAR_CLIENT_SECRET:-}
++      - GOOGLE_GMAIL_CLIENT_ID=${GOOGLE_GMAIL_CLIENT_ID:-}
++      - GOOGLE_GMAIL_CLIENT_SECRET=${GOOGLE_GMAIL_CLIENT_SECRET:-}
++      - GOOGLE_SERVICE_ACCOUNT_ID=${GOOGLE_SERVICE_ACCOUNT_ID:-}
++      - GOOGLE_SERVICE_ACCOUNT_EMAIL=${GOOGLE_SERVICE_ACCOUNT_EMAIL:-}
++      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:8000/api/v1/google-calendar/callback}
++      - GOOGLE_CALENDAR_DEFAULT_ID=${GOOGLE_CALENDAR_DEFAULT_ID:-primary}
++      - GOOGLE_CALENDAR_SCOPE=${GOOGLE_CALENDAR_SCOPE:-https://www.googleapis.com/auth/calendar}
++      - GOOGLE_CALENDAR_SYNC_ENABLED=${GOOGLE_CALENDAR_SYNC_ENABLED:-true}
++      - MINIMAX_API_KEY=${MINIMAX_API_KEY:-}
++      - MINIMAX_GROUP_ID=${MINIMAX_GROUP_ID:-}
++      - MINIMAX_BASE_URL=${MINIMAX_BASE_URL:-https://api.minimax.io}
++      - MINIMAX_TTS_MODEL=${MINIMAX_TTS_MODEL:-speech-2.8-hd}
++      - MINIMAX_TTS_VOICE_ID=${MINIMAX_TTS_VOICE_ID:-Portuguese_LovelyLady}
++      - MINIMAX_TTS_SPEED=${MINIMAX_TTS_SPEED:-1.0}
++      - MINIMAX_TTS_PITCH=${MINIMAX_TTS_PITCH:-2.0}
++      - MINIMAX_TTS_VOLUME=${MINIMAX_TTS_VOLUME:-3.64}
++      - MINIMAX_TTS_FORMAT=${MINIMAX_TTS_FORMAT:-mp3}
++      - MINIMAX_TTS_SAMPLE_RATE=${MINIMAX_TTS_SAMPLE_RATE:-32000}
++      - MINIMAX_TTS_BITRATE=${MINIMAX_TTS_BITRATE:-128000}
++      - MINIMAX_TTS_CHANNEL=${MINIMAX_TTS_CHANNEL:-1}
++      - CUSTO_POR_IMAGEM_USD=${CUSTO_POR_IMAGEM_USD:-0.015}
++      - TAXA_CAMBIO_BRL=${TAXA_CAMBIO_BRL:-5.0}
+       - STORAGE_MODE=local
+       - STORAGE_LOCAL_PATH=/app/storage
+       - VIVA_BRAIN_ROOT=/app/COFRE
+@@ -96,6 +140,12 @@ services:
+     container_name: fabio2-evolution
+     restart: unless-stopped
+     environment:
++      - SERVER_URL=http://localhost:8080
++      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY:-default_key_change_in_production}
++      - AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
++      - WEBSOCKET_ENABLED=true
++      - CONFIG_SESSION_PHONE_VERSION=2.3000.1032141294
++      - LOG_BAILEYS=error
+       - DATABASE_ENABLED=true
+       - DATABASE_PROVIDER=postgresql
+       - DATABASE_CONNECTION_URI=postgresql://${DB_USER:-fabio2_user}:${DB_PASSWORD:-fabio2_pass}@postgres:5432/evolution
+@@ -106,6 +156,12 @@ services:
+       - REDIS_ENABLED=true
+       - REDIS_URI=redis://redis:6379/0
+       - REDIS_PREFIX=evolution
++      - CACHE_REDIS_ENABLED=true
++      - CACHE_REDIS_URI=redis://redis:6379/6
++      - CACHE_REDIS_TTL=604800
++      - CACHE_REDIS_PREFIX_KEY=evolution-cache
++      - CACHE_REDIS_SAVE_INSTANCES=false
++      - CACHE_LOCAL_ENABLED=false
+       - STORAGE_LOCAL_ENABLED=true
+       - STORAGE_LOCAL_PATH=/evolution/instances
+     volumes:
+diff --git a/docker-compose.prod.yml b/docker-compose.prod.yml
+index 589eca4..88ceb29 100644
+--- a/docker-compose.prod.yml
++++ b/docker-compose.prod.yml
+@@ -46,6 +46,50 @@ services:
+       - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-default_key_change_in_production}
+       - WA_INSTANCE_NAME=${WA_INSTANCE_NAME:-fc-solucoes}
+       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
++      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
++      - OPENAI_API_MODEL=${OPENAI_API_MODEL:-gpt-5-mini}
++      - OPENAI_AUDIO_MODEL=${OPENAI_AUDIO_MODEL:-gpt-4o-mini-transcribe}
++      - OPENAI_TTS_MODEL=${OPENAI_TTS_MODEL:-tts-1}
++      - OPENAI_TTS_VOICE=${OPENAI_TTS_VOICE:-alloy}
++      - OPENAI_IMAGE_MODEL=${OPENAI_IMAGE_MODEL:-gpt-image-1}
++      - OPENAI_VISION_MODEL=${OPENAI_VISION_MODEL:-gpt-4o-mini}
++      - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
++      - OPENAI_TIMEOUT_SECONDS=${OPENAI_TIMEOUT_SECONDS:-60}
++      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
++      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
++      - ZAI_API_KEY=${ZAI_API_KEY:-}
++      - OLLAMA_API_KEY=${OLLAMA_API_KEY:-}
++      - VIVA_PROVIDER=${VIVA_PROVIDER:-openai}
++      - VIVA_MEMORY_ENABLED=${VIVA_MEMORY_ENABLED:-false}
++      - VIVA_MEMORY_FILE_LOG_ENABLED=${VIVA_MEMORY_FILE_LOG_ENABLED:-true}
++      - FRONTEND_BASE_URL=${FRONTEND_BASE_URL:-http://localhost:3000}
++      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
++      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
++      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
++      - GOOGLE_CALENDAR_CLIENT_ID=${GOOGLE_CALENDAR_CLIENT_ID:-}
++      - GOOGLE_CALENDAR_CLIENT_SECRET=${GOOGLE_CALENDAR_CLIENT_SECRET:-}
++      - GOOGLE_GMAIL_CLIENT_ID=${GOOGLE_GMAIL_CLIENT_ID:-}
++      - GOOGLE_GMAIL_CLIENT_SECRET=${GOOGLE_GMAIL_CLIENT_SECRET:-}
++      - GOOGLE_SERVICE_ACCOUNT_ID=${GOOGLE_SERVICE_ACCOUNT_ID:-}
++      - GOOGLE_SERVICE_ACCOUNT_EMAIL=${GOOGLE_SERVICE_ACCOUNT_EMAIL:-}
++      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:8000/api/v1/google-calendar/callback}
++      - GOOGLE_CALENDAR_DEFAULT_ID=${GOOGLE_CALENDAR_DEFAULT_ID:-primary}
++      - GOOGLE_CALENDAR_SCOPE=${GOOGLE_CALENDAR_SCOPE:-https://www.googleapis.com/auth/calendar}
++      - GOOGLE_CALENDAR_SYNC_ENABLED=${GOOGLE_CALENDAR_SYNC_ENABLED:-true}
++      - MINIMAX_API_KEY=${MINIMAX_API_KEY:-}
++      - MINIMAX_GROUP_ID=${MINIMAX_GROUP_ID:-}
++      - MINIMAX_BASE_URL=${MINIMAX_BASE_URL:-https://api.minimax.io}
++      - MINIMAX_TTS_MODEL=${MINIMAX_TTS_MODEL:-speech-2.8-hd}
++      - MINIMAX_TTS_VOICE_ID=${MINIMAX_TTS_VOICE_ID:-Portuguese_LovelyLady}
++      - MINIMAX_TTS_SPEED=${MINIMAX_TTS_SPEED:-1.0}
++      - MINIMAX_TTS_PITCH=${MINIMAX_TTS_PITCH:-2.0}
++      - MINIMAX_TTS_VOLUME=${MINIMAX_TTS_VOLUME:-3.64}
++      - MINIMAX_TTS_FORMAT=${MINIMAX_TTS_FORMAT:-mp3}
++      - MINIMAX_TTS_SAMPLE_RATE=${MINIMAX_TTS_SAMPLE_RATE:-32000}
++      - MINIMAX_TTS_BITRATE=${MINIMAX_TTS_BITRATE:-128000}
++      - MINIMAX_TTS_CHANNEL=${MINIMAX_TTS_CHANNEL:-1}
++      - CUSTO_POR_IMAGEM_USD=${CUSTO_POR_IMAGEM_USD:-0.015}
++      - TAXA_CAMBIO_BRL=${TAXA_CAMBIO_BRL:-5.0}
+       - STORAGE_MODE=local
+       - STORAGE_LOCAL_PATH=/app/storage
+       - VIVA_BRAIN_ROOT=/app/COFRE
+@@ -96,6 +140,12 @@ services:
+     container_name: fabio2-evolution
+     restart: unless-stopped
+     environment:
++      - SERVER_URL=http://localhost:8080
++      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY:-default_key_change_in_production}
++      - AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
++      - WEBSOCKET_ENABLED=true
++      - CONFIG_SESSION_PHONE_VERSION=2.3000.1032141294
++      - LOG_BAILEYS=error
+       - DATABASE_ENABLED=true
+       - DATABASE_PROVIDER=postgresql
+       - DATABASE_CONNECTION_URI=postgresql://${DB_USER:-fabio2_user}:${DB_PASSWORD:-fabio2_pass}@postgres:5432/evolution
+@@ -106,6 +156,12 @@ services:
+       - REDIS_ENABLED=true
+       - REDIS_URI=redis://redis:6379/0
+       - REDIS_PREFIX=evolution
++      - CACHE_REDIS_ENABLED=true
++      - CACHE_REDIS_URI=redis://redis:6379/6
++      - CACHE_REDIS_TTL=604800
++      - CACHE_REDIS_PREFIX_KEY=evolution-cache
++      - CACHE_REDIS_SAVE_INSTANCES=false
++      - CACHE_LOCAL_ENABLED=false
+       - STORAGE_LOCAL_ENABLED=true
+       - STORAGE_LOCAL_PATH=/evolution/instances
+     volumes:

@@ -72,6 +72,12 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
 - Fix de regras/precos Viviane em producao:
   - Causa raiz: backend em container sem acesso aos arquivos de regras/precos (`/app/viva_rules`).
   - Correcao: mount read-only de `./frontend/src/app/viva/REGRAS` para `/app/viva_rules` e `VIVA_RULES_DIR=/app/viva_rules` no backend (compose prod).
+- Fix de variaveis de IA/Voz/Google em producao:
+  - Causa raiz: `docker-compose.prod.yml` publicava so subconjunto de variaveis no backend, deixando `OPENAI_API_MODEL`, `GOOGLE_*` e `MINIMAX_*` ausentes no runtime.
+  - Correcao: pass-through completo das variaveis de IA, Google Calendar/Gmail e MiniMax no backend dos arquivos `docker-compose.prod.yml` e `docker-compose-prod.yml`.
+- Fix de autenticacao da Evolution em producao:
+  - Causa raiz: compose prod da Evolution sem `AUTHENTICATION_API_KEY`, gerando chave nao padronizada entre backend e Evolution.
+  - Correcao: alinhamento com stack local (`AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}` + flags de websocket/cache).
 
 ## Diretriz de deploy institucional
 
