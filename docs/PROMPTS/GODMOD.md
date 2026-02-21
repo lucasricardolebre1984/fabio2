@@ -200,7 +200,7 @@ graph TD
       - docs/API.md
       - docs/SESSION.md
       - RUNBOOK.md
-      - BUGS_REPORT.md
+      - docs/BUGSREPORT.md
 
 ✅ 6. PROVAR LEITURA:
       - Citar 7 fatos específicos extraídos dos docs
@@ -485,7 +485,7 @@ Quando Lucas pedir algo:
 5. ✅ docs/DECISIONS.md
 6. ✅ docs/ARCHITECTURE.md
 7. ✅ docs/API.md
-8. ✅ docs/COFRE/* (todos arquivos)
+8. ✅ backend/COFRE/* (todos arquivos)
 
 🎯 Fase atual do projeto: [extraído de STATUS.md]
 

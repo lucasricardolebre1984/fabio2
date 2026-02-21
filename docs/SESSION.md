@@ -4,6 +4,16 @@ Data da rodada: 2026-02-21
 Branch: main
 Status: consolidacao final de homologacao local (WhatsApp/VIVA/Viviane) + ajuste cirurgico de layout de contratos com rollback institucional.
 
+## Atualizacao complementar - alinhamento institucional (2026-02-21 06:xx BRT)
+
+- Criado `docs/FOUNDATION.md` para formalizar gates institucionais e proximo gate da homologacao.
+- Corrigido `docs/PROMPTS/GODMOD.md`:
+  - `BUGS_REPORT.md` -> `docs/BUGSREPORT.md`;
+  - `docs/COFRE/*` -> `backend/COFRE/*`.
+- Corrigido `docs/README.md` para incluir `docs/FOUNDATION.md` e explicitar que a raiz canonica do COFRE fica em `backend/COFRE/`.
+- Corrigido `docs/ARCHITECTURE.md` para apontar caminho explicito da persona/skills canonicas.
+- Drift operacional em Ubuntu tratado para manter runtime alinhado ao commit de `main` sem alteracoes locais persistentes.
+
 ## Objetivo da rodada
 
 - Validar e normalizar a pasta `docs` para refletir o estado real do SaaS.

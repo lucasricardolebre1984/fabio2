@@ -26,7 +26,7 @@ Centralizar contratos, clientes, agenda, campanhas e atendimento assistido por I
 ## Regras de produto
 
 - VIVA (interna) e operacao WhatsApp (externa) seguem dominio separado.
-- Persona e skills sao mantidas no COFRE.
+- Persona e skills sao mantidas no COFRE em `backend/COFRE/persona-skills/`.
 - Memoria operacional deve ser auditavel e sincronizada com eventos reais.
 
 Atualizado em: 2026-02-16

@@ -1,7 +1,7 @@
 ﻿# STATUS do projeto - FC Solucoes Financeiras
 
-Data: 2026-02-20
-Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA/Viviane funcionais e layout de contratos estabilizado para homologacao final; permanecem pendencias de CI externo, hardening e publicacao AWS.
+Data: 2026-02-21
+Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA/Viviane funcionais e layout de contratos estabilizado para homologacao final; documentacao institucional normalizada (FOUNDATION + caminhos COFRE), drift operacional do Ubuntu limpo e persistindo como pendencia principal a intermitencia especifica no fluxo WhatsApp.
 
 ## Fonte de verdade ativa
 

@@ -7,14 +7,16 @@ Escopo: estrutura ativa de documentacao institucional do SaaS FC Solucoes Financ
 
 1. Leia primeiro `docs/STATUS.md` para estado atual do sistema.
 2. Leia `docs/ARCHITECTURE/OVERVIEW.md` para arquitetura e rotas canonicas.
-3. Leia `docs/COFRE_RAG_PROTOCOL.md` para governanca de persona/skills/memorias.
-4. Leia `docs/API.md` para contrato de endpoints.
-5. Leia `docs/RUNBOOK.md` para operacao local e homologacao.
+3. Leia `docs/FOUNDATION.md` para gates institucionais e regra de alinhamento local/git/ubuntu.
+4. Leia `docs/COFRE_RAG_PROTOCOL.md` para governanca de persona/skills/memorias.
+5. Leia `docs/API.md` para contrato de endpoints.
+6. Leia `docs/RUNBOOK.md` para operacao local e homologacao.
 
 ## Documentos ativos (obrigatorios)
 
 - `docs/STATUS.md`
 - `docs/SESSION.md`
+- `docs/FOUNDATION.md`
 - `docs/ARCHITECTURE/OVERVIEW.md`
 - `docs/COFRE_RAG_PROTOCOL.md`
 - `docs/API.md`
@@ -32,6 +34,7 @@ Escopo: estrutura ativa de documentacao institucional do SaaS FC Solucoes Financ
 - Auditoria de documentacao desta rodada: `backend/COFRE/system/blindagem/audit/DOCS_AUDIT_2026-02-16.md`
 - Auditoria de qualidade web (perf/a11y/seo/best-practices + seguranca): `backend/COFRE/system/blindagem/audit/WEB_QUALITY_AUDIT_2026-02-16.md`
 - Consolidado de blindagem (auditoria + rollback): `backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md`
+- Fonte real do COFRE no projeto: `backend/COFRE/` (nao existe `docs/COFRE/`).
 
 ## Regra institucional de manutencao
 
