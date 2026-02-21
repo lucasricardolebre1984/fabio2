@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any, Dict, List, Optional
 from uuid import UUID
@@ -13,8 +14,24 @@ from app.services.viva_chat_repository_service import viva_chat_repository_servi
 from app.services.viva_shared_service import _normalize_mode
 
 
+_chat_tables_ready = False
+_chat_tables_lock = asyncio.Lock()
+
+
 async def ensure_chat_tables(db: AsyncSession) -> None:
-    await viva_chat_repository_service.ensure_tables(db)
+    global _chat_tables_ready
+    if _chat_tables_ready:
+        return
+    async with _chat_tables_lock:
+        if _chat_tables_ready:
+            return
+        try:
+            await viva_chat_repository_service.ensure_tables(db)
+            await db.commit()
+            _chat_tables_ready = True
+        except Exception:
+            await db.rollback()
+            raise
 
 
 def safe_json(value: Any, fallback: Any) -> Any:

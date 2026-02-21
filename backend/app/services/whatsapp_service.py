@@ -8,6 +8,36 @@ import httpx
 from app.config import settings
 
 
+DEFAULT_WEBHOOK_EVENTS: List[str] = [
+    "APPLICATION_STARTUP",
+    "QRCODE_UPDATED",
+    "MESSAGES_SET",
+    "MESSAGES_UPSERT",
+    "MESSAGES_UPDATE",
+    "MESSAGES_DELETE",
+    "SEND_MESSAGE",
+    "CONTACTS_SET",
+    "CONTACTS_UPSERT",
+    "CONTACTS_UPDATE",
+    "PRESENCE_UPDATE",
+    "CHATS_SET",
+    "CHATS_UPSERT",
+    "CHATS_UPDATE",
+    "CHATS_DELETE",
+    "GROUPS_UPSERT",
+    "GROUP_UPDATE",
+    "GROUP_PARTICIPANTS_UPDATE",
+    "CONNECTION_UPDATE",
+    "REMOVE_INSTANCE",
+    "LOGOUT_INSTANCE",
+    "LABELS_EDIT",
+    "LABELS_ASSOCIATION",
+    "CALL",
+    "TYPEBOT_START",
+    "TYPEBOT_CHANGE_STATUS",
+]
+
+
 class WhatsAppService:
     """Service for WhatsApp integration via Evolution API."""
 
@@ -151,6 +181,74 @@ class WhatsAppService:
 
         return None
 
+    def _desired_webhook_url(self) -> str:
+        """Resolve webhook URL with safe internal fallback for Docker network."""
+        configured = (settings.WEBHOOK_URL or "").strip()
+        if configured:
+            return configured
+        return "http://backend:8000/api/v1/webhook/evolution"
+
+    async def _ensure_instance_webhook(
+        self,
+        client: httpx.AsyncClient,
+        instance: str,
+    ) -> Dict[str, Any]:
+        """Ensure Evolution webhook is configured for inbound delivery."""
+        desired_url = self._desired_webhook_url()
+        try:
+            find_response = await self._request(
+                client,
+                "GET",
+                f"/webhook/find/{instance}",
+                timeout=10.0,
+            )
+            webhook_payload: Any = None
+            if find_response.status_code == 200:
+                try:
+                    webhook_payload = find_response.json()
+                except Exception:
+                    webhook_payload = None
+
+            if isinstance(webhook_payload, dict):
+                current_enabled = bool(webhook_payload.get("enabled"))
+                current_url = str(webhook_payload.get("url") or "").strip()
+                current_by_events = bool(
+                    webhook_payload.get("webhookByEvents", webhook_payload.get("byEvents", False))
+                )
+                if current_enabled and current_by_events and current_url == desired_url:
+                    return {"configured": True, "updated": False, "url": current_url}
+
+            payload = {
+                "webhook": {
+                    "enabled": True,
+                    "url": desired_url,
+                    "events": DEFAULT_WEBHOOK_EVENTS,
+                    "base64": False,
+                    "byEvents": True,
+                }
+            }
+            set_response = await self._request(
+                client,
+                "POST",
+                f"/webhook/set/{instance}",
+                json=payload,
+                timeout=15.0,
+            )
+            if set_response.status_code in [200, 201]:
+                return {"configured": True, "updated": True, "url": desired_url}
+
+            return {
+                "configured": False,
+                "updated": False,
+                "error": f"Status {set_response.status_code}: {set_response.text}",
+            }
+        except Exception as exc:
+            return {
+                "configured": False,
+                "updated": False,
+                "error": str(exc),
+            }
+
     def _find_instance(self, instances: List[Dict[str, Any]], name: str) -> Optional[Dict[str, Any]]:
         for item in instances:
             if item.get("name") == name:
@@ -177,12 +275,16 @@ class WhatsAppService:
                     numero_owner = owner.split("@")[0] if isinstance(owner, str) and "@" in owner else owner
                     numero = details.get("number") or numero_owner
                     nome_perfil = details.get("profile_name")
+                    webhook = None
+                    if str(state).lower() == "open":
+                        webhook = await self._ensure_instance_webhook(client, instance)
                     return {
                         "conectado": str(state).lower() == "open",
                         "estado": state,
                         "numero": numero,
                         "nome_perfil": nome_perfil,
                         "instance_name": instance,
+                        "webhook": webhook,
                     }
 
                 if response.status_code == 404:
@@ -239,11 +341,13 @@ class WhatsAppService:
                 if state_resp.status_code == 200:
                     current_state = self._extract_state(state_resp.json())
                     if str(current_state).lower() == "open":
+                        webhook = await self._ensure_instance_webhook(client, instance)
                         return {
                             "sucesso": True,
                             "conectado": True,
                             "mensagem": "WhatsApp ja conectado",
                             "instance_name": instance,
+                            "webhook": webhook,
                         }
 
                 connect_response = await self._request(
@@ -271,18 +375,22 @@ class WhatsAppService:
 
                     new_state = self._extract_state(payload)
                     if str(new_state).lower() == "open":
+                        webhook = await self._ensure_instance_webhook(client, instance)
                         return {
                             "sucesso": True,
                             "conectado": True,
                             "mensagem": "WhatsApp conectado",
                             "instance_name": instance,
+                            "webhook": webhook,
                         }
 
+                    webhook = await self._ensure_instance_webhook(client, instance)
                     return {
                         "sucesso": True,
                         "conectado": False,
                         "mensagem": "Conexao iniciada. Aguarde o QR Code no Evolution Manager",
                         "instance_name": instance,
+                        "webhook": webhook,
                     }
 
                 return {

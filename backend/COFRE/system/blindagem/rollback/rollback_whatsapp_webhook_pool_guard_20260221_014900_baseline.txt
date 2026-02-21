@@ -1,0 +1,8 @@
+Rollback baseline criado em 2026-02-21 01:49:00
+Commit baseline: e9b15ba
+Escopo alvo:
+- backend/app/services/viva_chat_session_service.py
+- backend/app/services/whatsapp_service.py
+- backend/COFRE/system/blindagem/audit/WHATSAPP_WEBHOOK_DB_POOL_GUARD_2026-02-21.md
+- backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
+- docs/STATUS.md

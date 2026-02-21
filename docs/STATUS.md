@@ -90,10 +90,17 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
 - Hotfix de entrega WhatsApp para eventos `@lid`:
   - Causa raiz: envio podia tentar destino `@lid` sem numero real resolvido, gerando falso sucesso/pendencia sem entrega no celular.
   - Correcao: bloqueio de envio direto para `@lid` sem resolucao (`erro_codigo=lid_unresolved`), enriquecimento do contexto com telefone de `sender` no payload do evento, priorizacao de numero resolvido no envio e flush da fila pendente.
+- Blindagem de runtime para IA/WhatsApp em producao (EC2):
+  - Causa raiz 1: webhook Evolution ausente (`webhook/find = null`) mesmo com instancia `open`, impedindo ingestao de mensagens no backend.
+  - Causa raiz 2: `ensure_chat_tables()` executava DDL por request, gerando lock em relacao e saturacao da pool (`QueuePool timeout`) no `/api/v1/viva/chat/stream`.
+  - Correcao:
+    - auto-healing de webhook em `whatsapp_service` (`/webhook/find` -> `/webhook/set`) com fallback institucional `http://backend:8000/api/v1/webhook/evolution`.
+    - guarda de inicializacao em `ensure_chat_tables()` com lock assíncrono e flag de execucao unica por processo.
+  - Evidencia: `backend/COFRE/system/blindagem/audit/WHATSAPP_WEBHOOK_DB_POOL_GUARD_2026-02-21.md`.
 
 ## Diretriz de deploy institucional
 
 - Alvo principal: Ubuntu AWS virgem (stack Docker)
 - Nao usar Vercel como alvo institucional desta operacao
 
-Atualizado em: 2026-02-20
+Atualizado em: 2026-02-21
