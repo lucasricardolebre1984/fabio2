@@ -51,6 +51,7 @@ function WhatsAppConversasPageContent() {
   const [busca, setBusca] = useState("");
   const [stats, setStats] = useState<Stats>({ conversas_ativas: 0, mensagens_hoje: 0 });
   const [showingArchivedFallback, setShowingArchivedFallback] = useState(false);
+  const [arquivandoIds, setArquivandoIds] = useState<Set<string>>(new Set());
 
   const carregarConversas = useCallback(async () => {
     try {
@@ -127,19 +128,41 @@ function WhatsAppConversasPageContent() {
     await carregarMensagens(conversa.id);
   };
 
-  const handleArquivar = async (e: React.MouseEvent, conversaId: string) => {
+  const handleArquivar = async (e: React.MouseEvent, conversa: Conversa) => {
     e.stopPropagation();
+    e.preventDefault();
+
+    if (conversa.status === "arquivada") {
+      return;
+    }
+
+    if (arquivandoIds.has(conversa.id)) {
+      return;
+    }
+
+    setArquivandoIds((prev) => {
+      const next = new Set(prev);
+      next.add(conversa.id);
+      return next;
+    });
+
     try {
-      await api.post(`/whatsapp-chat/conversas/${conversaId}/arquivar`);
+      await api.post(`/whatsapp-chat/conversas/${conversa.id}/arquivar`);
       toast({ title: "Conversa arquivada" });
       await carregarConversas();
       await carregarStats();
-      if (conversaSelecionada?.id === conversaId) {
+      if (conversaSelecionada?.id === conversa.id) {
         setConversaSelecionada(null);
         setMensagens([]);
       }
     } catch (error) {
       toast({ title: "Erro ao arquivar", variant: "destructive" });
+    } finally {
+      setArquivandoIds((prev) => {
+        const next = new Set(prev);
+        next.delete(conversa.id);
+        return next;
+      });
     }
   };
 
@@ -299,10 +322,11 @@ function WhatsAppConversasPageContent() {
                         <div className="flex flex-col items-end gap-1">
                           <span className="text-xs text-gray-400">{formatarData(conversa.ultima_mensagem_em)}</span>
                           <button
-                            onClick={(e) => handleArquivar(e, conversa.id)}
-                            className="p-1 text-gray-400 hover:text-gray-600"
+                            onClick={(e) => handleArquivar(e, conversa)}
+                            className="p-1 text-gray-400 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40"
                             aria-label={`Arquivar conversa de ${conversa.nome_contato || formatarNumero(conversa.numero_telefone)}`}
                             title="Arquivar"
+                            disabled={conversa.status === "arquivada" || arquivandoIds.has(conversa.id)}
                           >
                             <Archive className="h-4 w-4" />
                           </button>

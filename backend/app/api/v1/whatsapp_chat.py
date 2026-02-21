@@ -104,6 +104,9 @@ async def arquivar_conversa(
     if not conversa:
         raise HTTPException(status_code=404, detail="Conversa nao encontrada")
 
+    if conversa.status == StatusConversa.ARQUIVADA:
+        return {"status": "arquivada", "already_archived": True}
+
     conversa.status = StatusConversa.ARQUIVADA
     await db.commit()
     return {"status": "arquivada"}
