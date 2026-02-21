@@ -147,7 +147,7 @@ Para qualquer mudanca de status funcional (`Em validacao` -> `Resolvido`), execu
 | BUG-123 | Alta | VIVA/Agenda NLU | Comando natural sem data explicita (`viva marque ... as 17 horas`) falhava com pedido de data/hora e quebrava fluxo operacional | Resolvido |
 | BUG-124 | Critica | Viviane/WhatsApp | Fluxo comercial repetia perguntas de nome/cidade/transferencia, perdia contexto e gerava cancelamento de lead no handoff humano | Resolvido |
 | BUG-125 | Alta | Viviane/WhatsApp UX | Tom muito rigido: resposta com preco espontaneo e baixa empatia em perguntas sociais ("voce e robo?", "ficar rico"), gerando desconforto e risco de abandono | Resolvido |
-| BUG-133 | Critica | WhatsApp/SaaS Conversas | Conversas do WhatsApp nao aparecem com consistencia em `/whatsapp/conversas` e respostas nao retornam no SaaS, apesar de `whatsapp/status` conectado/open e webhook configurado | Aberto |
+| BUG-133 | Critica | WhatsApp/SaaS Conversas | Conversas do WhatsApp nao aparecem com consistencia em `/whatsapp/conversas` e respostas nao retornam no SaaS, apesar de `whatsapp/status` conectado/open e webhook configurado | Em validacao (intermitente; nao reproduzido de forma continua na rodada 2026-02-21 13:xx) |
 
 ---
 
@@ -2635,3 +2635,18 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
 **Validacao tecnica:**
 - `pytest tests/test_whatsapp_lid_resolution.py tests/test_evolution_webhook_lid_resolution.py tests/test_viva_domain_intents.py tests/test_viva_chat_orchestrator_guards.py tests/test_viva_chat_runtime_sanitizers.py -q` => `33 passed`.
 **Status:** Resolvido
+
+### BUG-133: WhatsApp no SaaS com intermitencia de conversas/respostas
+**Data:** 2026-02-21
+**Severidade:** Critica
+**Descricao:** Em homologacao houve relato de status WhatsApp conectado/open, mas com conversa nao aparecendo no SaaS e sem retorno da IA em alguns contatos.
+**Passos reportados:** 1. Enviar mensagens para o numero conectado 2. Abrir `/whatsapp/conversas` 3. Validar criacao da conversa e resposta automatica.
+**Esperado:** Conversa visivel no SaaS e resposta da IA no mesmo contato.
+**Atual (rodada 2026-02-21 13:xx):**
+- `GET /api/v1/whatsapp/status` => `conectado=true`, `estado=open`, webhook configurado.
+- `GET /api/v1/whatsapp-chat/conversas?status=ativa` => `2` conversas ativas.
+- Banco (Ubuntu): `whatsapp_conversas` com `2 ativas / 2 arquivadas`.
+- Banco (Ubuntu): `whatsapp_mensagens` com trafego `usuario` + `ia` ate `2026-02-21 16:16:48`.
+- Logs backend com `POST /api/v1/webhook/evolution` (200) em sequencia durante teste.
+**Leitura tecnica atual:** sintoma permanece tratado como intermitente; nesta rodada nao houve reproducao continua de falha estrutural do pipeline.
+**Status:** Em validacao

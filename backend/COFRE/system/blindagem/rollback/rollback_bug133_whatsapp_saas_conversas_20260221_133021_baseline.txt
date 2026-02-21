@@ -1,0 +1,2 @@
+00096544ab62ede7da9037a6f614d6068dd78c9d
+?? backend/COFRE/system/blindagem/rollback/rollback_bug133_whatsapp_saas_conversas_20260221_133021_baseline.txt

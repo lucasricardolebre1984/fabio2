@@ -33,7 +33,7 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
 
 ## Pendencias criticas abertas
 
-- BUG-133: WhatsApp/SaaS conversas sem consistencia de exibicao/resposta (sintoma de homologacao em curso)
+- BUG-133: WhatsApp/SaaS com intermitencia de exibicao/resposta em homologacao (em validacao com evidencias de pipeline ativo)
 - BUG-099: latencia alta no chat interno da VIVA
 - BUG-104: em validacao apos ajuste de consulta de agenda (`liste`/`lite agenda`) e estabilizacao de saudacao
 - BUG-105: em validacao apos ajuste de roteamento de contratos (modelos vs emitidos por cliente)
@@ -141,6 +141,7 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
   - `backend/COFRE/system/blindagem/audit/VIVA_CAMPAIGN_CONTEXT_TRUTH_GUARD_2026-02-21.md`
   - `backend/COFRE/system/blindagem/audit/WHATSAPP_VISIBILITY_RUNTIME_GUARD_2026-02-21.md`
   - `backend/COFRE/system/blindagem/audit/WHATSAPP_LID_RESOLUTION_HARDENING_2026-02-21.md`
+  - `backend/COFRE/system/blindagem/audit/WHATSAPP_SAAS_INTERMITTENCY_VALIDATION_2026-02-21.md`
   - `docs/AUDIT/WHATSAPP_CAMPAIGN_ENDPOINT_TRACE_2026-02-21.md`
   - `docs/AUDIT/COMPONENT_COMMON_DOMAIN_DETECTION_2026-02-21.md`
 
