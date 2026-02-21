@@ -583,6 +583,44 @@ Durante a homologação com cliente, o comportamento intermitente do WhatsApp ex
 
 ---
 
+## DECISÃO-013: Migração para Nx para modularização do frontend
+
+### Data
+21/02/2026
+
+### Contexto
+O frontend Next.js está organizado como app monolítico em `frontend/src/app/`. Os
+domínios (contratos, clientes, agenda, campanhas, WhatsApp, VIVA) compartilham
+estrutura sem limites explícitos. A modularização com Nx permite separar features
+em libs, melhorar builds incrementais e estabelecer regras de boundary.
+
+### Decisão
+- Adotar Nx como ferramenta de workspace para o frontend.
+- Migrar em fases: inicialização, movimentação para `apps/web`, extração de
+  `shared-*`, extração de `feature-*` por domínio, e regras de boundary.
+- Manter o backend FastAPI fora do workspace Nx.
+- Executar a migração somente após fechar o gate de homologação WhatsApp
+  (BUG-133).
+
+### Motivo
+- Melhora a manutenibilidade e o isolamento entre domínios.
+- Permite builds afetados (`nx affected`) e cache distribuído.
+- Alinha com boas práticas de monorepo para aplicações web.
+
+### Rollback
+- Cada fase deve ter commit atômico e baseline em
+  `backend/COFRE/system/blindagem/rollback/`.
+- Reverter com `git revert` ou `git apply --reverse` do patch correspondente.
+
+### Referência
+- Roadmap detalhado: `docs/ROADMAP_NX.md`
+
+---
+
+*Documentado em: 21/02/2026*
+
+---
+
 ## DECISAO-015: cliente canonico por CPF/CNPJ normalizado no fluxo de contratos
 
 ### Data
