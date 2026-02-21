@@ -56,7 +56,11 @@ def _has_create_imperative(normalized: str) -> bool:
         "crie compromisso",
         "novo compromisso",
         "adicionar compromisso",
+        "adicionar um compromisso",
         "adicione compromisso",
+        "adicione um compromisso",
+        "adiciona compromisso",
+        "adiciona um compromisso",
         # Natural variants commonly used by operators.
         "coloque na agenda",
         "coloca na agenda",
@@ -167,11 +171,14 @@ def parse_agenda_command(message: str) -> Optional[Dict[str, Any]]:
         or lower.startswith("marcar")
         or lower.startswith("marca")
         or lower.startswith("marque")
+        or lower.startswith("adicionar")
+        or lower.startswith("adicione")
+        or lower.startswith("adiciona")
     ):
         return None
 
     payload = re.sub(
-        r"^(agendar|agende|agenda|marcar|marca|marque)\s*:?\s*",
+        r"^(agendar|agende|agenda|marcar|marca|marque|adicionar|adicione|adiciona)\s*:?\s*",
         "",
         text,
         flags=re.IGNORECASE,
@@ -577,7 +584,7 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
 
     title = title_source
     verb_match = re.search(
-        r"(?i)\b(agendar|agende|agenda|marcar|marca|marque|criar|crie|novo compromisso|criar compromisso|crie compromisso|adicionar compromisso|adicione compromisso)\b",
+        r"(?i)\b(agendar|agende|agenda|marcar|marca|marque|criar|crie|novo compromisso|criar compromisso|crie compromisso|adicionar compromisso|adicionar um compromisso|adicione compromisso|adicione um compromisso|adiciona compromisso|adiciona um compromisso)\b",
         title,
     )
     if verb_match:
@@ -590,7 +597,7 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
 
     if time_token:
         title = title.replace(time_token, "")
-    title = re.sub(r"\b\d{1,2}(?::\d{2})?\b", " ", title)
+    title = re.sub(r"(?i)\b\d{1,2}(?::\d{2})?\b|\b\d{1,2}h\d{0,2}\b", " ", title)
     if date_match:
         title = title.replace(date_match.group(1), "")
     title = re.sub(
@@ -654,7 +661,10 @@ def build_agenda_recovery_reply(message: str, errors: List[str]) -> str:
     normalized = _normalize_key(message)
     lower_errors = [str(err).lower() for err in (errors or [])]
     has_datetime_error = any("data/hora" in err for err in lower_errors)
-    has_time_in_text = bool(re.search(r"\b\d{1,2}:\d{2}\b", message or ""))
+    has_time_in_text = bool(
+        re.search(r"\b\d{1,2}:\d{2}\b", message or "")
+        or re.search(r"(?i)\b\d{1,2}h(?:\d{2})?\b", message or "")
+    )
 
     if has_datetime_error and not has_time_in_text:
         return (
