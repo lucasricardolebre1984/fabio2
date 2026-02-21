@@ -83,6 +83,15 @@ from app.services.viva_shared_service import (
 logger = logging.getLogger(__name__)
 
 
+async def _release_db_before_remote_call(db: Any) -> None:
+    """Libera conexao da pool antes de chamadas externas potencialmente lentas."""
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
+
 def _is_time_query_intent(message: str) -> bool:
     normalized = _normalize_key(message or "")
     if not normalized:
@@ -656,6 +665,7 @@ class VivaChatOrchestratorService:
                     prompt = f"{prompt}\n{BACKGROUND_ONLY_SUFFIX}"
 
                 image_quality = "high" if campaign_mode in ("FC", "REZETA") else None
+                await _release_db_before_remote_call(db)
                 resultado = await openai_service.generate_image(prompt=prompt, size=image_size, quality=image_quality)
                 if not resultado.get("success"):
                     erro = resultado.get("error")
@@ -752,6 +762,7 @@ class VivaChatOrchestratorService:
                     modo=modo,
                     memory_context=memory_context,
                 )
+                await _release_db_before_remote_call(db)
                 resposta = await viva_model_service.chat(
                     messages=messages,
                     temperature=0.45,
@@ -851,6 +862,7 @@ class VivaChatOrchestratorService:
 
             # Stream da resposta
             full_response = ""
+            await _release_db_before_remote_call(db)
             async for chunk in openai_service.chat_stream(
                 messages=messages,
                 temperature=0.45,
