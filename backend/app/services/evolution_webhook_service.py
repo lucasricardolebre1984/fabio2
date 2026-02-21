@@ -19,6 +19,7 @@ from app.models.whatsapp_conversa import (
     WhatsappConversa,
     WhatsappMensagem,
 )
+from app.services.openai_service import openai_service
 from app.services.viva_ia_service import viva_service
 from app.services.viva_model_service import viva_model_service
 from app.services.whatsapp_service import WhatsAppService
@@ -95,9 +96,24 @@ class EvolutionWebhookService:
 
             tipo_midia: Optional[str] = None
             falha_transcricao_audio = False
+            falha_leitura_imagem = False
             texto = self._extrair_texto_mensagem(message_content)
 
-            if not texto and self._eh_audio_mensagem(message_content):
+            if self._eh_imagem_mensagem(message_content):
+                tipo_midia = "imagem"
+                legenda = self._extrair_legenda_imagem(message_content)
+                descricao = await self._descrever_imagem_mensagem(
+                    instance_name=instance_name,
+                    message_wrapper=message_wrapper,
+                    message_content=message_content,
+                )
+                if not descricao:
+                    falha_leitura_imagem = True
+                texto = self._build_image_user_text(
+                    caption=legenda,
+                    vision_description=descricao,
+                )
+            elif not texto and self._eh_audio_mensagem(message_content):
                 tipo_midia = "audio"
                 texto = await self._transcrever_audio_mensagem(
                     instance_name=instance_name,
@@ -189,6 +205,11 @@ class EvolutionWebhookService:
                 resposta_ia = (
                     "Recebi seu audio, mas nao consegui transcrever agora. "
                     "Pode me enviar em texto ou em um audio mais curto para eu te ajudar?"
+                )
+            elif falha_leitura_imagem:
+                resposta_ia = (
+                    "Recebi sua imagem, mas nao consegui ler o conteudo com seguranca agora. "
+                    "Me descreve em uma frase o que voce quer resolver com ela que eu te ajudo em seguida."
                 )
             else:
                 resposta_ia = await viva_service.processar_mensagem(
@@ -719,9 +740,26 @@ class EvolutionWebhookService:
     def _eh_audio_mensagem(self, message_data: Dict[str, Any]) -> bool:
         return isinstance(message_data.get("audioMessage"), dict)
 
+    def _eh_imagem_mensagem(self, message_data: Dict[str, Any]) -> bool:
+        return isinstance(message_data.get("imageMessage"), dict)
+
+    def _extrair_legenda_imagem(self, message_data: Dict[str, Any]) -> Optional[str]:
+        image_data = message_data.get("imageMessage")
+        if not isinstance(image_data, dict):
+            return None
+        caption = str(image_data.get("caption") or "").strip()
+        return caption or None
+
     def _extrair_base64_audio_local(self, audio_data: Dict[str, Any]) -> Optional[str]:
         for key in ("base64", "data", "media", "file", "content"):
             value = audio_data.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return None
+
+    def _extrair_base64_imagem_local(self, image_data: Dict[str, Any]) -> Optional[str]:
+        for key in ("base64", "data", "media", "file", "content", "jpegThumbnail"):
+            value = image_data.get(key)
             if isinstance(value, str) and value.strip():
                 return value.strip()
         return None
@@ -809,6 +847,74 @@ class EvolutionWebhookService:
         texto_lower = texto.lower()
         if not texto or texto_lower.startswith("erro") or texto_lower.startswith("error"):
             logging.warning("Falha na transcricao do audio: %s", texto or "vazio")
+            return None
+        return texto
+
+    def _build_image_user_text(self, caption: Optional[str], vision_description: Optional[str]) -> str:
+        caption_clean = str(caption or "").strip()
+        vision_clean = str(vision_description or "").strip()
+        if vision_clean and caption_clean:
+            return (
+                "[imagem recebida]\n"
+                f"Legenda do cliente: {caption_clean}\n"
+                f"Conteudo da imagem: {vision_clean}"
+            )
+        if vision_clean:
+            return (
+                "[imagem recebida]\n"
+                f"Conteudo da imagem: {vision_clean}"
+            )
+        if caption_clean:
+            return caption_clean
+        return "[imagem]"
+
+    async def _descrever_imagem_mensagem(
+        self,
+        instance_name: str,
+        message_wrapper: Dict[str, Any],
+        message_content: Dict[str, Any],
+    ) -> Optional[str]:
+        image_data = message_content.get("imageMessage")
+        if not isinstance(image_data, dict):
+            return None
+
+        media_base64 = self._extrair_base64_imagem_local(image_data)
+        if not media_base64:
+            wa_service = WhatsAppService()
+            media_result = await wa_service.get_media_base64(
+                message_payload=message_wrapper,
+                instance_name=instance_name,
+            )
+            if media_result.get("sucesso"):
+                media_base64 = str(media_result.get("base64") or "").strip()
+            else:
+                logging.warning(
+                    "Falha ao baixar imagem para analise via Evolution: %s",
+                    media_result.get("erro"),
+                )
+
+        if not media_base64:
+            return None
+
+        mime_type = str(image_data.get("mimetype") or "image/jpeg")
+        mime_type = mime_type.split(";", 1)[0].strip() or "image/jpeg"
+        prompt = (
+            "Descreva em portugues do Brasil, de forma objetiva e curta, o conteudo desta imagem "
+            "para atendimento comercial no WhatsApp. "
+            "Se houver documento, boleto, comprovante, print de app, valores ou datas visiveis, cite. "
+            "Nao invente informacoes nao visiveis."
+        )
+        descricao = await openai_service.vision_base64(
+            image_base64=media_base64,
+            prompt=prompt,
+            mime_type=mime_type,
+            max_tokens=260,
+        )
+        texto = str(descricao or "").strip()
+        if not texto:
+            return None
+        if texto.lower().startswith(("erro", "error")):
+            logging.warning("Falha na analise da imagem: %s", texto[:200])
             return None
         return texto
 

@@ -313,6 +313,11 @@ ESCALA PARA HUMANO:
 
             if self._eh_saudacao_curta(texto):
                 return f"{self._saudacao_horario()}! Tudo bem? Com quem eu falo?"
+            if self._is_image_context_message(texto):
+                return (
+                    f"{self._saudacao_horario()}! Recebi sua imagem e ja fiz uma leitura inicial. "
+                    "Para te atender de forma personalizada, com quem eu falo?"
+                )
             return (
                 f"{self._saudacao_horario()}! Para te atender de forma personalizada, "
                 "com quem eu falo?"
@@ -470,6 +475,11 @@ ESCALA PARA HUMANO:
         if texto in self.greeting_keywords:
             return True
         return len(texto) <= 15 and any(item in texto for item in self.greeting_keywords)
+
+    def _is_image_context_message(self, texto: str) -> bool:
+        if not texto:
+            return False
+        return "[imagem recebida]" in texto or "[imagem]" in texto
 
     def _eh_pergunta_identidade_ia(self, texto: str) -> bool:
         patterns = (
