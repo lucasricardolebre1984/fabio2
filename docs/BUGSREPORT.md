@@ -2478,3 +2478,54 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
 - `backend/app/services/viva_chat_orchestrator_service.py`
 - `backend/COFRE/system/blindagem/audit/VIVA_STREAM_CANONICAL_ORCHESTRATION_2026-02-21.md`
 **Status:** Resolvido
+
+### BUG-128: Follow-up de clientes/contratos cai no LLM e inventa dados
+**Data:** 2026-02-21
+**Severidade:** Critica
+**Descricao:** No chat `/viva`, follow-ups curtos como `para Lucas`, `quero`, `com numero`, `clientes cadastrados` e `quantos clientes temos` podiam escapar do roteador deterministico e cair na resposta livre do modelo, gerando perguntas desnecessarias e listagens de contratos inexistentes.
+**Sintoma real observado:**
+- VIVA listava 3 contratos ficticios para Lucas, enquanto o SaaS mostrava 5 contratos reais;
+- VIVA perguntava exportacao CSV/Excel em pergunta direta no chat;
+- follow-up `do cliente lucas` e `com numero` nao eram resolvidos pelo contexto canonico.
+**Causa raiz:**
+- `extract_client_name_for_contract_query` nao reconhecia `para <nome>`;
+- `_is_direct_confirmation` era restrito e nao cobria `quero`/`com numero`;
+- faltava resolucao de cliente por contexto recente quando o usuario respondia curto;
+- intents de clientes nao cobriam `clientes cadastrados`/`clientes na base` nem contagem direta.
+**Correcao aplicada:**
+- `backend/app/services/assistant/intents/contratos.py`
+  - suporte a `para/pro/pra <nome>` em extracao de cliente.
+- `backend/app/services/viva_domain_query_router_service.py`
+  - confirmacoes curtas ampliadas (`quero`, `com numero`, etc.);
+  - fallback de cliente por contexto recente para fluxo de contratos por cliente;
+  - suporte a follow-up pendente de nome de cliente;
+  - suporte a contagem direta de clientes (`quantos clientes...`);
+  - suporte a follow-up de detalhe de cliente por contexto.
+- `backend/app/services/assistant/intents/clientes.py`
+  - intents ampliadas para `clientes cadastrados` e `clientes na base`.
+**Blindagem adicional WhatsApp (mesma rodada):**
+- `backend/app/services/evolution_webhook_service.py`
+  - parse de payload `data.messages[]` para mensagens inbound.
+- `backend/app/services/whatsapp_service.py`
+  - webhook so considerado pronto quando eventos minimos (`MESSAGES_UPSERT`, `CONNECTION_UPDATE`) estao de fato configurados.
+**Status:** Resolvido
+
+### BUG-129: Conversa WhatsApp some da central e erro tecnico vaza para cliente
+**Data:** 2026-02-21
+**Severidade:** Critica
+**Descricao:** A rota `/whatsapp/conversas` podia mostrar lista vazia mesmo com mensagens no dia (caso sem conversa aberta e apenas arquivada). Em paralelo, quando runtime sem credencial de IA, o cliente recebia texto tecnico cru (`OPENAI_API_KEY nao configurada`) no WhatsApp.
+**Sintoma real observado:**
+- painel mostrava `Hoje > 0` e `Ativas = 0`, com coluna esquerda vazia;
+- no WhatsApp real, cliente recebia resposta com erro interno de provedor.
+**Causa raiz:**
+- central de conversas carregava apenas `status=ativa`;
+- quando tudo estava arquivado, a UX parecia "sem dados";
+- resposta tecnica do runtime era propagada diretamente para o cliente no webhook.
+**Correcao aplicada (escopo WhatsApp):**
+- `frontend/src/app/whatsapp/conversas/page.tsx`
+  - busca de conversas passou a consultar `ativa + aguardando` e, se vazio, mostrar fallback com `arquivada` (com aviso visual).
+- `backend/app/services/evolution_webhook_service.py`
+  - blindagem de resposta outbound para bloquear vazamento de erro tecnico de provedor no WhatsApp e aplicar fallback institucional.
+- `docker-compose.prod.yml` e `docker-compose-prod.yml`
+  - default de `WA_INSTANCE_NAME` alterado para `fc-solucoes-local` quando variavel nao for definida, reduzindo colisao local x producao em testes.
+**Status:** Resolvido

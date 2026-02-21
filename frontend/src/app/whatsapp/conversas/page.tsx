@@ -50,11 +50,32 @@ function WhatsAppConversasPageContent() {
   const [novaMensagem, setNovaMensagem] = useState("");
   const [busca, setBusca] = useState("");
   const [stats, setStats] = useState<Stats>({ conversas_ativas: 0, mensagens_hoje: 0 });
+  const [showingArchivedFallback, setShowingArchivedFallback] = useState(false);
 
   const carregarConversas = useCallback(async () => {
     try {
-      const response = await api.get<Conversa[]>("/whatsapp-chat/conversas");
-      setConversas(response.data);
+      const [ativasResp, aguardandoResp] = await Promise.all([
+        api.get<Conversa[]>("/whatsapp-chat/conversas", { params: { status: "ativa", limit: 100 } }),
+        api.get<Conversa[]>("/whatsapp-chat/conversas", { params: { status: "aguardando", limit: 100 } }),
+      ]);
+
+      const abertasMap = new Map<string, Conversa>();
+      for (const conversa of [...ativasResp.data, ...aguardandoResp.data]) {
+        abertasMap.set(conversa.id, conversa);
+      }
+      const abertas = Array.from(abertasMap.values());
+
+      if (abertas.length > 0) {
+        setConversas(abertas);
+        setShowingArchivedFallback(false);
+        return;
+      }
+
+      const arquivadasResp = await api.get<Conversa[]>("/whatsapp-chat/conversas", {
+        params: { status: "arquivada", limit: 100 },
+      });
+      setConversas(arquivadasResp.data);
+      setShowingArchivedFallback(arquivadasResp.data.length > 0);
     } catch (error) {
       console.error("Erro ao carregar conversas:", error);
     }
@@ -239,6 +260,11 @@ function WhatsAppConversasPageContent() {
                 </div>
               ) : (
                 <div className="divide-y">
+                  {showingArchivedFallback && (
+                    <div className="border-b bg-amber-50 px-4 py-2 text-xs text-amber-800">
+                      Exibindo conversas arquivadas (nenhuma conversa ativa no momento).
+                    </div>
+                  )}
                   {conversasFiltradas.map((conversa) => (
                     <div
                       key={conversa.id}

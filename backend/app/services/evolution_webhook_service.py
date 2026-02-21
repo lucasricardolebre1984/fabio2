@@ -184,6 +184,7 @@ class EvolutionWebhookService:
                     "Perfeito, recebi sua mensagem. "
                     "Para eu te ajudar melhor, me confirma seu objetivo principal em uma frase."
                 )
+            resposta_ia = self._sanitize_outbound_runtime_errors(resposta_ia)
 
             wa_service = WhatsAppService()
             preferred_number = self._pick_preferred_number_from_context(contexto_atual)
@@ -270,6 +271,29 @@ class EvolutionWebhookService:
             logging.exception("Erro ao processar mensagem webhook: %s", str(e))
             return False
 
+    def _sanitize_outbound_runtime_errors(self, response_text: str) -> str:
+        text = str(response_text or "").strip()
+        lowered = text.lower()
+        if not lowered:
+            return (
+                "Perfeito, recebi sua mensagem. "
+                "Para eu te ajudar melhor, me confirma seu objetivo principal em uma frase."
+            )
+
+        technical_markers = (
+            "openai_api_key",
+            "falha no provedor openai",
+            "provider openai",
+            "api key nao configurada",
+        )
+        if any(marker in lowered for marker in technical_markers):
+            logging.warning("Resposta tecnica bloqueada no WhatsApp: %s", text[:180])
+            return (
+                "Recebi sua mensagem e sigo com voce por aqui. "
+                "Se quiser, me envie em texto objetivo que eu continuo o atendimento agora."
+            )
+        return text
+
     def _extrair_instance_name(
         self,
         instance_data: Any,
@@ -292,6 +316,20 @@ class EvolutionWebhookService:
     def _extrair_message_wrapper(self, payload_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if not isinstance(payload_data, dict):
             return None
+
+        messages_data = payload_data.get("messages")
+        if isinstance(messages_data, list):
+            for item in messages_data:
+                if not isinstance(item, dict):
+                    continue
+                if isinstance(item.get("key"), dict):
+                    if isinstance(item.get("message"), dict):
+                        return item
+                    if any(
+                        key in item
+                        for key in ("conversation", "extendedTextMessage", "imageMessage", "audioMessage")
+                    ):
+                        return {"key": item.get("key"), "message": item}
 
         if isinstance(payload_data.get("key"), dict):
             if isinstance(payload_data.get("message"), dict):

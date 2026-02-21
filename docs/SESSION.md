@@ -47,6 +47,19 @@ Status: consolidacao final de homologacao local (WhatsApp/VIVA/Viviane) + ajuste
   - `backend/tests/test_viva_chat.py` (teste `test_viva_chat_stream_delegates_to_canonical_flow`)
   - `backend/COFRE/system/blindagem/audit/VIVA_STREAM_CANONICAL_ORCHESTRATION_2026-02-21.md`
   - `docs/BUGSREPORT.md` (BUG-127)
+- Correcao de follow-up deterministico em dominio clientes/contratos:
+  - `backend/app/services/viva_domain_query_router_service.py`
+  - `backend/app/services/assistant/intents/clientes.py`
+  - `backend/app/services/assistant/intents/contratos.py`
+  - `backend/tests/test_viva_domain_intents.py`
+  - `backend/COFRE/system/blindagem/audit/VIVA_DOMAIN_FOLLOWUP_TRUTH_GUARD_2026-02-21.md`
+  - `docs/BUGSREPORT.md` (BUG-128)
+- Correcao de central WhatsApp + blindagem de erro outbound:
+  - `frontend/src/app/whatsapp/conversas/page.tsx`
+  - `backend/app/services/evolution_webhook_service.py`
+  - `docker-compose.prod.yml`
+  - `docker-compose-prod.yml`
+  - `docs/BUGSREPORT.md` (BUG-129)
 
 ## Novos bugs abertos nesta auditoria
 

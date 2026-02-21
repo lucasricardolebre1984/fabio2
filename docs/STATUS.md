@@ -91,6 +91,10 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
   - Causa raiz: stream seguia caminho tecnico separado e podia responder agenda sem executar rota real.
   - Correcao: `handle_chat_with_viva_stream` passou a delegar para o fluxo canonico `handle_chat_with_viva` e emitir SSE com `content` + `done`.
   - Evidencia: `backend/COFRE/system/blindagem/audit/VIVA_STREAM_CANONICAL_ORCHESTRATION_2026-02-21.md`.
+- Fix de follow-up deterministico em clientes/contratos (anti-invencao):
+  - Causa raiz: follow-ups curtos (`para Lucas`, `quero`, `com numero`, `clientes cadastrados`) podiam escapar do roteador de dominio e cair no modelo livre.
+  - Correcao: roteador de dominio com continuidade por contexto, intents ampliadas e contagem direta de clientes.
+  - Evidencia: `backend/COFRE/system/blindagem/audit/VIVA_DOMAIN_FOLLOWUP_TRUTH_GUARD_2026-02-21.md`.
 - Fix de templates de contratos no deploy AWS:
   - Causa raiz: backend em container sem acesso a `./contratos/templates`, caindo no fallback sem clausulas (`CLÁUSULAS NÃO CADASTRADAS`).
   - Correcao: mount read-only de `./contratos` para `/app/contratos` no backend em `docker-compose.prod.yml` e `docker-compose-prod.yml`.
@@ -108,6 +112,13 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
     - padronizacao `byEvents=false` para evitar rotas inexistentes (`/webhook/evolution/<evento>`) e garantir ingestao no endpoint unico implementado.
     - guarda de inicializacao em `ensure_chat_tables()` com lock assíncrono e flag de execucao unica por processo.
   - Evidencia: `backend/COFRE/system/blindagem/audit/WHATSAPP_WEBHOOK_DB_POOL_GUARD_2026-02-21.md`.
+- Fix de visibilidade da central WhatsApp + sanitizacao de erro tecnico:
+  - Causa raiz 1: `/whatsapp/conversas` carregava apenas `status=ativa` e podia parecer vazia com dados arquivados.
+  - Causa raiz 2: erro tecnico de provedor (`OPENAI_API_KEY`) podia vazar no texto enviado ao cliente.
+  - Correcao:
+    - fallback de listagem na central para `arquivada` quando nao houver `ativa/aguardando`;
+    - sanitizacao de resposta tecnica no webhook antes do envio outbound;
+    - default local de `WA_INSTANCE_NAME=fc-solucoes-local` para reduzir colisao local x producao quando env nao definido.
 
 ## Diretriz de deploy institucional
 

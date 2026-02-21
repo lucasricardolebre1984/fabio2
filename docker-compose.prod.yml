@@ -44,7 +44,7 @@ services:
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost}
       - EVOLUTION_API_URL=http://evolution-api:8080
       - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-default_key_change_in_production}
-      - WA_INSTANCE_NAME=${WA_INSTANCE_NAME:-fc-solucoes}
+      - WA_INSTANCE_NAME=${WA_INSTANCE_NAME:-fc-solucoes-local}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
       - OPENAI_API_MODEL=${OPENAI_API_MODEL:-gpt-5-mini}
