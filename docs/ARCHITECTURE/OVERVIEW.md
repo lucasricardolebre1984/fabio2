@@ -1,4 +1,4 @@
-﻿# ARQUITETURA - Visao Geral
+# ARQUITETURA - Visao Geral
 
 Projeto: FC Solucoes Financeiras SaaS
 Versao documental: 2.0
@@ -27,7 +27,7 @@ FastAPI
 
 ## Fonte canonica da VIVA
 
-- Persona principal: `backend/COFRE/persona-skills/AGENT.md`
+- Persona principal: `backend/COFRE/persona-skills/viva/AGENT.md`
 - Skills operacionais: `backend/COFRE/persona-skills/*.md`
 - Memorias por tabela: `backend/COFRE/memories/<tabela>/`
 
@@ -85,3 +85,4 @@ Status da matriz: todos os menus em `ok` no mapeamento tecnico desta auditoria.
 - Vercel fora do escopo institucional atual
 
 Atualizado em: 2026-02-16
+

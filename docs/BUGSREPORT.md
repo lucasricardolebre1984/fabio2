@@ -341,7 +341,7 @@ Para qualquer mudanca de status funcional (`Em validacao` -> `Resolvido`), execu
   - fallbacks (`viva_local` e `deepseek`) passaram a ler persona em runtime, evitando prompt antigo em memoria do processo.
 - criterio de aceite:
   - persona_fallback_active deve ficar `false`;
-  - persona_file deve apontar para `backend/COFRE/persona-skills/AGENT.md`;
+  - persona_file deve apontar para `backend/COFRE/persona-skills/viva/AGENT.md`;
   - persona_sha256 deve ser estavel entre requests (sem drift).
 
 ### Atualizacao 2026-02-14 (Gate 4 - BUG-097 formato end-to-end)
@@ -2292,7 +2292,7 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
 ### Atualizacao 2026-02-16 (BUG-106/112/113 - ordem direta sem loop)
 - backend:
   - `backend/app/services/viva_agenda_nlu_service.py`
-  - `backend/COFRE/persona-skills/AGENT.md`
+  - `backend/COFRE/persona-skills/viva/AGENT.md`
 - ajustes aplicados:
   - parser de concluir compromisso agora exige contexto de agenda (`agenda|compromisso|evento`), evitando disparo indevido por frases fora do domínio;
   - prompt mestre no COFRE reforçado para:
@@ -2457,7 +2457,7 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
 ### Atualizacao 2026-02-20 (BUG-124 - anti-loop nome/cidade/handoff)
 - backend:
   - `backend/app/services/viva_ia_service.py`
-  - `backend/COFRE/persona-skills/VIVIANE.md`
+  - `backend/COFRE/persona-skills/viviane/AGENT.md`
 - ajustes aplicados:
   - extracao de nome mais natural (`fala com Glauco`, `me chama de ...`, `Nome, ...`);
   - captura de cidade por resposta curta quando contexto espera cidade (ex.: `Ribeirao Preto`);
@@ -2477,7 +2477,7 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
 ### Atualizacao 2026-02-20 (BUG-125 - naturalidade e controle de preco)
 - backend:
   - `backend/app/services/viva_ia_service.py`
-  - `backend/COFRE/persona-skills/VIVIANE.md`
+  - `backend/COFRE/persona-skills/viviane/AGENT.md`
   - `backend/tests/test_viviane_humanizacao.py`
 - ajustes aplicados:
   - resposta de identidade com empatia quando cliente reclamar de tom rapido/robotico;
@@ -2668,3 +2668,4 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
 - Logs backend com `POST /api/v1/webhook/evolution` (200) em sequencia durante teste.
 **Leitura tecnica atual:** sintoma permanece tratado como intermitente; nesta rodada nao houve reproducao continua de falha estrutural do pipeline.
 **Status:** Em validacao
+

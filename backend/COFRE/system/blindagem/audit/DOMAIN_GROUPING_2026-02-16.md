@@ -106,7 +106,7 @@ Dominios logicos consolidados (9):
 ### 8) COFRE (persona/skills/memoria)
 
 - Estrutura:
-  - `backend/COFRE/persona-skills/AGENT.md`
+  - `backend/COFRE/persona-skills/viva/AGENT.md`
   - `backend/COFRE/persona-skills/*.md|*.txt`
   - `backend/COFRE/memories/*`
   - `backend/COFRE/system/endpoints_manifest.json`
@@ -217,3 +217,4 @@ Validacao tecnica:
 - Integridade COFRE validada:
   - todas as tabelas `public` possuem pasta correspondente em `backend/COFRE/memories`;
   - extra esperado: `redis_viva_memory_medium` (cache/memoria curta).
+

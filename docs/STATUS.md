@@ -5,8 +5,8 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
 
 ## Fonte de verdade ativa
 
-- Persona canonica: `backend/COFRE/persona-skills/AGENT.md`
-- Skills canonicas: `backend/COFRE/persona-skills/*.md`
+- Persona canonica VIVA: `backend/COFRE/persona-skills/viva/AGENT.md`
+- Persona canonica VIVIANE: `backend/COFRE/persona-skills/viviane/AGENT.md`
 - Memorias canonicas: `backend/COFRE/memories/<tabela>/`
 - Protocolo: `docs/COFRE_RAG_PROTOCOL.md`
 

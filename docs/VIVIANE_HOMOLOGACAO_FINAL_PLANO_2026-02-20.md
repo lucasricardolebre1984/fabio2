@@ -13,10 +13,10 @@
 - Extracao de nome e cidade ficou mais natural em respostas curtas.
 - Naturalidade conversational reforcada (humor + empatia + sem preco espontaneo).
 - Persona Viviane foi separada em arquivo dedicado no COFRE:
-  - `backend/COFRE/persona-skills/VIVIANE.md`
+  - `backend/COFRE/persona-skills/viviane/AGENT.md`
 
 ## Fonte de verdade da Viviane
-- Prompt base da persona: `backend/COFRE/persona-skills/VIVIANE.md`
+- Prompt base da persona: `backend/COFRE/persona-skills/viviane/AGENT.md`
 - Regras e precos carregados em runtime por:
   - `frontend/src/app/viva/REGRAS/Descrição_Detalhada_dos_Serviços_Rezeta_Brasil.md`
   - `frontend/src/app/viva/REGRAS/tabela_precos_ia_01_planilha1.csv`
@@ -57,3 +57,4 @@
 - Entrega WhatsApp validada em numeros diferentes (sem hardcode).
 - Documentacao atualizada em `docs/` e `backend/COFRE/`.
 - Rollback patch versionado em `backend/COFRE/system/blindagem/rollback/`.
+

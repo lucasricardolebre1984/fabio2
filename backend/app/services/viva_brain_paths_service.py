@@ -13,11 +13,17 @@ class VivaBrainPathsService:
     def __init__(self) -> None:
         self.root_dir = self._discover_root_dir()
         self.persona_skills_dir = self.root_dir / "persona-skills"
+        self.viva_persona_dir = self.persona_skills_dir / "viva"
+        self.viviane_persona_dir = self.persona_skills_dir / "viviane"
+        self.viva_agent_file = self.viva_persona_dir / "AGENT.md"
+        self.viviane_agent_file = self.viviane_persona_dir / "AGENT.md"
         self.memories_dir = self.root_dir / "memories"
 
     @staticmethod
     def _marker_exists(path: Path) -> bool:
-        return (path / "persona-skills" / "AGENT.md").exists()
+        viva_v2 = path / "persona-skills" / "viva" / "AGENT.md"
+        viviane_v2 = path / "persona-skills" / "viviane" / "AGENT.md"
+        return viva_v2.exists() and viviane_v2.exists()
 
     def _discover_root_dir(self) -> Path:
         raw = str(getattr(settings, "VIVA_BRAIN_ROOT", "COFRE") or "COFRE").strip()
@@ -37,6 +43,8 @@ class VivaBrainPathsService:
 
     def ensure_runtime_dirs(self) -> None:
         self.persona_skills_dir.mkdir(parents=True, exist_ok=True)
+        self.viva_persona_dir.mkdir(parents=True, exist_ok=True)
+        self.viviane_persona_dir.mkdir(parents=True, exist_ok=True)
         self.memories_dir.mkdir(parents=True, exist_ok=True)
 
 

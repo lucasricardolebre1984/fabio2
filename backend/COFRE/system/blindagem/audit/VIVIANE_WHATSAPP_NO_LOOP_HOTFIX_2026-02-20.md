@@ -17,9 +17,9 @@
   - respostas de handoff sem loop e sem repetir historico;
   - extracao de nome em linguagem natural (`fala com`, `me chama de`, `Nome, ...`);
   - extracao de cidade por resposta curta quando contexto exige cidade.
-- Arquivo: `backend/COFRE/persona-skills/VIVIANE.md`
+- Arquivo: `backend/COFRE/persona-skills/viviane/AGENT.md`
   - prompt canonico da persona WhatsApp externa.
-- Arquivo: `backend/COFRE/persona-skills/AGENT.md`
+- Arquivo: `backend/COFRE/persona-skills/viva/AGENT.md`
   - governanca explicita: VIVA interna separada da Viviane externa.
 - Arquivo: `backend/COFRE/README.md`
   - estrutura canonica atualizada para duas personas no COFRE.
@@ -36,4 +36,5 @@
 - Menos friccao no fluxo comercial.
 - Transferencia humana objetiva, sem insistencia.
 - Menor risco de cancelamento por repeticao.
+
 

@@ -14,8 +14,8 @@ Modulos principais: contratos, clientes, agenda, campanhas e integracao WhatsApp
 
 ## Regra de ouro (COFRE)
 Fonte unica para VIVA:
-- Persona: `backend/COFRE/persona-skills/AGENT.md`
-- Skills: `backend/COFRE/persona-skills/*.md`
+- Persona VIVA: `backend/COFRE/persona-skills/viva/AGENT.md`
+- Persona VIVIANE: `backend/COFRE/persona-skills/viviane/AGENT.md`
 - Memorias auditaveis: `backend/COFRE/memories/<nome_tabela>/`
 
 Toda acao de delete funcional (UI/API) deve refletir delete no COFRE quando aplicavel.

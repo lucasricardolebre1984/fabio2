@@ -1,7 +1,7 @@
 """DeepSeek Service - provedor alternativo ao OpenAI.
 
 Importante: este service deve seguir o mesmo contrato canonico do agente
-(`backend/COFRE/persona-skills/AGENT.md`) para nao reintroduzir prompts legados.
+(`backend/COFRE/persona-skills/viva/AGENT.md`) para nao reintroduzir prompts legados.
 """
 
 from __future__ import annotations

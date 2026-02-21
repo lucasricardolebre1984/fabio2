@@ -7,8 +7,8 @@ Data: 2026-02-16
 Definir fonte unica e auditavel para persona, skills e memorias da VIVA.
 
 ## Fonte unica
-- Persona principal: `backend/COFRE/persona-skills/AGENT.md`
-- Skills oficiais: `backend/COFRE/persona-skills/*.md`
+- Persona VIVA: `backend/COFRE/persona-skills/viva/AGENT.md`
+- Persona VIVIANE: `backend/COFRE/persona-skills/viviane/AGENT.md`
 - Memorias espelhadas por tabela: `backend/COFRE/memories/<tabela>/`
 
 ## Tabelas espelhadas (MVP atual)
@@ -26,8 +26,8 @@ Toda exclusao funcional no produto deve refletir no COFRE:
 
 ## Regra de governanca
 - Nao criar persona paralela fora do COFRE.
-- Nao criar skill operacional fora de `backend/COFRE/persona-skills`.
-- Toda mudanca de comportamento institucional da VIVA deve atualizar o AGENT canonico.
+- Toda mudanca de comportamento institucional da VIVA deve atualizar `persona-skills/viva/AGENT.md`.
+- Toda mudanca de comportamento institucional da VIVIANE deve atualizar `persona-skills/viviane/AGENT.md`.
 
 ## Regra de versionamento
 - Dados de runtime em `backend/COFRE/memories/` nao devem ser commitados.

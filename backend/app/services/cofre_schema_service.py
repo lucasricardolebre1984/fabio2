@@ -86,11 +86,16 @@ class CofreSchemaService:
 
     async def sync_persona_and_skills(self, db: AsyncSession) -> Dict[str, int]:
         persona_dir = viva_brain_paths_service.persona_skills_dir
-        persona_file = persona_dir / "AGENT.md"
         upserted_persona = 0
         upserted_skills = 0
+        persona_files = [
+            viva_brain_paths_service.viva_agent_file,
+            viva_brain_paths_service.viviane_agent_file,
+        ]
 
-        if persona_file.exists():
+        for persona_file in persona_files:
+            if not persona_file.exists():
+                continue
             await db.execute(
                 text(
                     """
@@ -110,7 +115,7 @@ class CofreSchemaService:
             )
             upserted_persona += 1
 
-        for skill_file in sorted(persona_dir.glob("*.md")):
+        for skill_file in sorted(persona_dir.glob("**/*.md")):
             if skill_file.name.lower() == "agent.md":
                 continue
             await db.execute(

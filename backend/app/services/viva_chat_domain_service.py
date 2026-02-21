@@ -185,7 +185,7 @@ def _build_viva_concierge_messages(
     agent_status = viva_agent_profile_service.get_profile_status()
     persona_sha = str(agent_status.get("persona_sha256") or "")
     persona_sha_short = persona_sha[:12] if persona_sha else "n/a"
-    persona_source = str(agent_status.get("persona_file") or "COFRE/persona-skills/AGENT.md")
+    persona_source = str(agent_status.get("persona_file") or "COFRE/persona-skills/viva/AGENT.md")
     messages: List[Dict[str, str]] = [
         {"role": "system", "content": viva_concierge_service.build_system_prompt(modo=modo)},
         {

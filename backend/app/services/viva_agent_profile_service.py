@@ -1,4 +1,4 @@
-"""Loads the single agent profile and campaign skill from canonical folders."""
+"""Loads the VIVA persona from a single canonical AGENT.md file."""
 
 from __future__ import annotations
 
@@ -12,23 +12,15 @@ from app.services.viva_brain_paths_service import viva_brain_paths_service
 
 class VivaAgentProfileService:
     def __init__(self) -> None:
-        # Canonical source (single folder): COFRE/persona-skills
+        # Canonical source (single file): COFRE/persona-skills/viva/AGENT.md
         self._brain_paths = viva_brain_paths_service
         self._brain_paths.ensure_runtime_dirs()
-        self._agent_file = self._brain_paths.persona_skills_dir / "AGENT.md"
-        self._campaign_skill_files = [
-            self._brain_paths.persona_skills_dir / "skill-generate-campanha-neutra.md",
-            self._brain_paths.persona_skills_dir / "skillconteudo.txt",
-        ]
+        self._agent_file = self._brain_paths.viva_agent_file
 
         self._fallback_agent = (
             "Voce e VIVA, assistente principal do Fabio no SaaS. "
             "Atue com tom institucional, objetivo e pratico. "
             "Nao invente dados e confirme claramente as acoes executadas."
-        )
-        self._fallback_campaign_skill = (
-            "Skill generate_campanha_neutra: "
-            "seguir o pedido atual do usuario, sem padrao visual herdado."
         )
 
     @staticmethod
@@ -59,19 +51,14 @@ class VivaAgentProfileService:
             return content
         if bool(getattr(settings, "VIVA_AGENT_STRICT", True)):
             raise RuntimeError(
-                "AGENT.md canonico ausente/vazio em COFRE/persona-skills. "
+                "AGENT.md canonico ausente/vazio em COFRE/persona-skills/viva. "
                 "Modo estrito ativo para evitar drift de persona."
             )
         return self._fallback_agent
 
     def get_campaign_skill_prompt(self, max_chars: int = 2400) -> str:
-        content = ""
-        for path in self._campaign_skill_files:
-            content = self._safe_read_text(path, "")
-            if content:
-                break
-        if not content:
-            content = self._fallback_campaign_skill
+        # A skill de campanha agora vem do proprio AGENT.md da VIVA.
+        content = self.get_agent_prompt()
         if max_chars <= 0:
             return content
         if len(content) <= max_chars:
@@ -84,12 +71,6 @@ class VivaAgentProfileService:
         using_fallback = not bool(agent_content)
         strict_mode = bool(getattr(settings, "VIVA_AGENT_STRICT", True))
 
-        campaign_file = None
-        for path in self._campaign_skill_files:
-            if path.exists() and self._safe_read_text(path, ""):
-                campaign_file = path
-                break
-
         return {
             "cofre_root": str(self._brain_paths.root_dir),
             "persona_file": str(self._agent_file),
@@ -97,8 +78,8 @@ class VivaAgentProfileService:
             "persona_sha256": self._sha256(self._agent_file) if agent_exists else "",
             "persona_fallback_active": using_fallback,
             "strict_mode": strict_mode,
-            "campaign_skill_file": str(campaign_file) if campaign_file else "",
-            "campaign_skill_sha256": self._sha256(campaign_file) if campaign_file else "",
+            "campaign_skill_file": str(self._agent_file) if agent_exists else "",
+            "campaign_skill_sha256": self._sha256(self._agent_file) if agent_exists else "",
         }
 
     def build_system_prompt(self, modo: Optional[str] = None) -> str:

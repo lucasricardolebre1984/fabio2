@@ -11,7 +11,7 @@
   - resposta dedicada para intencao com humor (`ficar rico`) sem travar em metrico/preco;
   - filtro pos-modelo remove sentencas com preco nao solicitado;
   - regra dinamica de prompt reforca: preco so quando cliente pedir.
-- Arquivo: `backend/COFRE/persona-skills/VIVIANE.md`
+- Arquivo: `backend/COFRE/persona-skills/viviane/AGENT.md`
   - regra explicita de nao informar preco espontaneamente;
   - diretriz para responder com leveza em humor e ajustar ritmo sob feedback.
 - Testes: `backend/tests/test_viviane_humanizacao.py`
@@ -23,4 +23,3 @@
 - `python -m py_compile app/services/viva_ia_service.py tests/test_viviane_humanizacao.py`
 - `PYTHONPATH=C:\\projetos\\fabio2\\backend pytest tests/test_viviane_humanizacao.py -q`
 - Resultado: `17 passed`.
-

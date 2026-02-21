@@ -12,7 +12,7 @@
   - `_remover_preco_nao_solicitado(...)` + `_sentenca_tem_preco(...)`.
   - `asked_price` em `_garantir_resposta_texto(...)`.
   - regra dinamica no prompt: preco apenas sob demanda.
-- `backend/COFRE/persona-skills/VIVIANE.md`
+- `backend/COFRE/persona-skills/viviane/AGENT.md`
   - politicas de naturalidade e preco ajustadas.
 - `backend/tests/test_viviane_humanizacao.py`
   - testes de regressao novos para os cenarios acima.
@@ -20,4 +20,5 @@
 ## Validacao
 - `PYTHONPATH=C:\\projetos\\fabio2\\backend pytest tests/test_viviane_humanizacao.py -q`
 - Resultado: `17 passed`.
+
 

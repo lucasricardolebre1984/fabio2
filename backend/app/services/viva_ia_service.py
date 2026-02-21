@@ -209,8 +209,8 @@ ESCALA PARA HUMANO:
             candidates.append(Path(env_path))
         candidates.extend(
             [
-                Path("/app/COFRE/persona-skills/VIVIANE.md"),
-                Path(__file__).resolve().parents[3] / "backend" / "COFRE" / "persona-skills" / "VIVIANE.md",
+                Path("/app/COFRE/persona-skills/viviane/AGENT.md"),
+                Path(__file__).resolve().parents[3] / "backend" / "COFRE" / "persona-skills" / "viviane" / "AGENT.md",
             ]
         )
         for path in candidates:

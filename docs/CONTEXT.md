@@ -24,8 +24,8 @@ A operacao precisa de um sistema unico para contratos, clientes, agenda, campanh
 
 ## Fonte de verdade semantica
 
-- Persona: `backend/COFRE/persona-skills/AGENT.md`
-- Skills: `backend/COFRE/persona-skills/*.md`
+- Persona VIVA: `backend/COFRE/persona-skills/viva/AGENT.md`
+- Persona VIVIANE: `backend/COFRE/persona-skills/viviane/AGENT.md`
 - Memorias: `backend/COFRE/memories/<tabela>/`
 
 ## Publico operacional

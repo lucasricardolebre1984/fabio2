@@ -44,7 +44,7 @@ Consolidar entendimento institucional para continuidade da homologacao sem perda
 
 ## Mapa de verdade institucional
 
-- Persona canonica: `backend/COFRE/persona-skills/AGENT.md`
+- Persona canonica: `backend/COFRE/persona-skills/viva/AGENT.md`
 - Skills canonicas: `backend/COFRE/persona-skills/*.md`
 - Memoria canonica: `backend/COFRE/memories/`
 - Status oficial: `docs/STATUS.md`
@@ -68,4 +68,3 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod ps
 curl -I https://fabio.automaniaai.com.br
 curl -sS https://fabio.automaniaai.com.br/health
 ```
-
