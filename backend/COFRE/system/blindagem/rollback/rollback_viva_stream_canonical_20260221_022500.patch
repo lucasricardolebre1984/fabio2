@@ -1,0 +1,442 @@
+diff --git a/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md b/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
+index 71b2e1b..420920b 100644
+--- a/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
++++ b/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
+@@ -41,6 +41,9 @@ Este arquivo centraliza os artefatos institucionais de blindagem para homologaca
+ - `backend/COFRE/system/blindagem/audit/VIVA_WHATSAPP_IA_DELIVERY_HOTFIX_2026-02-20.md`
+ - `backend/COFRE/system/blindagem/audit/WHATSAPP_WEBHOOK_DB_POOL_GUARD_2026-02-21.md`
+ - `backend/COFRE/system/blindagem/audit/VIVA_STREAM_PERSISTENCE_WEBHOOK_CATCHALL_2026-02-21.md`
++- `backend/COFRE/system/blindagem/audit/VIVA_AGENDA_NLU_COHERENCE_2026-02-21.md`
++- `backend/COFRE/system/blindagem/audit/VIVA_AGENDA_TRUTH_GUARD_2026-02-21.md`
++- `backend/COFRE/system/blindagem/audit/VIVA_STREAM_CANONICAL_ORCHESTRATION_2026-02-21.md`
+ 
+ ## Rollbacks
+ - `backend/COFRE/system/blindagem/rollback/rollback_gate2_cca7e3d.patch`
+@@ -57,6 +60,8 @@ Este arquivo centraliza os artefatos institucionais de blindagem para homologaca
+ - `backend/COFRE/system/blindagem/rollback/rollback_whatsapp_webhook_pool_guard_20260221_014900.patch`
+ - `backend/COFRE/system/blindagem/rollback/rollback_viva_stream_persist_commit_webhook_catchall_20260221_001222_baseline.txt`
+ - `backend/COFRE/system/blindagem/rollback/rollback_viva_stream_persist_commit_webhook_catchall_20260221_001222.patch`
++- `backend/COFRE/system/blindagem/rollback/rollback_viva_agenda_nlu_coherence_20260221_005642_baseline.txt`
++- `backend/COFRE/system/blindagem/rollback/rollback_viva_agenda_nlu_coherence_20260221_005642.patch`
+ 
+ ## Regra
+ - Novos relatorios de auditoria devem entrar em `backend/COFRE/system/blindagem/audit/`.
+diff --git a/backend/app/services/viva_chat_orchestrator_service.py b/backend/app/services/viva_chat_orchestrator_service.py
+index 7f7e675..8058b88 100644
+--- a/backend/app/services/viva_chat_orchestrator_service.py
++++ b/backend/app/services/viva_chat_orchestrator_service.py
+@@ -4,7 +4,6 @@ Extrai a orquestracao pesada do endpoint /chat para reduzir acoplamento em rota.
+ """
+ 
+ import logging
+-import asyncio
+ from typing import Any, Dict, List, Optional
+ from uuid import UUID, uuid4
+ from datetime import datetime, timezone
+@@ -23,6 +22,7 @@ from app.services.viva_chat_domain_service import (
+     _collect_campaign_fields_from_context,
+     _extract_cast_preference,
+     _extract_campaign_brief_fields,
++    _ensure_fabio_greeting,
+     _has_pending_campaign_brief,
+     _is_greeting,
+     _preferred_greeting,
+@@ -38,6 +38,7 @@ from app.services.viva_chat_domain_service import (
+     _mode_hint,
+     _resolve_image_size_from_format,
+ )
++from pydantic import ValidationError
+ from app.api.v1.viva_schemas import ChatResponse, MediaItem
+ from app.schemas.agenda import EventoCreate
+ from app.services.agenda_service import AgendaService
+@@ -273,6 +274,8 @@ class VivaChatOrchestratorService:
+             agenda_natural_command = viva_agenda_nlu_service.parse_agenda_natural_create(request.mensagem)
+             agenda_errors: List[str] = []
+             agenda_create_payload: Optional[Dict[str, Any]] = None
++            agenda_created = False
++            agenda_checked = False
+             handoff_intent = _is_handoff_whatsapp_intent(request.mensagem)
+             viviane_handoff_query_intent = _is_viviane_handoff_query_intent(request.mensagem)
+             logo_request = _is_logo_request(request.mensagem)
+@@ -302,8 +305,8 @@ class VivaChatOrchestratorService:
+                     agenda_create_payload = agenda_natural_command
+ 
+             if agenda_create_payload:
+-                evento = await service.create(
+-                    EventoCreate(
++                try:
++                    evento_payload = EventoCreate(
+                         titulo=agenda_create_payload["title"],
+                         descricao=agenda_create_payload.get("description"),
+                         tipo=agenda_create_payload["tipo"],
+@@ -311,8 +314,24 @@ class VivaChatOrchestratorService:
+                         data_fim=None,
+                         cliente_id=None,
+                         contrato_id=None,
+-                    ),
++                    )
++                except (ValidationError, ValueError, TypeError) as exc:
++                    logger.warning("viva_agenda_create_payload_invalid user_id=%s erro=%s", current_user.id, exc)
++                    return await finalize(
++                        resposta=viva_agenda_nlu_service.build_agenda_recovery_reply(
++                            request.mensagem,
++                            [str(exc)],
++                        )
++                    )
++
++                evento = await service.create(evento_payload, current_user.id)
++                agenda_created = True
++                logger.info(
++                    "viva_agenda_create_ok user_id=%s evento_id=%s titulo=%s data_inicio=%s",
+                     current_user.id,
++                    evento.id,
++                    evento.titulo,
++                    evento.data_inicio,
+                 )
+                 await _sync_google_event_safe(evento)
+ 
+@@ -465,6 +484,7 @@ class VivaChatOrchestratorService:
+                     page_size=120,
+                 )
+                 items = list(agenda_data.get("items", []))
++                agenda_checked = True
+                 return await finalize(resposta=viva_agenda_nlu_service.format_agenda_list(items, period_label))
+ 
+             if agenda_errors and (agenda_command is not None or agenda_natural_command is not None):
+@@ -780,7 +800,26 @@ class VivaChatOrchestratorService:
+                     resposta = await viva_local_service.chat(messages_local, modo)
+ 
+             resposta = _sanitize_fake_asset_delivery_reply(resposta, modo)
+-            return await finalize(resposta=resposta)
++            safe_resposta = _ensure_fabio_greeting(request.mensagem, resposta)
++            normalized_safe = _normalize_key(safe_resposta)
++            if not agenda_created and any(
++                token in normalized_safe
++                for token in ("agendamento criado", "compromisso criado", "marquei ", "criei ")
++            ):
++                safe_resposta = (
++                    "Nao consegui confirmar criacao de compromisso na agenda. "
++                    "Informe data e hora exatas (DD/MM/AAAA HH:MM) que eu executo novamente."
++                )
++            elif not agenda_checked and any(
++                token in normalized_safe
++                for token in ("consultei sua agenda", "calendario checado", "nao ha compromissos")
++            ):
++                safe_resposta = (
++                    "Nao consegui confirmar a consulta da agenda com seguranca agora. "
++                    "Posso tentar novamente em seguida."
++                )
++
++            return await finalize(resposta=safe_resposta)
+         except Exception as e:
+             raise HTTPException(status_code=500, detail=f"Erro: {str(e)}")
+ 
+@@ -788,169 +827,24 @@ class VivaChatOrchestratorService:
+ 
+ 
+     async def handle_chat_with_viva_stream(self, request: Any, current_user: Any, db: Any):
+-        """Chat com VIVA usando streaming de resposta (SSE).
+-        
+-        NOTA: Versão simplificada focada em chat textual.
+-        Para geração de imagens/campanhas, usa o endpoint não-streaming.
++        """Chat VIVA em SSE ancorado no fluxo canonico.
++
++        Importante:
++        - Evita divergencia de comportamento entre `/chat` e `/chat/stream`.
++        - Garante que intents operacionais (agenda/handoff/consultas de dominio)
++          usem a mesma orquestracao deterministica do endpoint canonico.
+         """
+         try:
+-            await ensure_chat_tables(db)
+-
+-            modo = (
+-                _normalize_mode(request.modo)
+-                or _infer_mode_from_message(request.mensagem)
+-                or _infer_mode_from_context(request.contexto)
+-            )
+-
+-            session_id = await resolve_chat_session(
+-                db=db,
+-                user_id=current_user.id,
+-                requested_session_id=request.session_id,
+-                modo=modo,
+-            )
+-
+-            # Persistir mensagem do usuário
+-            await append_chat_message(
+-                db=db,
+-                session_id=session_id,
+-                user_id=current_user.id,
+-                tipo="usuario",
+-                conteudo=request.mensagem,
+-                modo=modo,
+-                meta={"contexto_len": len(request.contexto or [])},
+-            )
+-
+-            if bool(getattr(settings, "VIVA_MEMORY_ENABLED", False)):
+-                await viva_memory_service.append_memory(
+-                    db=db,
+-                    user_id=current_user.id,
+-                    session_id=session_id,
+-                    tipo="usuario",
+-                    conteudo=request.mensagem,
+-                    modo=modo,
+-                    meta={"source": "viva_chat_stream_input"},
+-                )
+-
+-            # Carregar snapshot (limite reduzido para streaming - Gate 2)
+-            MAX_CONTEXT_MESSAGES = 10
+-            snapshot = await load_chat_snapshot(
+-                db=db,
+-                user_id=current_user.id,
+-                session_id=session_id,
+-                limit=MAX_CONTEXT_MESSAGES * 2,  # Considerando user+ia alternados
+-            )
+-            contexto_efetivo = context_from_snapshot(snapshot)
+-
+-            if not modo:
+-                modo = _normalize_mode(snapshot.modo) or _infer_mode_from_context(contexto_efetivo)
+-
+-            # Memória opcional
+-            memory_context = None
+-            if bool(getattr(settings, "VIVA_MEMORY_ENABLED", False)):
+-                memory_context = await viva_memory_service.build_chat_memory_context(
+-                    db=db,
+-                    user_id=current_user.id,
+-                    session_id=session_id,
+-                    query=request.mensagem,
+-                    modo=modo,
+-                )
+-
+-            # Preparar mensagens para o modelo
+-            if not settings.OPENAI_API_KEY:
+-                yield {"error": "OPENAI_API_KEY não configurada para streaming"}
+-                return
+-
+-            messages = _build_viva_concierge_messages(
+-                mensagem=request.mensagem,
+-                contexto=contexto_efetivo,
+-                modo=modo,
+-                memory_context=memory_context,
+-            )
+-
+-            # Stream da resposta
+-            full_response = ""
+-            await _release_db_before_remote_call(db)
+-            try:
+-                async for chunk in openai_service.chat_stream(
+-                    messages=messages,
+-                    # Alguns modelos aceitam somente comportamento padrao (temperature=1).
+-                    temperature=1.0,
+-                    max_tokens=220,
+-                ):
+-                    chunk_text = str(chunk or "")
+-                    normalized_chunk = chunk_text.strip().lower()
+-                    if normalized_chunk.startswith(("erro", "error")):
+-                        yield {"error": chunk_text.strip() or "Erro no streaming da VIVA"}
+-                        return
+-                    full_response += chunk_text
+-                    yield {"content": chunk_text}
+-            except asyncio.CancelledError:
+-                # Best-effort: se o cliente desconectar no meio, tenta persistir o que ja foi gerado.
+-                if full_response.strip():
+-                    try:
+-                        await append_chat_message(
+-                            db=db,
+-                            session_id=session_id,
+-                            user_id=current_user.id,
+-                            tipo="ia",
+-                            conteudo=full_response,
+-                            modo=modo,
+-                            anexos=None,
+-                            meta={"stream": True, "cancelled": True},
+-                        )
+-                        if bool(getattr(settings, "VIVA_MEMORY_ENABLED", False)):
+-                            await viva_memory_service.append_memory(
+-                                db=db,
+-                                user_id=current_user.id,
+-                                session_id=session_id,
+-                                tipo="ia",
+-                                conteudo=full_response,
+-                                modo=modo,
+-                                meta={"source": "viva_chat_stream_cancelled"},
+-                            )
+-                        await db.commit()
+-                    except Exception:
+-                        await db.rollback()
+-                raise
+-
+-            if not full_response.strip():
+-                yield {"error": "Streaming finalizado sem resposta da IA"}
+-                return
+-
+-            # Persistir resposta completa
+-            await append_chat_message(
++            response = await self.handle_chat_with_viva(
++                request=request,
++                current_user=current_user,
+                 db=db,
+-                session_id=session_id,
+-                user_id=current_user.id,
+-                tipo="ia",
+-                conteudo=full_response,
+-                modo=modo,
+-                anexos=None,
+-                meta={"stream": True},
+             )
+-
+-            if bool(getattr(settings, "VIVA_MEMORY_ENABLED", False)):
+-                await viva_memory_service.append_memory(
+-                    db=db,
+-                    user_id=current_user.id,
+-                    session_id=session_id,
+-                    tipo="ia",
+-                    conteudo=full_response,
+-                    modo=modo,
+-                    meta={"source": "viva_chat_stream_finalize"},
+-                )
+-
+-            try:
+-                await db.commit()
+-            except Exception:
+-                await db.rollback()
+-                raise
+-
+-            # Sinalizar fim do streaming (apos persistencia)
+-            yield {"done": True, "session_id": str(session_id)}
+-
++            content = str(getattr(response, "resposta", "") or "")
++            yield {"content": content}
++            yield {"done": True, "session_id": str(getattr(response, "session_id", "") or "")}
+         except Exception as e:
+-            logger.error(f"Erro no streaming VIVA: {str(e)}")
++            logger.error("Erro no streaming VIVA (canonical wrapper): %s", str(e))
+             yield {"error": f"Erro: {str(e)}"}
+ 
+ 
+diff --git a/backend/tests/test_viva_chat.py b/backend/tests/test_viva_chat.py
+index a756d62..7ed1e19 100644
+--- a/backend/tests/test_viva_chat.py
++++ b/backend/tests/test_viva_chat.py
+@@ -3,6 +3,7 @@ import pytest
+ from httpx import AsyncClient
+ 
+ from app.main import app
++from app.services.viva_chat_orchestrator_service import VivaChatOrchestratorService
+ 
+ 
+ @pytest.mark.asyncio
+@@ -99,3 +100,35 @@ async def test_viva_chat_stream():
+         )
+         # Pode ser streaming ou fallback
+         assert response.status_code in [200, 201, 400, 500]
++
++
++@pytest.mark.asyncio
++async def test_viva_chat_stream_delegates_to_canonical_flow(monkeypatch):
++    """Garante que o stream usa a mesma orquestracao canonica de /chat."""
++
++    class FakeResponse:
++        def __init__(self):
++            self.resposta = "Ola Fabio! Fluxo canonico."
++            self.session_id = "sessao-123"
++
++    async def fake_handle_chat_with_viva(self, request, current_user, db):
++        return FakeResponse()
++
++    monkeypatch.setattr(
++        VivaChatOrchestratorService,
++        "handle_chat_with_viva",
++        fake_handle_chat_with_viva,
++    )
++
++    service = VivaChatOrchestratorService()
++    chunks = []
++    async for chunk in service.handle_chat_with_viva_stream(
++        request=object(),
++        current_user=object(),
++        db=object(),
++    ):
++        chunks.append(chunk)
++
++    assert chunks[0]["content"] == "Ola Fabio! Fluxo canonico."
++    assert chunks[1]["done"] is True
++    assert chunks[1]["session_id"] == "sessao-123"
+diff --git a/docs/BUGSREPORT.md b/docs/BUGSREPORT.md
+index 5c0e9bc..094b2f7 100644
+--- a/docs/BUGSREPORT.md
++++ b/docs/BUGSREPORT.md
+@@ -2456,3 +2456,25 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
+ - validacao tecnica:
+   - `npm run lint -- --file "src/app/(dashboard)/contratos/[id]/page.tsx" --file "src/lib/pdf.ts"` => OK;
+   - `python -m py_compile backend/app/services/pdf_service_playwright.py` => OK.
++
++### BUG-127: VIVA stream responde agenda sem executar rota real do SaaS
++**Data:** 2026-02-21
++**Severidade:** Critica
++**Descricao:** No chat `/viva`, o fluxo de streaming (`POST /api/v1/viva/chat/stream`) confirmava criacao/consulta de agenda em linguagem natural, mas o painel `/agenda` nao refletia o compromisso. Tambem surgiam loops de desambiguacao ("sincronizar ou abrir?") fora do comportamento canonico da persona.
++**Sintoma real observado:**
++- usuario pediu "marque um compromisso ... daqui uma hora";
++- VIVA respondeu "feito/agendado";
++- tela `/agenda` nao exibiu o novo item (apenas compromisso anterior).
++**Causa raiz:**
++- `/api/v1/viva/chat/stream` seguia um caminho tecnico diferente do `/api/v1/viva/chat`;
++- o caminho de stream nao passava pela mesma orquestracao deterministica de agenda/domain router e podia cair em resposta livre do modelo.
++**Correcao aplicada:**
++- endpoint de stream passou a delegar para a mesma orquestracao canonica de `/api/v1/viva/chat`, garantindo fonte unica de verdade para:
++  - agenda (criar/consultar/concluir),
++  - handoff,
++  - consultas de dominio,
++  - guardas anti-confirmacao falsa.
++**Arquivos:**
++- `backend/app/services/viva_chat_orchestrator_service.py`
++- `backend/COFRE/system/blindagem/audit/VIVA_STREAM_CANONICAL_ORCHESTRATION_2026-02-21.md`
++**Status:** Resolvido
+diff --git a/docs/SESSION.md b/docs/SESSION.md
+index 24d8045..9ed8834 100644
+--- a/docs/SESSION.md
++++ b/docs/SESSION.md
+@@ -1,6 +1,6 @@
+ ﻿# SESSION - contexto da rodada atual
+ 
+-Data da rodada: 2026-02-20
++Data da rodada: 2026-02-21
+ Branch: main
+ Status: consolidacao final de homologacao local (WhatsApp/VIVA/Viviane) + ajuste cirurgico de layout de contratos com rollback institucional.
+ 
+@@ -42,6 +42,11 @@ Status: consolidacao final de homologacao local (WhatsApp/VIVA/Viviane) + ajuste
+   - `backend/COFRE/system/blindagem/audit/CONTRATOS_LOGO_LAYOUT_2026-02-20.md`
+   - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317_pre_fix_baseline.txt`
+   - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317.patch`
++- Correcao de paridade canonica no chat stream:
++  - `backend/app/services/viva_chat_orchestrator_service.py`
++  - `backend/tests/test_viva_chat.py` (teste `test_viva_chat_stream_delegates_to_canonical_flow`)
++  - `backend/COFRE/system/blindagem/audit/VIVA_STREAM_CANONICAL_ORCHESTRATION_2026-02-21.md`
++  - `docs/BUGSREPORT.md` (BUG-127)
+ 
+ ## Novos bugs abertos nesta auditoria
+ 
+@@ -56,4 +61,4 @@ Status: consolidacao final de homologacao local (WhatsApp/VIVA/Viviane) + ajuste
+ O historico tecnico antigo permanece preservado em arquivos de rollback e em documentos no VAULT.
+ Este arquivo passa a registrar apenas o contexto corrente de sessao.
+ 
+-Atualizado em: 2026-02-20
++Atualizado em: 2026-02-21
+diff --git a/docs/STATUS.md b/docs/STATUS.md
+index c44e897..7abf3a9 100644
+--- a/docs/STATUS.md
++++ b/docs/STATUS.md
+@@ -84,6 +84,13 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
+ - Fix de persistencia do chat VIVA (stream + non-stream):
+   - Causa raiz: mensagens `ia` eram inseridas no banco, mas nao eram commitadas (e no streaming o `done` era emitido antes de persistir).
+   - Correcao: commit explicito apos `append_chat_message`/memoria e `done` somente apos persistencia.
++- Fix de coerencia de agenda na VIVA (consulta/criacao):
++  - Causa raiz: frases comuns (`o que tem na agenda`, `crie ... daqui meia hora`) podiam escapar da rota deterministica de agenda e cair em resposta livre.
++  - Correcao: ampliacao do NLU para capturar consulta de agenda (`hoje/ontem/data explicita`) e criacao relativa com `daqui meia hora`.
++- Fix de paridade entre `/viva/chat` e `/viva/chat/stream`:
++  - Causa raiz: stream seguia caminho tecnico separado e podia responder agenda sem executar rota real.
++  - Correcao: `handle_chat_with_viva_stream` passou a delegar para o fluxo canonico `handle_chat_with_viva` e emitir SSE com `content` + `done`.
++  - Evidencia: `backend/COFRE/system/blindagem/audit/VIVA_STREAM_CANONICAL_ORCHESTRATION_2026-02-21.md`.
+ - Fix de templates de contratos no deploy AWS:
+   - Causa raiz: backend em container sem acesso a `./contratos/templates`, caindo no fallback sem clausulas (`CLÁUSULAS NÃO CADASTRADAS`).
+   - Correcao: mount read-only de `./contratos` para `/app/contratos` no backend em `docker-compose.prod.yml` e `docker-compose-prod.yml`.

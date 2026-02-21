@@ -50,6 +50,8 @@ def _has_create_imperative(normalized: str) -> bool:
         "marcar",
         "marca",
         "marque",
+        "criar",
+        "crie",
         "criar compromisso",
         "crie compromisso",
         "novo compromisso",
@@ -94,6 +96,12 @@ def _has_query_existence_intent(normalized: str) -> bool:
         "confirme se",
         "verifica se",
         "verifique se",
+        "verifique a agenda",
+        "verificar agenda",
+        "consulte agenda",
+        "consultar agenda",
+        "conferir agenda",
+        "confere agenda",
     )
     if has_agenda_token and _has_any_phrase(normalized, generic_confirmation_phrases):
         return True
@@ -288,6 +296,8 @@ def is_agenda_query_intent(message: str, contexto: List[Dict[str, Any]]) -> bool
         "como esta a agenda",
         "como esta minha agenda hj",
         "como ta minha agenda",
+        "o que tem na agenda",
+        "o que tem na minha agenda",
         "o que tenho",
         "quais compromissos",
         "listar agenda",
@@ -299,7 +309,13 @@ def is_agenda_query_intent(message: str, contexto: List[Dict[str, Any]]) -> bool
         "compromissos de hoje",
         "agenda hj",
         "agenda hoje",
+        "agenda de ontem",
+        "agenda ontem",
         "agenda amanha",
+        "verifique a agenda",
+        "consultar agenda",
+        "consulte agenda",
+        "confira agenda",
     )
 
     if any(term in normalized for term in query_terms):
@@ -319,6 +335,7 @@ def is_agenda_query_intent(message: str, contexto: List[Dict[str, Any]]) -> bool
             "como esta",
             "como ta",
             "o que tenho",
+            "o que tem",
             "o que temos",
             "tenho",
             "temos",
@@ -344,6 +361,46 @@ def is_agenda_query_intent(message: str, contexto: List[Dict[str, Any]]) -> bool
 def agenda_window_from_text(message: str) -> Tuple[datetime, datetime, str]:
     normalized = _normalize_key(message)
     now = _now_brt()
+
+    explicit_dt_match = re.search(
+        r"\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\D+(\d{1,2}):(\d{2})(?::\d{2})?\b",
+        message or "",
+    )
+    if explicit_dt_match:
+        raw_date = explicit_dt_match.group(1)
+        hour = int(explicit_dt_match.group(2))
+        minute = int(explicit_dt_match.group(3))
+        parsed_date: Optional[datetime] = None
+        for fmt in ("%d/%m/%Y", "%d/%m/%y", "%d-%m-%Y"):
+            try:
+                parsed_date = datetime.strptime(raw_date, fmt)
+                break
+            except ValueError:
+                continue
+        if parsed_date is not None and 0 <= hour <= 23 and 0 <= minute <= 59:
+            start = _to_brt_aware(parsed_date.replace(hour=hour, minute=minute, second=0, microsecond=0))
+            end = start + timedelta(minutes=1)
+            return start, end, f"em {start.strftime('%d/%m/%Y %H:%M')}"
+
+    explicit_date_match = re.search(r"\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b", message or "")
+    if explicit_date_match:
+        raw_date = explicit_date_match.group(1)
+        parsed_date = None
+        for fmt in ("%d/%m/%Y", "%d/%m/%y", "%d-%m-%Y"):
+            try:
+                parsed_date = datetime.strptime(raw_date, fmt)
+                break
+            except ValueError:
+                continue
+        if parsed_date is not None:
+            start = _to_brt_aware(parsed_date.replace(hour=0, minute=0, second=0, microsecond=0))
+            end = start + timedelta(days=1)
+            return start, end, f"de {start.strftime('%d/%m/%Y')}"
+
+    if "ontem" in normalized:
+        start = (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=1)
+        return start, end, "de ontem"
 
     if "amanha" in normalized:
         start = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -419,7 +476,7 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
         "doze": 12,
     }
     relative_match = re.search(
-        r"\bdaqui\s+(?:(\d+)|(um|uma|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez|onze|doze))\s*"
+        r"\bdaqui\s+(?:(\d+)|(um|uma|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez|onze|doze)|(meia|meio))\s*"
         r"(hora|horas|h|minuto|minutos|min)\b",
         normalized,
         flags=re.IGNORECASE,
@@ -430,12 +487,16 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
             amount = int(relative_match.group(1))
         elif relative_match.group(2):
             amount = int(word_to_number.get(str(relative_match.group(2)).lower(), 0))
-        unit = str(relative_match.group(3) or "").lower()
-        if amount > 0:
-            if unit in ("hora", "horas", "h"):
+        elif relative_match.group(3):
+            amount = 30
+        unit = str(relative_match.group(4) or "").lower()
+        if unit in ("hora", "horas", "h"):
+            if relative_match.group(3):
+                relative_delta = timedelta(minutes=30)
+            elif amount > 0:
                 relative_delta = timedelta(hours=amount)
-            else:
-                relative_delta = timedelta(minutes=amount)
+        elif amount > 0:
+            relative_delta = timedelta(minutes=amount)
 
     explicit_time_detected = False
     hh_mm_match = re.search(r"\b(\d{1,2}):(\d{2})\b", raw)
@@ -516,7 +577,7 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
 
     title = title_source
     verb_match = re.search(
-        r"(?i)\b(agendar|agende|agenda|marcar|marca|marque|novo compromisso|criar compromisso|crie compromisso|adicionar compromisso|adicione compromisso)\b",
+        r"(?i)\b(agendar|agende|agenda|marcar|marca|marque|criar|crie|novo compromisso|criar compromisso|crie compromisso|adicionar compromisso|adicione compromisso)\b",
         title,
     )
     if verb_match:

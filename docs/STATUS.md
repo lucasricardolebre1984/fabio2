@@ -84,6 +84,13 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
 - Fix de persistencia do chat VIVA (stream + non-stream):
   - Causa raiz: mensagens `ia` eram inseridas no banco, mas nao eram commitadas (e no streaming o `done` era emitido antes de persistir).
   - Correcao: commit explicito apos `append_chat_message`/memoria e `done` somente apos persistencia.
+- Fix de coerencia de agenda na VIVA (consulta/criacao):
+  - Causa raiz: frases comuns (`o que tem na agenda`, `crie ... daqui meia hora`) podiam escapar da rota deterministica de agenda e cair em resposta livre.
+  - Correcao: ampliacao do NLU para capturar consulta de agenda (`hoje/ontem/data explicita`) e criacao relativa com `daqui meia hora`.
+- Fix de paridade entre `/viva/chat` e `/viva/chat/stream`:
+  - Causa raiz: stream seguia caminho tecnico separado e podia responder agenda sem executar rota real.
+  - Correcao: `handle_chat_with_viva_stream` passou a delegar para o fluxo canonico `handle_chat_with_viva` e emitir SSE com `content` + `done`.
+  - Evidencia: `backend/COFRE/system/blindagem/audit/VIVA_STREAM_CANONICAL_ORCHESTRATION_2026-02-21.md`.
 - Fix de templates de contratos no deploy AWS:
   - Causa raiz: backend em container sem acesso a `./contratos/templates`, caindo no fallback sem clausulas (`CLÁUSULAS NÃO CADASTRADAS`).
   - Correcao: mount read-only de `./contratos` para `/app/contratos` no backend em `docker-compose.prod.yml` e `docker-compose-prod.yml`.

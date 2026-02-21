@@ -1,6 +1,6 @@
 ﻿# SESSION - contexto da rodada atual
 
-Data da rodada: 2026-02-20
+Data da rodada: 2026-02-21
 Branch: main
 Status: consolidacao final de homologacao local (WhatsApp/VIVA/Viviane) + ajuste cirurgico de layout de contratos com rollback institucional.
 
@@ -42,6 +42,11 @@ Status: consolidacao final de homologacao local (WhatsApp/VIVA/Viviane) + ajuste
   - `backend/COFRE/system/blindagem/audit/CONTRATOS_LOGO_LAYOUT_2026-02-20.md`
   - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317_pre_fix_baseline.txt`
   - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317.patch`
+- Correcao de paridade canonica no chat stream:
+  - `backend/app/services/viva_chat_orchestrator_service.py`
+  - `backend/tests/test_viva_chat.py` (teste `test_viva_chat_stream_delegates_to_canonical_flow`)
+  - `backend/COFRE/system/blindagem/audit/VIVA_STREAM_CANONICAL_ORCHESTRATION_2026-02-21.md`
+  - `docs/BUGSREPORT.md` (BUG-127)
 
 ## Novos bugs abertos nesta auditoria
 
@@ -56,4 +61,4 @@ Status: consolidacao final de homologacao local (WhatsApp/VIVA/Viviane) + ajuste
 O historico tecnico antigo permanece preservado em arquivos de rollback e em documentos no VAULT.
 Este arquivo passa a registrar apenas o contexto corrente de sessao.
 
-Atualizado em: 2026-02-20
+Atualizado em: 2026-02-21

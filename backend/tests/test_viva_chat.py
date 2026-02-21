@@ -3,6 +3,7 @@ import pytest
 from httpx import AsyncClient
 
 from app.main import app
+from app.services.viva_chat_orchestrator_service import VivaChatOrchestratorService
 
 
 @pytest.mark.asyncio
@@ -99,3 +100,35 @@ async def test_viva_chat_stream():
         )
         # Pode ser streaming ou fallback
         assert response.status_code in [200, 201, 400, 500]
+
+
+@pytest.mark.asyncio
+async def test_viva_chat_stream_delegates_to_canonical_flow(monkeypatch):
+    """Garante que o stream usa a mesma orquestracao canonica de /chat."""
+
+    class FakeResponse:
+        def __init__(self):
+            self.resposta = "Ola Fabio! Fluxo canonico."
+            self.session_id = "sessao-123"
+
+    async def fake_handle_chat_with_viva(self, request, current_user, db):
+        return FakeResponse()
+
+    monkeypatch.setattr(
+        VivaChatOrchestratorService,
+        "handle_chat_with_viva",
+        fake_handle_chat_with_viva,
+    )
+
+    service = VivaChatOrchestratorService()
+    chunks = []
+    async for chunk in service.handle_chat_with_viva_stream(
+        request=object(),
+        current_user=object(),
+        db=object(),
+    ):
+        chunks.append(chunk)
+
+    assert chunks[0]["content"] == "Ola Fabio! Fluxo canonico."
+    assert chunks[1]["done"] is True
+    assert chunks[1]["session_id"] == "sessao-123"

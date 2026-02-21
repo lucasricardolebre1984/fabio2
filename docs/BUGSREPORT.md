@@ -2456,3 +2456,25 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
 - validacao tecnica:
   - `npm run lint -- --file "src/app/(dashboard)/contratos/[id]/page.tsx" --file "src/lib/pdf.ts"` => OK;
   - `python -m py_compile backend/app/services/pdf_service_playwright.py` => OK.
+
+### BUG-127: VIVA stream responde agenda sem executar rota real do SaaS
+**Data:** 2026-02-21
+**Severidade:** Critica
+**Descricao:** No chat `/viva`, o fluxo de streaming (`POST /api/v1/viva/chat/stream`) confirmava criacao/consulta de agenda em linguagem natural, mas o painel `/agenda` nao refletia o compromisso. Tambem surgiam loops de desambiguacao ("sincronizar ou abrir?") fora do comportamento canonico da persona.
+**Sintoma real observado:**
+- usuario pediu "marque um compromisso ... daqui uma hora";
+- VIVA respondeu "feito/agendado";
+- tela `/agenda` nao exibiu o novo item (apenas compromisso anterior).
+**Causa raiz:**
+- `/api/v1/viva/chat/stream` seguia um caminho tecnico diferente do `/api/v1/viva/chat`;
+- o caminho de stream nao passava pela mesma orquestracao deterministica de agenda/domain router e podia cair em resposta livre do modelo.
+**Correcao aplicada:**
+- endpoint de stream passou a delegar para a mesma orquestracao canonica de `/api/v1/viva/chat`, garantindo fonte unica de verdade para:
+  - agenda (criar/consultar/concluir),
+  - handoff,
+  - consultas de dominio,
+  - guardas anti-confirmacao falsa.
+**Arquivos:**
+- `backend/app/services/viva_chat_orchestrator_service.py`
+- `backend/COFRE/system/blindagem/audit/VIVA_STREAM_CANONICAL_ORCHESTRATION_2026-02-21.md`
+**Status:** Resolvido

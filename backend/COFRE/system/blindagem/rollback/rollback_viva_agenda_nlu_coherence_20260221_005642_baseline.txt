@@ -1,0 +1,6 @@
+Rollback baseline criado em 2026-02-21 00:56:42
+Commit baseline: c9cb5b0
+Escopo alvo:
+- backend/app/services/viva_agenda_nlu_service.py
+- backend/COFRE/system/blindagem/audit/VIVA_AGENDA_NLU_COHERENCE_2026-02-21.md
+- docs/STATUS.md
