@@ -104,6 +104,15 @@ def test_extract_city_from_short_reply_when_context_expects_city():
     assert city == "Ribeirao Preto"
 
 
+def test_extract_city_from_short_reply_rejects_laughter_noise():
+    service = VivaIAService()
+    city = service._extrair_cidade_resposta_curta(
+        texto_original="Heheh",
+        contexto={"last_missing_field": "cidade"},
+    )
+    assert city is None
+
+
 def test_handoff_start_reply_avoids_repeat_loop():
     service = VivaIAService()
     reply = service._build_handoff_start_reply({"nome": "Glauco"})

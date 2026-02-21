@@ -977,6 +977,9 @@ ESCALA PARA HUMANO:
         if not cleaned:
             return None
 
+        if self._is_likely_laughter_or_noise_for_city(cleaned):
+            return None
+
         normalized = self._normalizar(cleaned)
         blocked_terms = (
             "cpf",
@@ -1012,6 +1015,30 @@ ESCALA PARA HUMANO:
             return None
 
         return " ".join(word.capitalize() for word in words)
+
+    def _is_likely_laughter_or_noise_for_city(self, texto: str) -> bool:
+        if not texto:
+            return True
+
+        normalized = self._remover_acentos(texto).lower().strip()
+        compact = re.sub(r"[^a-z]", "", normalized)
+        if not compact:
+            return True
+
+        if compact in {"ok", "blz", "show", "sim", "nao", "não"}:
+            return True
+
+        laughter_patterns = (
+            r"^k{2,}$",
+            r"^(ha){2,}h?$",
+            r"^(he){2,}h?$",
+            r"^(hi){2,}h?$",
+            r"^(ho){2,}h?$",
+            r"^(hu){2,}h?$",
+            r"^(rs){2,}$",
+            r"^(ha|he|hi|ho|hu|kk|rs){2,}$",
+        )
+        return any(re.fullmatch(pattern, compact) for pattern in laughter_patterns)
 
     def _build_handoff_start_reply(self, lead: Dict[str, str]) -> str:
         nome = str(lead.get("nome") or "").strip()
