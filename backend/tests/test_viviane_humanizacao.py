@@ -1,4 +1,5 @@
 from app.services.viva_ia_service import VivaIAService
+from datetime import datetime, timedelta, timezone
 
 
 def test_disengage_intent_detected():
@@ -108,6 +109,25 @@ def test_handoff_start_reply_avoids_repeat_loop():
     reply = service._build_handoff_start_reply({"nome": "Glauco"})
     assert "Vou te transferir agora" in reply
     assert "Nao precisa repetir" in reply
+
+
+def test_handoff_followup_intent_detection():
+    service = VivaIAService()
+    assert service._is_handoff_followup_intent("sim pode transferir")
+    assert not service._is_handoff_followup_intent("quais clientes temos na base")
+
+
+def test_handoff_stale_detection_and_release():
+    service = VivaIAService()
+    stale = (datetime.now(timezone.utc) - timedelta(minutes=45)).isoformat()
+    contexto = {
+        "handoff_status": "in_progress",
+        "handoff_last_update": stale,
+    }
+    assert service._handoff_is_stale(contexto)
+    service._clear_handoff_context(contexto)
+    assert contexto["handoff_status"] == "released"
+    assert "handoff_last_update" not in contexto
 
 
 def test_money_humor_reply_does_not_force_price():

@@ -282,13 +282,18 @@ ESCALA PARA HUMANO:
 
         handoff_status = str(contexto.get("handoff_status") or "").strip().lower()
         if handoff_status in {"requested", "in_progress"}:
-            contexto["lead"] = lead
-            contexto["handoff_status"] = "in_progress"
-            contexto["conversation_mode"] = "descompressao"
-            contexto["handoff_last_update"] = datetime.now(timezone.utc).isoformat()
-            conversa.contexto_ia = contexto
-            await db.commit()
-            return self._build_handoff_in_progress_reply(lead=lead)
+            if self._handoff_is_stale(contexto):
+                self._clear_handoff_context(contexto)
+            elif self._is_handoff_followup_intent(texto):
+                contexto["lead"] = lead
+                contexto["handoff_status"] = "in_progress"
+                contexto["conversation_mode"] = "descompressao"
+                contexto["handoff_last_update"] = datetime.now(timezone.utc).isoformat()
+                conversa.contexto_ia = contexto
+                await db.commit()
+                return self._build_handoff_in_progress_reply(lead=lead)
+            else:
+                self._clear_handoff_context(contexto)
 
         if self._deve_escalar_para_humano(texto):
             contexto["lead"] = lead
@@ -508,6 +513,55 @@ ESCALA PARA HUMANO:
         if not texto:
             return False
         return any(keyword in texto for keyword in self.handoff_keywords)
+
+    def _is_handoff_followup_intent(self, texto: str) -> bool:
+        if not texto:
+            return False
+
+        followup_keywords = (
+            "sim",
+            "pode",
+            "quero",
+            "segue",
+            "prosseguir",
+            "transfere",
+            "transferir",
+            "transferencia",
+            "especialista",
+            "consultor",
+            "consultora",
+            "atendente",
+            "andamento",
+            "encaminhar",
+            "encaminha",
+            "segue com isso",
+            "pode seguir",
+            "ok",
+            "certo",
+        )
+        return any(keyword in texto for keyword in followup_keywords)
+
+    def _handoff_is_stale(self, contexto: Dict[str, object], timeout_minutes: int = 20) -> bool:
+        timestamp_raw = str(
+            contexto.get("handoff_last_update")
+            or contexto.get("handoff_started_at")
+            or ""
+        ).strip()
+        if not timestamp_raw:
+            return False
+        try:
+            when = datetime.fromisoformat(timestamp_raw.replace("Z", "+00:00"))
+        except ValueError:
+            return False
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=timezone.utc)
+        elapsed = datetime.now(timezone.utc) - when.astimezone(timezone.utc)
+        return elapsed.total_seconds() >= timeout_minutes * 60
+
+    def _clear_handoff_context(self, contexto: Dict[str, object]) -> None:
+        contexto["handoff_status"] = "released"
+        contexto.pop("handoff_last_update", None)
+        contexto.pop("handoff_started_at", None)
 
     def _is_disengage_intent(self, texto: str) -> bool:
         if not texto:

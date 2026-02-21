@@ -117,6 +117,27 @@ class EvolutionWebhookService:
                 nome_contato=push_name,
                 db=db,
             )
+            if message_id:
+                duplicate_stmt = (
+                    select(WhatsappMensagem.id)
+                    .where(
+                        and_(
+                            WhatsappMensagem.conversa_id == conversa.id,
+                            WhatsappMensagem.message_id == message_id,
+                            WhatsappMensagem.tipo_origem == TipoOrigem.USUARIO,
+                        )
+                    )
+                    .limit(1)
+                )
+                duplicate_row = await db.execute(duplicate_stmt)
+                if duplicate_row.scalar_one_or_none() is not None:
+                    logging.info(
+                        "Webhook ignorado: mensagem inbound duplicada. conversa_id=%s message_id=%s",
+                        str(conversa.id),
+                        message_id,
+                    )
+                    return True
+
             contexto_atual = conversa.contexto_ia if isinstance(conversa.contexto_ia, dict) else {}
             contexto_atual = await self._refresh_lid_resolution_context(
                 db=db,

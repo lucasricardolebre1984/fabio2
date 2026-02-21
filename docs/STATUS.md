@@ -34,6 +34,7 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
 ## Pendencias criticas abertas
 
 - BUG-133: WhatsApp/SaaS com intermitencia de exibicao/resposta em homologacao (em validacao com evidencias de pipeline ativo)
+- BUG-134: regressao de loop de handoff da Viviane no WhatsApp (corrigido local, pendente validacao Ubuntu)
 - BUG-099: latencia alta no chat interno da VIVA
 - BUG-104: em validacao apos ajuste de consulta de agenda (`liste`/`lite agenda`) e estabilizacao de saudacao
 - BUG-105: em validacao apos ajuste de roteamento de contratos (modelos vs emitidos por cliente)

@@ -1,7 +1,7 @@
 # BUGSREPORT - Registro de Bugs
 
 > **Projeto:** FC SoluÃ§Ãµes Financeiras SaaS  
-> **Ãšltima AtualizaÃ§Ã£o:** 2026-02-16 (auditoria gate 1-9 + memoria/persona + conversa real)
+> **Ultima Atualizacao:** 2026-02-21 (homologacao WhatsApp/Viviane + auditoria de intermitencia)
 
 ---
 
@@ -148,6 +148,7 @@ Para qualquer mudanca de status funcional (`Em validacao` -> `Resolvido`), execu
 | BUG-124 | Critica | Viviane/WhatsApp | Fluxo comercial repetia perguntas de nome/cidade/transferencia, perdia contexto e gerava cancelamento de lead no handoff humano | Resolvido |
 | BUG-125 | Alta | Viviane/WhatsApp UX | Tom muito rigido: resposta com preco espontaneo e baixa empatia em perguntas sociais ("voce e robo?", "ficar rico"), gerando desconforto e risco de abandono | Resolvido |
 | BUG-133 | Critica | WhatsApp/SaaS Conversas | Conversas do WhatsApp nao aparecem com consistencia em `/whatsapp/conversas` e respostas nao retornam no SaaS, apesar de `whatsapp/status` conectado/open e webhook configurado | Em validacao (intermitente; nao reproduzido de forma continua na rodada 2026-02-21 13:xx) |
+| BUG-134 | Critica | Viviane/WhatsApp | Regressao de handoff: mensagem presa em loop ("transferencia em andamento...") e bloqueio de continuidade em novos assuntos | Corrigido local (pendente validacao Ubuntu) |
 
 ---
 
@@ -257,6 +258,23 @@ Para qualquer mudanca de status funcional (`Em validacao` -> `Resolvido`), execu
   - resumo agora retorna cadastro real + contratos ativos (cancelados excluidos da lista ativa).
 - validacao tecnica:
   - `python -m pytest tests/test_viva_domain_intents.py -q` (em `backend/`) => OK
+
+### BUG-134: Regressao de loop de handoff no WhatsApp (Viviane)
+**Data:** 2026-02-21  
+**Severidade:** Critica  
+**Descricao:** apos `handoff_status=requested/in_progress`, qualquer mensagem podia ser sequestrada para a resposta fixa de transferencia em andamento, quebrando contexto e atendimento.
+**Sintoma em conversa real:** repeticao de "transferencia em andamento..." mesmo para mensagens como `oi`, `lixo`, `vou procurar outra empresa`.
+**Causa raiz tecnica:** short-circuit global em `viva_ia_service` para todo input quando `handoff_status` ativo.
+**Correcao aplicada local:**  
+- `backend/app/services/viva_ia_service.py`
+  - `handoff` so responde em loop quando houver follow-up real de transferencia;
+  - liberacao automatica de handoff quando mensagem muda de assunto;
+  - timeout de handoff stale para evitar lock eterno no contexto.
+- `backend/app/services/evolution_webhook_service.py`
+  - deduplicacao de inbound por `message_id` para reduzir repeticao/eco no runtime.
+- testes:
+  - `backend/tests/test_viviane_humanizacao.py` (novos cenarios de follow-up e stale release)
+**Status:** Corrigido local (aguardando deploy + prova final em Ubuntu)
 
 ### Atualizacao 2026-02-19 (BUG-122 - WhatsApp `@lid` sem resposta)
 - backend:
