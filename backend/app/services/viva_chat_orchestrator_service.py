@@ -6,7 +6,7 @@ Extrai a orquestracao pesada do endpoint /chat para reduzir acoplamento em rota.
 import logging
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
 from zoneinfo import ZoneInfo
@@ -64,6 +64,7 @@ from app.services.viva_chat_runtime_helpers_service import (
     _build_image_prompt,
     _build_viviane_handoff_message,
     _extract_cliente_nome,
+    _extract_handoff_lead_minutes,
     _extract_handoff_custom_message,
     _extract_image_url,
     _extract_phone_candidate,
@@ -116,6 +117,12 @@ def _format_datetime_brt(value: Any) -> str:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M")
+
+
+def _as_brt_aware(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+    return value.astimezone(ZoneInfo("America/Sao_Paulo"))
 
 
 def _wants_google_calendar_verification(message: str) -> bool:
@@ -282,6 +289,33 @@ class VivaChatOrchestratorService:
                     modo=modo,
                 )
 
+            async def _resolve_handoff_phone_candidate() -> Optional[str]:
+                numero = _extract_phone_candidate(request.mensagem)
+                if numero:
+                    return numero
+
+                # Reaproveita numero citado recentemente na mesma sessao.
+                for msg in reversed(contexto_efetivo[-40:]):
+                    if str(msg.get("tipo") or "") != "usuario":
+                        continue
+                    numero_ctx = _extract_phone_candidate(str(msg.get("conteudo") or ""))
+                    if numero_ctx:
+                        return numero_ctx
+
+                if bool(getattr(settings, "VIVA_MEMORY_ENABLED", False)):
+                    pinned = await viva_memory_service.list_pinned_long_memory(
+                        db=db,
+                        user_id=current_user.id,
+                        modo=modo,
+                        limit=20,
+                    )
+                    for item in pinned:
+                        numero_pinned = _extract_phone_candidate(str(item.get("conteudo") or ""))
+                        if numero_pinned:
+                            return numero_pinned
+
+                return None
+
             service = AgendaService(db)
 
             async def _sync_google_event_safe(evento: Any) -> None:
@@ -379,7 +413,7 @@ class VivaChatOrchestratorService:
                         google_status_line = "\nGoogle Calendar: nao conectado."
 
                 if handoff_intent:
-                    numero = _extract_phone_candidate(request.mensagem)
+                    numero = await _resolve_handoff_phone_candidate()
                     cliente_nome = _extract_cliente_nome(request.mensagem)
                     if not numero:
                         return await finalize(
@@ -394,19 +428,24 @@ class VivaChatOrchestratorService:
                     handoff_msg = (
                         _extract_handoff_custom_message(request.mensagem)
                         or _build_viviane_handoff_message(
-                            cliente_nome=cliente_nome,
+                            cliente_nome=cliente_nome or str(getattr(current_user, "nome", "") or "Fabio"),
                             evento_titulo=evento.titulo,
                             data_inicio=evento.data_inicio,
                             modo=modo,
                         )
                     )
+                    lead_minutes = _extract_handoff_lead_minutes(request.mensagem)
+                    scheduled_for = _as_brt_aware(evento.data_inicio) - timedelta(minutes=lead_minutes)
+                    now_brt = datetime.now(ZoneInfo("America/Sao_Paulo"))
+                    if scheduled_for < now_brt:
+                        scheduled_for = now_brt
                     task_id = await viva_handoff_service.schedule_task(
                         db=db,
                         user_id=current_user.id,
                         cliente_nome=cliente_nome,
                         cliente_numero=numero,
                         mensagem=handoff_msg,
-                        scheduled_for=evento.data_inicio,
+                        scheduled_for=scheduled_for,
                         agenda_event_id=evento.id,
                         meta={"source": "viva_chat", "session_id": str(session_id)},
                     )
@@ -479,6 +518,104 @@ class VivaChatOrchestratorService:
                     resposta=(
                         "Compromisso concluido com sucesso: "
                         f"{evento.titulo} ({_format_datetime_brt(evento.data_inicio)})."
+                    )
+                )
+
+            if handoff_intent and not agenda_created:
+                numero = await _resolve_handoff_phone_candidate()
+                if not numero:
+                    return await finalize(
+                        resposta=(
+                            "Nao consegui acionar a Viviane porque nao encontrei um numero WhatsApp valido. "
+                            "Me envie o numero com DDD (ex.: 5516999999999)."
+                        )
+                    )
+
+                # Persistencia de regra: quando o operador explicita "meu numero / para sempre / regra",
+                # guarda em memoria pinned para reutilizacao entre sessoes.
+                normalized_input = _normalize_key(request.mensagem or "")
+                if bool(getattr(settings, "VIVA_MEMORY_ENABLED", False)) and any(
+                    token in normalized_input
+                    for token in ("meu numero", "para sempre", "nunca mais perguntar", "nunca mais erguntar", "regra")
+                ):
+                    await viva_memory_service.append_memory(
+                        db=db,
+                        user_id=current_user.id,
+                        session_id=session_id,
+                        tipo="pinned",
+                        conteudo=(
+                            f"Numero WhatsApp padrao de {getattr(current_user, 'nome', 'Fabio')}: {numero}. "
+                            "Quando pedir lembrete via Viviane, usar esse numero por padrao."
+                        ),
+                        modo=modo,
+                        meta={"pinned": True, "source": "viviane_default_whatsapp_rule"},
+                    )
+
+                inicio, fim, _ = viva_agenda_nlu_service.agenda_window_from_text(request.mensagem)
+                agenda_data = await service.list(
+                    inicio=inicio,
+                    fim=fim,
+                    concluido=False,
+                    user_id=current_user.id,
+                    page=1,
+                    page_size=120,
+                )
+                items = list(agenda_data.get("items", []))
+                if not items:
+                    now_brt = datetime.now(ZoneInfo("America/Sao_Paulo"))
+                    agenda_data = await service.list(
+                        inicio=now_brt,
+                        fim=now_brt + timedelta(days=7),
+                        concluido=False,
+                        user_id=current_user.id,
+                        page=1,
+                        page_size=120,
+                    )
+                    items = list(agenda_data.get("items", []))
+
+                if not items:
+                    return await finalize(
+                        resposta=(
+                            "Nao encontrei compromisso pendente para vincular ao lembrete da Viviane. "
+                            "Primeiro me passe o compromisso e horario."
+                        )
+                    )
+
+                ordered_items = sorted(items, key=lambda item: _as_brt_aware(item.data_inicio))
+                now_brt = datetime.now(ZoneInfo("America/Sao_Paulo"))
+                upcoming_items = [item for item in ordered_items if _as_brt_aware(item.data_inicio) >= now_brt]
+                target_event = upcoming_items[0] if upcoming_items else ordered_items[-1]
+
+                lead_minutes = _extract_handoff_lead_minutes(request.mensagem)
+                scheduled_for = _as_brt_aware(target_event.data_inicio) - timedelta(minutes=lead_minutes)
+                if scheduled_for < now_brt:
+                    scheduled_for = now_brt
+
+                handoff_msg = (
+                    _extract_handoff_custom_message(request.mensagem)
+                    or _build_viviane_handoff_message(
+                        cliente_nome=str(getattr(current_user, "nome", "") or "Fabio"),
+                        evento_titulo=target_event.titulo,
+                        data_inicio=target_event.data_inicio,
+                        modo=modo,
+                    )
+                )
+                task_id = await viva_handoff_service.schedule_task(
+                    db=db,
+                    user_id=current_user.id,
+                    cliente_nome=str(getattr(current_user, "nome", "") or "Fabio"),
+                    cliente_numero=numero,
+                    mensagem=handoff_msg,
+                    scheduled_for=scheduled_for,
+                    agenda_event_id=target_event.id,
+                    meta={"source": "viva_chat_followup", "session_id": str(session_id)},
+                )
+                return await finalize(
+                    resposta=(
+                        f"Lembrete da Viviane agendado no WhatsApp {numero} para "
+                        f"{_format_datetime_brt(scheduled_for)} "
+                        f"(compromisso: {target_event.titulo} em {_format_datetime_brt(target_event.data_inicio)}). "
+                        f"ID: {task_id}."
                     )
                 )
 

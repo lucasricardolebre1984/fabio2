@@ -61,6 +61,9 @@ def _has_create_imperative(normalized: str) -> bool:
         "adicione um compromisso",
         "adiciona compromisso",
         "adiciona um compromisso",
+        "adicionar na agenda",
+        "adicione na agenda",
+        "adiciona na agenda",
         # Natural variants commonly used by operators.
         "coloque na agenda",
         "coloca na agenda",
@@ -584,7 +587,7 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
 
     title = title_source
     verb_match = re.search(
-        r"(?i)\b(agendar|agende|agenda|marcar|marca|marque|criar|crie|novo compromisso|criar compromisso|crie compromisso|adicionar compromisso|adicionar um compromisso|adicione compromisso|adicione um compromisso|adiciona compromisso|adiciona um compromisso)\b",
+        r"(?i)\b(agendar|agende|agenda|marcar|marca|marque|criar|crie|novo compromisso|criar compromisso|crie compromisso|adicionar compromisso|adicionar um compromisso|adicione compromisso|adicione um compromisso|adiciona compromisso|adiciona um compromisso|adicionar na agenda|adicione na agenda|adiciona na agenda)\b",
         title,
     )
     if verb_match:
@@ -601,7 +604,7 @@ def parse_agenda_natural_create(message: str) -> Optional[Dict[str, Any]]:
     if date_match:
         title = title.replace(date_match.group(1), "")
     title = re.sub(
-        r"(?i)\b(hoje|hoj\w*|amanha|amanhã|amanh\w*|as|às|s|para|pra|dia|de|do|da|no|na|mim|comigo|daqui|hora|horas|minuto|minutos|um|uma|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez)\b",
+        r"(?i)\b(hoje|hoj\w*|amanha|amanhã|amanh\w*|agora|as|às|s|para|pra|dia|de|do|da|no|na|mim|comigo|daqui|hora|horas|minuto|minutos|um|uma|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez)\b",
         " ",
         title,
     )

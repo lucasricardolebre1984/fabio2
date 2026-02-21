@@ -131,6 +131,9 @@ def _sanitize_fake_asset_delivery_reply(resposta: str, modo: Optional[str]) -> s
 
 def _is_handoff_whatsapp_intent(texto: str) -> bool:
     normalized = _normalize_key(texto)
+    if not normalized:
+        return False
+
     terms = (
         "avisar cliente",
         "avise cliente",
@@ -141,12 +144,49 @@ def _is_handoff_whatsapp_intent(texto: str) -> bool:
         "viviane avisar",
         "viviane lembrar",
     )
-    return any(term in normalized for term in terms)
+    if any(term in normalized for term in terms):
+        return True
+
+    has_viviane_or_whatsapp = ("viviane" in normalized) or ("whatsapp" in normalized)
+    has_reminder_semantics = any(
+        term in normalized
+        for term in (
+            "lembrete",
+            "lembrar",
+            "me lembre",
+            "me lembra",
+            "me avisa",
+            "aviso",
+            "notificar",
+            "notificacao",
+        )
+    )
+    has_query_semantics = any(
+        term in normalized
+        for term in (
+            "quais",
+            "listar",
+            "liste",
+            "mostra",
+            "mostrar",
+            "status",
+            "tem ",
+            "tenho ",
+            "existe",
+            "existem",
+            "consulta",
+            "consultar",
+            "historico",
+        )
+    )
+    return has_viviane_or_whatsapp and has_reminder_semantics and not has_query_semantics
 
 
 def _is_viviane_handoff_query_intent(texto: str) -> bool:
     normalized = _normalize_key(texto)
     if not normalized:
+        return False
+    if _is_handoff_whatsapp_intent(texto):
         return False
     if "handoff" in normalized:
         return True
@@ -165,7 +205,27 @@ def _is_viviane_handoff_query_intent(texto: str) -> bool:
         "fila",
         "tarefas",
     )
-    return has_viviane and any(term in normalized for term in handoff_terms)
+    query_terms = (
+        "quais",
+        "listar",
+        "liste",
+        "mostra",
+        "mostrar",
+        "status",
+        "tem ",
+        "tenho ",
+        "existe",
+        "existem",
+        "consulta",
+        "consultar",
+        "historico",
+        "pendentes",
+        "enviados",
+        "falhas",
+    )
+    return has_viviane and any(term in normalized for term in handoff_terms) and any(
+        term in normalized for term in query_terms
+    )
 
 
 def _handoff_status_from_text(texto: str) -> Optional[str]:
@@ -241,6 +301,31 @@ def _extract_phone_candidate(texto: str) -> Optional[str]:
     if len(digits) > 13:
         digits = digits[-13:]
     return digits
+
+
+def _extract_handoff_lead_minutes(texto: str) -> int:
+    normalized = _normalize_key(texto or "")
+    if not normalized:
+        return 0
+
+    if "meia hora antes" in normalized:
+        return 30
+
+    minute_match = re.search(r"\b(\d{1,3})\s*(min|minuto|minutos)\s+antes\b", normalized)
+    if minute_match:
+        try:
+            return max(0, int(minute_match.group(1)))
+        except ValueError:
+            return 0
+
+    hour_match = re.search(r"\b(\d{1,2})\s*(h|hora|horas)\s+antes\b", normalized)
+    if hour_match:
+        try:
+            return max(0, int(hour_match.group(1)) * 60)
+        except ValueError:
+            return 0
+
+    return 0
 
 
 def _extract_cliente_nome(texto: str) -> Optional[str]:
