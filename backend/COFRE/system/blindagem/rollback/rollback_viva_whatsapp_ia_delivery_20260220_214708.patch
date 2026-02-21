@@ -1,0 +1,334 @@
+diff --git a/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md b/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
+index e42b262..e0acb55 100644
+--- a/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
++++ b/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
+@@ -38,6 +38,7 @@ Este arquivo centraliza os artefatos institucionais de blindagem para homologaca
+ - `backend/COFRE/system/blindagem/audit/VIVIANE_WHATSAPP_NO_LOOP_HOTFIX_2026-02-20.md`
+ - `backend/COFRE/system/blindagem/audit/VIVIANE_NATURALIDADE_2026-02-20.md`
+ - `backend/COFRE/system/blindagem/audit/CONTRATOS_LOGO_LAYOUT_2026-02-20.md`
++- `backend/COFRE/system/blindagem/audit/VIVA_WHATSAPP_IA_DELIVERY_HOTFIX_2026-02-20.md`
+ 
+ ## Rollbacks
+ - `backend/COFRE/system/blindagem/rollback/rollback_gate2_cca7e3d.patch`
+@@ -48,6 +49,8 @@ Este arquivo centraliza os artefatos institucionais de blindagem para homologaca
+ - `backend/COFRE/system/blindagem/rollback/rollback_viviane_naturalidade_20260220_115739.patch`
+ - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317_pre_fix_baseline.txt`
+ - `backend/COFRE/system/blindagem/rollback/rollback_contratos_logo_layout_20260220_131317.patch`
++- `backend/COFRE/system/blindagem/rollback/rollback_viva_whatsapp_ia_delivery_20260220_214708_baseline.txt`
++- `backend/COFRE/system/blindagem/rollback/rollback_viva_whatsapp_ia_delivery_20260220_214708.patch`
+ 
+ ## Regra
+ - Novos relatorios de auditoria devem entrar em `backend/COFRE/system/blindagem/audit/`.
+diff --git a/backend/app/services/evolution_webhook_service.py b/backend/app/services/evolution_webhook_service.py
+index 62a7940..1fb61a0 100644
+--- a/backend/app/services/evolution_webhook_service.py
++++ b/backend/app/services/evolution_webhook_service.py
+@@ -87,6 +87,7 @@ class EvolutionWebhookService:
+                 else None
+             )
+             push_name = self._extrair_push_name(message_wrapper, payload_data)
++            event_sender_phone = self._extract_phone_from_event(data)
+             message_content = self._extrair_conteudo_mensagem(message_wrapper)
+ 
+             tipo_midia: Optional[str] = None
+@@ -123,6 +124,7 @@ class EvolutionWebhookService:
+                 message_wrapper=message_wrapper,
+                 payload_data=payload_data,
+                 contexto_atual=contexto_atual,
++                event_sender_phone=event_sender_phone,
+             )
+             # Tenta entregar mensagens pendentes antigas antes de responder a nova entrada.
+             await self._flush_pending_outbound_for_conversation(
+@@ -184,8 +186,14 @@ class EvolutionWebhookService:
+                 )
+ 
+             wa_service = WhatsAppService()
+-            destino_envio = remote_jid or numero
+             preferred_number = self._pick_preferred_number_from_context(contexto_atual)
++            destino_envio = remote_jid or numero
++            if (
++                isinstance(destino_envio, str)
++                and destino_envio.lower().endswith("@lid")
++                and preferred_number
++            ):
++                destino_envio = preferred_number
+             envio_result = await wa_service.send_text(
+                 numero=destino_envio,
+                 mensagem=resposta_ia,
+@@ -194,6 +202,7 @@ class EvolutionWebhookService:
+             )
+             enviado = bool(envio_result.get("sucesso"))
+             erro_envio = None if enviado else envio_result.get("erro")
++            erro_codigo = str(envio_result.get("erro_codigo") or "").strip().lower()
+             if enviado:
+                 contexto = dict(conversa.contexto_ia or {})
+                 if contexto.get("needs_manual_bind"):
+@@ -238,6 +247,21 @@ class EvolutionWebhookService:
+                 contexto["manual_bind_last_error"] = str(erro_envio or "")[:500]
+                 contexto["manual_bind_updated_at"] = datetime.utcnow().isoformat()
+                 conversa.contexto_ia = contexto
++            elif erro_codigo == "lid_unresolved":
++                await self._queue_pending_outbound(
++                    db=db,
++                    conversa=conversa,
++                    conteudo=resposta_ia,
++                    remote_jid=destino_envio,
++                    push_name=push_name,
++                    erro=erro_envio,
++                )
++                contexto = dict(conversa.contexto_ia or {})
++                contexto["needs_manual_bind"] = True
++                contexto["manual_bind_reason"] = "lid_unresolved"
++                contexto["manual_bind_last_error"] = str(erro_envio or "")[:500]
++                contexto["manual_bind_updated_at"] = datetime.utcnow().isoformat()
++                conversa.contexto_ia = contexto
+ 
+             await db.commit()
+ 
+@@ -412,6 +436,41 @@ class EvolutionWebhookService:
+                 return normalized_digits
+         return None
+ 
++    def _extract_phone_from_event(self, event_payload: Dict[str, Any]) -> Optional[str]:
++        if not isinstance(event_payload, dict):
++            return None
++        payload_data = event_payload.get("data")
++        candidates = [
++            event_payload.get("sender"),
++            event_payload.get("senderPn"),
++            event_payload.get("participant"),
++        ]
++        if isinstance(payload_data, dict):
++            candidates.extend(
++                [
++                    payload_data.get("sender"),
++                    payload_data.get("senderPn"),
++                    payload_data.get("participant"),
++                ]
++            )
++            payload_key = payload_data.get("key")
++            if isinstance(payload_key, dict):
++                candidates.extend(
++                    [
++                        payload_key.get("sender"),
++                        payload_key.get("participant"),
++                        payload_key.get("remoteJidAlt"),
++                    ]
++                )
++
++        for candidate in candidates:
++            if not isinstance(candidate, str) or "@" not in candidate:
++                continue
++            normalized = self._normalize_digits(candidate.split("@")[0])
++            if self._is_plausible_phone_digits(normalized):
++                return normalized
++        return None
++
+     def _pick_preferred_number_from_context(self, context: Dict[str, Any]) -> Optional[str]:
+         if not isinstance(context, dict):
+             return None
+@@ -455,6 +514,7 @@ class EvolutionWebhookService:
+         message_wrapper: Dict[str, Any],
+         payload_data: Dict[str, Any],
+         contexto_atual: Dict[str, Any],
++        event_sender_phone: Optional[str] = None,
+     ) -> Dict[str, Any]:
+         if not isinstance(remote_jid, str) or not remote_jid.lower().endswith("@lid"):
+             return contexto_atual
+@@ -496,6 +556,14 @@ class EvolutionWebhookService:
+                 contexto["resolved_whatsapp_number"] = from_meta
+                 contexto["resolved_whatsapp_source"] = "lid_meta"
+                 changed = True
++        if (
++            not contexto.get("resolved_whatsapp_number")
++            and event_sender_phone
++            and self._is_plausible_phone_digits(event_sender_phone)
++        ):
++            contexto["resolved_whatsapp_number"] = event_sender_phone
++            contexto["resolved_whatsapp_source"] = "event_sender"
++            changed = True
+ 
+         # Para @lid, evitar inferir telefone por lead interno/cadastro de cliente.
+         # Esse atalho pode enviar para numero antigo/incorreto e perder o lead real.
+@@ -767,6 +835,8 @@ class EvolutionWebhookService:
+                 continue
+             destino = str(item.get("remote_jid") or "").strip() or str(remote_jid or "").strip()
+             nome = str(item.get("push_name") or "").strip() or push_name
++            if isinstance(destino, str) and destino.lower().endswith("@lid") and preferred:
++                destino = preferred
+             result = await wa_service.send_text(
+                 numero=destino,
+                 mensagem=conteudo,
+diff --git a/backend/app/services/openai_service.py b/backend/app/services/openai_service.py
+index 4327c49..01285ae 100644
+--- a/backend/app/services/openai_service.py
++++ b/backend/app/services/openai_service.py
+@@ -29,6 +29,14 @@ class OpenAIService:
+         self.timeout = float(settings.OPENAI_TIMEOUT_SECONDS)
+         self._last_embedding_provider = "none"
+ 
++    def _supports_optional_chat_params(self) -> bool:
++        """Return whether current chat model accepts custom temperature/token params."""
++        model = str(self.model_chat or "").strip().lower()
++        # GPT-5 family currently requires default temperature behavior in chat/completions.
++        if model.startswith("gpt-5"):
++            return False
++        return True
++
+     def _headers(self) -> Dict[str, str]:
+         return {
+             "Authorization": f"Bearer {self.api_key}",
+@@ -179,17 +187,18 @@ class OpenAIService:
+         if not normalized:
+             return "Erro: mensagem invalida para chat OpenAI"
+ 
++        with_optional_params = self._supports_optional_chat_params()
+         content, error, status = await self._chat_completions(
+             messages=normalized,
+             temperature=temperature,
+             max_tokens=max_tokens,
+-            with_optional_params=True,
++            with_optional_params=with_optional_params,
+         )
+         if content:
+             return content
+ 
+         # Retry sem parametros opcionais (alguns modelos recusam temperature/tokens).
+-        if status in {400, 422}:
++        if with_optional_params and status in {400, 422}:
+             content, error, _ = await self._chat_completions(
+                 messages=normalized,
+                 temperature=temperature,
+@@ -231,8 +240,14 @@ class OpenAIService:
+             return
+ 
+         try:
++            stream_last_error: Optional[str] = None
++            attempt_optional_params = (
++                [True, False]
++                if self._supports_optional_chat_params()
++                else [False]
++            )
+             async with httpx.AsyncClient(timeout=self.timeout) as client:
+-                for with_optional_params in (True, False):
++                for with_optional_params in attempt_optional_params:
+                     payload: Dict[str, Any] = {
+                         "model": self.model_chat,
+                         "messages": normalized,
+@@ -250,6 +265,7 @@ class OpenAIService:
+                     ) as response:
+                         if response.status_code != 200:
+                             error_text = (await response.aread()).decode(errors="ignore")[:400]
++                            stream_last_error = error_text
+                             lower_error = error_text.lower()
+                             should_retry_without_optional = (
+                                 with_optional_params
+@@ -263,8 +279,7 @@ class OpenAIService:
+                             if should_retry_without_optional:
+                                 continue
+ 
+-                            yield f"Erro OpenAI stream ({response.status_code}): {error_text}"
+-                            return
++                            break
+ 
+                         async for line in response.aiter_lines():
+                             if not line.strip():
+@@ -290,6 +305,21 @@ class OpenAIService:
+                                 except json.JSONDecodeError:
+                                     continue
+                         return
++
++            # Fallback resiliente: usa resposta nao-streaming quando streaming falhar.
++            fallback = await self.chat(
++                messages=normalized,
++                temperature=temperature,
++                max_tokens=max_tokens,
++            )
++            fallback_clean = str(fallback or "").strip()
++            if fallback_clean and not fallback_clean.lower().startswith(("erro", "error")):
++                yield fallback_clean
++                return
++            if stream_last_error:
++                yield f"Erro OpenAI stream: {stream_last_error}"
++                return
++            yield fallback_clean or "Erro OpenAI stream: falha desconhecida"
+         except Exception as e:
+             yield f"Erro no streaming: {str(e)}"
+ 
+diff --git a/backend/app/services/viva_chat_orchestrator_service.py b/backend/app/services/viva_chat_orchestrator_service.py
+index c64e593..284e612 100644
+--- a/backend/app/services/viva_chat_orchestrator_service.py
++++ b/backend/app/services/viva_chat_orchestrator_service.py
+@@ -868,8 +868,17 @@ class VivaChatOrchestratorService:
+                 temperature=0.45,
+                 max_tokens=220,
+             ):
+-                full_response += chunk
+-                yield {"content": chunk}
++                chunk_text = str(chunk or "")
++                normalized_chunk = chunk_text.strip().lower()
++                if normalized_chunk.startswith(("erro", "error")):
++                    yield {"error": chunk_text.strip() or "Erro no streaming da VIVA"}
++                    return
++                full_response += chunk_text
++                yield {"content": chunk_text}
++
++            if not full_response.strip():
++                yield {"error": "Streaming finalizado sem resposta da IA"}
++                return
+ 
+             # Sinalizar fim do streaming
+             yield {"done": True, "session_id": str(session_id)}
+diff --git a/backend/app/services/whatsapp_service.py b/backend/app/services/whatsapp_service.py
+index bce9fc6..77d558b 100644
+--- a/backend/app/services/whatsapp_service.py
++++ b/backend/app/services/whatsapp_service.py
+@@ -361,6 +361,15 @@ class WhatsAppService:
+                 )
+                 if numero_resolvido:
+                     numero = numero_resolvido
++                elif isinstance(numero, str) and numero.lower().endswith("@lid"):
++                    return {
++                        "sucesso": False,
++                        "erro": "Destino @lid sem numero resolvido. Aguardando bind do WhatsApp real.",
++                        "erro_codigo": "lid_unresolved",
++                        "instance_name": instance,
++                        "destino": numero,
++                        "destino_original": destino_original,
++                    }
+ 
+                 payload = {
+                     "number": numero,
+@@ -408,6 +417,7 @@ class WhatsAppService:
+                 return {
+                     "sucesso": False,
+                     "erro": f"Status {response.status_code}: {response.text}",
++                    "erro_codigo": "send_text_http_error",
+                     "instance_name": instance,
+                     "destino": numero,
+                     "destino_original": destino_original,
+@@ -416,6 +426,7 @@ class WhatsAppService:
+                 return {
+                     "sucesso": False,
+                     "erro": str(e),
++                    "erro_codigo": "send_text_exception",
+                     "instance_name": self.instance_name,
+                     "destino": numero,
+                     "destino_original": destino_original,
+diff --git a/docs/STATUS.md b/docs/STATUS.md
+index 0ae1900..a2bb144 100644
+--- a/docs/STATUS.md
++++ b/docs/STATUS.md
+@@ -84,6 +84,12 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
+ - Fix de templates de contratos no deploy AWS:
+   - Causa raiz: backend em container sem acesso a `./contratos/templates`, caindo no fallback sem clausulas (`CLÁUSULAS NÃO CADASTRADAS`).
+   - Correcao: mount read-only de `./contratos` para `/app/contratos` no backend em `docker-compose.prod.yml` e `docker-compose-prod.yml`.
++- Hotfix de resiliencia da IA VIVA em producao (stream/chat OpenAI):
++  - Causa raiz: `chat_stream` devolvia erros OpenAI como conteudo normal (sem acionar fallback do frontend), e alguns modelos (`gpt-5*`) recusam `temperature` customizada.
++  - Correcao: detecao de suporte a parametros opcionais por modelo, fallback automatico stream -> chat nao-streaming no backend e sinalizacao de erro SSE quando chunk vier com erro.
++- Hotfix de entrega WhatsApp para eventos `@lid`:
++  - Causa raiz: envio podia tentar destino `@lid` sem numero real resolvido, gerando falso sucesso/pendencia sem entrega no celular.
++  - Correcao: bloqueio de envio direto para `@lid` sem resolucao (`erro_codigo=lid_unresolved`), enriquecimento do contexto com telefone de `sender` no payload do evento, priorizacao de numero resolvido no envio e flush da fila pendente.
+ 
+ ## Diretriz de deploy institucional
+ 

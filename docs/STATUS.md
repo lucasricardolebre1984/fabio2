@@ -84,6 +84,12 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
 - Fix de templates de contratos no deploy AWS:
   - Causa raiz: backend em container sem acesso a `./contratos/templates`, caindo no fallback sem clausulas (`CLÁUSULAS NÃO CADASTRADAS`).
   - Correcao: mount read-only de `./contratos` para `/app/contratos` no backend em `docker-compose.prod.yml` e `docker-compose-prod.yml`.
+- Hotfix de resiliencia da IA VIVA em producao (stream/chat OpenAI):
+  - Causa raiz: `chat_stream` devolvia erros OpenAI como conteudo normal (sem acionar fallback do frontend), e alguns modelos (`gpt-5*`) recusam `temperature` customizada.
+  - Correcao: detecao de suporte a parametros opcionais por modelo, fallback automatico stream -> chat nao-streaming no backend e sinalizacao de erro SSE quando chunk vier com erro.
+- Hotfix de entrega WhatsApp para eventos `@lid`:
+  - Causa raiz: envio podia tentar destino `@lid` sem numero real resolvido, gerando falso sucesso/pendencia sem entrega no celular.
+  - Correcao: bloqueio de envio direto para `@lid` sem resolucao (`erro_codigo=lid_unresolved`), enriquecimento do contexto com telefone de `sender` no payload do evento, priorizacao de numero resolvido no envio e flush da fila pendente.
 
 ## Diretriz de deploy institucional
 

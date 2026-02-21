@@ -1,0 +1,8 @@
+Rollback baseline criado em 2026-02-20 21:47:08
+Commit baseline: 0af66e8
+Escopo alvo:
+- backend/app/services/openai_service.py
+- backend/app/services/viva_chat_orchestrator_service.py
+- backend/app/services/whatsapp_service.py
+- backend/app/services/evolution_webhook_service.py
+- docs/STATUS.md

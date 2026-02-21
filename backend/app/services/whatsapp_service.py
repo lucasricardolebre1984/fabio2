@@ -361,6 +361,15 @@ class WhatsAppService:
                 )
                 if numero_resolvido:
                     numero = numero_resolvido
+                elif isinstance(numero, str) and numero.lower().endswith("@lid"):
+                    return {
+                        "sucesso": False,
+                        "erro": "Destino @lid sem numero resolvido. Aguardando bind do WhatsApp real.",
+                        "erro_codigo": "lid_unresolved",
+                        "instance_name": instance,
+                        "destino": numero,
+                        "destino_original": destino_original,
+                    }
 
                 payload = {
                     "number": numero,
@@ -408,6 +417,7 @@ class WhatsAppService:
                 return {
                     "sucesso": False,
                     "erro": f"Status {response.status_code}: {response.text}",
+                    "erro_codigo": "send_text_http_error",
                     "instance_name": instance,
                     "destino": numero,
                     "destino_original": destino_original,
@@ -416,6 +426,7 @@ class WhatsAppService:
                 return {
                     "sucesso": False,
                     "erro": str(e),
+                    "erro_codigo": "send_text_exception",
                     "instance_name": self.instance_name,
                     "destino": numero,
                     "destino_original": destino_original,

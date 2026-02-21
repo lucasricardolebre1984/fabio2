@@ -868,8 +868,17 @@ class VivaChatOrchestratorService:
                 temperature=0.45,
                 max_tokens=220,
             ):
-                full_response += chunk
-                yield {"content": chunk}
+                chunk_text = str(chunk or "")
+                normalized_chunk = chunk_text.strip().lower()
+                if normalized_chunk.startswith(("erro", "error")):
+                    yield {"error": chunk_text.strip() or "Erro no streaming da VIVA"}
+                    return
+                full_response += chunk_text
+                yield {"content": chunk_text}
+
+            if not full_response.strip():
+                yield {"error": "Streaming finalizado sem resposta da IA"}
+                return
 
             # Sinalizar fim do streaming
             yield {"done": True, "session_id": str(session_id)}

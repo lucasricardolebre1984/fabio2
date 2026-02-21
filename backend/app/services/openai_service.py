@@ -29,6 +29,14 @@ class OpenAIService:
         self.timeout = float(settings.OPENAI_TIMEOUT_SECONDS)
         self._last_embedding_provider = "none"
 
+    def _supports_optional_chat_params(self) -> bool:
+        """Return whether current chat model accepts custom temperature/token params."""
+        model = str(self.model_chat or "").strip().lower()
+        # GPT-5 family currently requires default temperature behavior in chat/completions.
+        if model.startswith("gpt-5"):
+            return False
+        return True
+
     def _headers(self) -> Dict[str, str]:
         return {
             "Authorization": f"Bearer {self.api_key}",
@@ -179,17 +187,18 @@ class OpenAIService:
         if not normalized:
             return "Erro: mensagem invalida para chat OpenAI"
 
+        with_optional_params = self._supports_optional_chat_params()
         content, error, status = await self._chat_completions(
             messages=normalized,
             temperature=temperature,
             max_tokens=max_tokens,
-            with_optional_params=True,
+            with_optional_params=with_optional_params,
         )
         if content:
             return content
 
         # Retry sem parametros opcionais (alguns modelos recusam temperature/tokens).
-        if status in {400, 422}:
+        if with_optional_params and status in {400, 422}:
             content, error, _ = await self._chat_completions(
                 messages=normalized,
                 temperature=temperature,
@@ -231,8 +240,14 @@ class OpenAIService:
             return
 
         try:
+            stream_last_error: Optional[str] = None
+            attempt_optional_params = (
+                [True, False]
+                if self._supports_optional_chat_params()
+                else [False]
+            )
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                for with_optional_params in (True, False):
+                for with_optional_params in attempt_optional_params:
                     payload: Dict[str, Any] = {
                         "model": self.model_chat,
                         "messages": normalized,
@@ -250,6 +265,7 @@ class OpenAIService:
                     ) as response:
                         if response.status_code != 200:
                             error_text = (await response.aread()).decode(errors="ignore")[:400]
+                            stream_last_error = error_text
                             lower_error = error_text.lower()
                             should_retry_without_optional = (
                                 with_optional_params
@@ -263,8 +279,7 @@ class OpenAIService:
                             if should_retry_without_optional:
                                 continue
 
-                            yield f"Erro OpenAI stream ({response.status_code}): {error_text}"
-                            return
+                            break
 
                         async for line in response.aiter_lines():
                             if not line.strip():
@@ -290,6 +305,21 @@ class OpenAIService:
                                 except json.JSONDecodeError:
                                     continue
                         return
+
+            # Fallback resiliente: usa resposta nao-streaming quando streaming falhar.
+            fallback = await self.chat(
+                messages=normalized,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            fallback_clean = str(fallback or "").strip()
+            if fallback_clean and not fallback_clean.lower().startswith(("erro", "error")):
+                yield fallback_clean
+                return
+            if stream_last_error:
+                yield f"Erro OpenAI stream: {stream_last_error}"
+                return
+            yield fallback_clean or "Erro OpenAI stream: falha desconhecida"
         except Exception as e:
             yield f"Erro no streaming: {str(e)}"
 

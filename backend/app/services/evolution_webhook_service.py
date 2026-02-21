@@ -87,6 +87,7 @@ class EvolutionWebhookService:
                 else None
             )
             push_name = self._extrair_push_name(message_wrapper, payload_data)
+            event_sender_phone = self._extract_phone_from_event(data)
             message_content = self._extrair_conteudo_mensagem(message_wrapper)
 
             tipo_midia: Optional[str] = None
@@ -123,6 +124,7 @@ class EvolutionWebhookService:
                 message_wrapper=message_wrapper,
                 payload_data=payload_data,
                 contexto_atual=contexto_atual,
+                event_sender_phone=event_sender_phone,
             )
             # Tenta entregar mensagens pendentes antigas antes de responder a nova entrada.
             await self._flush_pending_outbound_for_conversation(
@@ -184,8 +186,14 @@ class EvolutionWebhookService:
                 )
 
             wa_service = WhatsAppService()
-            destino_envio = remote_jid or numero
             preferred_number = self._pick_preferred_number_from_context(contexto_atual)
+            destino_envio = remote_jid or numero
+            if (
+                isinstance(destino_envio, str)
+                and destino_envio.lower().endswith("@lid")
+                and preferred_number
+            ):
+                destino_envio = preferred_number
             envio_result = await wa_service.send_text(
                 numero=destino_envio,
                 mensagem=resposta_ia,
@@ -194,6 +202,7 @@ class EvolutionWebhookService:
             )
             enviado = bool(envio_result.get("sucesso"))
             erro_envio = None if enviado else envio_result.get("erro")
+            erro_codigo = str(envio_result.get("erro_codigo") or "").strip().lower()
             if enviado:
                 contexto = dict(conversa.contexto_ia or {})
                 if contexto.get("needs_manual_bind"):
@@ -235,6 +244,21 @@ class EvolutionWebhookService:
                 contexto = dict(conversa.contexto_ia or {})
                 contexto["needs_manual_bind"] = True
                 contexto["manual_bind_reason"] = "exists_false_lid"
+                contexto["manual_bind_last_error"] = str(erro_envio or "")[:500]
+                contexto["manual_bind_updated_at"] = datetime.utcnow().isoformat()
+                conversa.contexto_ia = contexto
+            elif erro_codigo == "lid_unresolved":
+                await self._queue_pending_outbound(
+                    db=db,
+                    conversa=conversa,
+                    conteudo=resposta_ia,
+                    remote_jid=destino_envio,
+                    push_name=push_name,
+                    erro=erro_envio,
+                )
+                contexto = dict(conversa.contexto_ia or {})
+                contexto["needs_manual_bind"] = True
+                contexto["manual_bind_reason"] = "lid_unresolved"
                 contexto["manual_bind_last_error"] = str(erro_envio or "")[:500]
                 contexto["manual_bind_updated_at"] = datetime.utcnow().isoformat()
                 conversa.contexto_ia = contexto
@@ -412,6 +436,41 @@ class EvolutionWebhookService:
                 return normalized_digits
         return None
 
+    def _extract_phone_from_event(self, event_payload: Dict[str, Any]) -> Optional[str]:
+        if not isinstance(event_payload, dict):
+            return None
+        payload_data = event_payload.get("data")
+        candidates = [
+            event_payload.get("sender"),
+            event_payload.get("senderPn"),
+            event_payload.get("participant"),
+        ]
+        if isinstance(payload_data, dict):
+            candidates.extend(
+                [
+                    payload_data.get("sender"),
+                    payload_data.get("senderPn"),
+                    payload_data.get("participant"),
+                ]
+            )
+            payload_key = payload_data.get("key")
+            if isinstance(payload_key, dict):
+                candidates.extend(
+                    [
+                        payload_key.get("sender"),
+                        payload_key.get("participant"),
+                        payload_key.get("remoteJidAlt"),
+                    ]
+                )
+
+        for candidate in candidates:
+            if not isinstance(candidate, str) or "@" not in candidate:
+                continue
+            normalized = self._normalize_digits(candidate.split("@")[0])
+            if self._is_plausible_phone_digits(normalized):
+                return normalized
+        return None
+
     def _pick_preferred_number_from_context(self, context: Dict[str, Any]) -> Optional[str]:
         if not isinstance(context, dict):
             return None
@@ -455,6 +514,7 @@ class EvolutionWebhookService:
         message_wrapper: Dict[str, Any],
         payload_data: Dict[str, Any],
         contexto_atual: Dict[str, Any],
+        event_sender_phone: Optional[str] = None,
     ) -> Dict[str, Any]:
         if not isinstance(remote_jid, str) or not remote_jid.lower().endswith("@lid"):
             return contexto_atual
@@ -496,6 +556,14 @@ class EvolutionWebhookService:
                 contexto["resolved_whatsapp_number"] = from_meta
                 contexto["resolved_whatsapp_source"] = "lid_meta"
                 changed = True
+        if (
+            not contexto.get("resolved_whatsapp_number")
+            and event_sender_phone
+            and self._is_plausible_phone_digits(event_sender_phone)
+        ):
+            contexto["resolved_whatsapp_number"] = event_sender_phone
+            contexto["resolved_whatsapp_source"] = "event_sender"
+            changed = True
 
         # Para @lid, evitar inferir telefone por lead interno/cadastro de cliente.
         # Esse atalho pode enviar para numero antigo/incorreto e perder o lead real.
@@ -767,6 +835,8 @@ class EvolutionWebhookService:
                 continue
             destino = str(item.get("remote_jid") or "").strip() or str(remote_jid or "").strip()
             nome = str(item.get("push_name") or "").strip() or push_name
+            if isinstance(destino, str) and destino.lower().endswith("@lid") and preferred:
+                destino = preferred
             result = await wa_service.send_text(
                 numero=destino,
                 mensagem=conteudo,
