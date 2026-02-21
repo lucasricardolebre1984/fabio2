@@ -1,6 +1,6 @@
 # BLINDAGEM - Indice Canonico (COFRE)
 
-Atualizado em: 2026-02-20
+Atualizado em: 2026-02-21
 
 Este arquivo centraliza os artefatos institucionais de blindagem para homologacao.
 
@@ -40,6 +40,7 @@ Este arquivo centraliza os artefatos institucionais de blindagem para homologaca
 - `backend/COFRE/system/blindagem/audit/CONTRATOS_LOGO_LAYOUT_2026-02-20.md`
 - `backend/COFRE/system/blindagem/audit/VIVA_WHATSAPP_IA_DELIVERY_HOTFIX_2026-02-20.md`
 - `backend/COFRE/system/blindagem/audit/WHATSAPP_WEBHOOK_DB_POOL_GUARD_2026-02-21.md`
+- `backend/COFRE/system/blindagem/audit/VIVA_STREAM_PERSISTENCE_WEBHOOK_CATCHALL_2026-02-21.md`
 
 ## Rollbacks
 - `backend/COFRE/system/blindagem/rollback/rollback_gate2_cca7e3d.patch`
@@ -54,6 +55,8 @@ Este arquivo centraliza os artefatos institucionais de blindagem para homologaca
 - `backend/COFRE/system/blindagem/rollback/rollback_viva_whatsapp_ia_delivery_20260220_214708.patch`
 - `backend/COFRE/system/blindagem/rollback/rollback_whatsapp_webhook_pool_guard_20260221_014900_baseline.txt`
 - `backend/COFRE/system/blindagem/rollback/rollback_whatsapp_webhook_pool_guard_20260221_014900.patch`
+- `backend/COFRE/system/blindagem/rollback/rollback_viva_stream_persist_commit_webhook_catchall_20260221_001222_baseline.txt`
+- `backend/COFRE/system/blindagem/rollback/rollback_viva_stream_persist_commit_webhook_catchall_20260221_001222.patch`
 
 ## Regra
 - Novos relatorios de auditoria devem entrar em `backend/COFRE/system/blindagem/audit/`.

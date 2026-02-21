@@ -4,6 +4,7 @@ Extrai a orquestracao pesada do endpoint /chat para reduzir acoplamento em rota.
 """
 
 import logging
+import asyncio
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
@@ -204,6 +205,11 @@ class VivaChatOrchestratorService:
                         modo=modo,
                         meta={"source": "viva_chat_finalize", **final_meta},
                     )
+                try:
+                    await db.commit()
+                except Exception:
+                    await db.rollback()
+                    raise
                 return ChatResponse(resposta=resposta, midia=midia, session_id=session_id)
 
             await append_chat_message(
@@ -765,7 +771,8 @@ class VivaChatOrchestratorService:
                 await _release_db_before_remote_call(db)
                 resposta = await viva_model_service.chat(
                     messages=messages,
-                    temperature=0.45,
+                    # Alguns modelos aceitam somente comportamento padrao (temperature=1).
+                    temperature=1.0,
                     max_tokens=220,
                 )
                 if not resposta or resposta.strip().lower().startswith(("erro", "error")):
@@ -863,25 +870,52 @@ class VivaChatOrchestratorService:
             # Stream da resposta
             full_response = ""
             await _release_db_before_remote_call(db)
-            async for chunk in openai_service.chat_stream(
-                messages=messages,
-                temperature=0.45,
-                max_tokens=220,
-            ):
-                chunk_text = str(chunk or "")
-                normalized_chunk = chunk_text.strip().lower()
-                if normalized_chunk.startswith(("erro", "error")):
-                    yield {"error": chunk_text.strip() or "Erro no streaming da VIVA"}
-                    return
-                full_response += chunk_text
-                yield {"content": chunk_text}
+            try:
+                async for chunk in openai_service.chat_stream(
+                    messages=messages,
+                    # Alguns modelos aceitam somente comportamento padrao (temperature=1).
+                    temperature=1.0,
+                    max_tokens=220,
+                ):
+                    chunk_text = str(chunk or "")
+                    normalized_chunk = chunk_text.strip().lower()
+                    if normalized_chunk.startswith(("erro", "error")):
+                        yield {"error": chunk_text.strip() or "Erro no streaming da VIVA"}
+                        return
+                    full_response += chunk_text
+                    yield {"content": chunk_text}
+            except asyncio.CancelledError:
+                # Best-effort: se o cliente desconectar no meio, tenta persistir o que ja foi gerado.
+                if full_response.strip():
+                    try:
+                        await append_chat_message(
+                            db=db,
+                            session_id=session_id,
+                            user_id=current_user.id,
+                            tipo="ia",
+                            conteudo=full_response,
+                            modo=modo,
+                            anexos=None,
+                            meta={"stream": True, "cancelled": True},
+                        )
+                        if bool(getattr(settings, "VIVA_MEMORY_ENABLED", False)):
+                            await viva_memory_service.append_memory(
+                                db=db,
+                                user_id=current_user.id,
+                                session_id=session_id,
+                                tipo="ia",
+                                conteudo=full_response,
+                                modo=modo,
+                                meta={"source": "viva_chat_stream_cancelled"},
+                            )
+                        await db.commit()
+                    except Exception:
+                        await db.rollback()
+                raise
 
             if not full_response.strip():
                 yield {"error": "Streaming finalizado sem resposta da IA"}
                 return
-
-            # Sinalizar fim do streaming
-            yield {"done": True, "session_id": str(session_id)}
 
             # Persistir resposta completa
             await append_chat_message(
@@ -905,6 +939,15 @@ class VivaChatOrchestratorService:
                     modo=modo,
                     meta={"source": "viva_chat_stream_finalize"},
                 )
+
+            try:
+                await db.commit()
+            except Exception:
+                await db.rollback()
+                raise
+
+            # Sinalizar fim do streaming (apos persistencia)
+            yield {"done": True, "session_id": str(session_id)}
 
         except Exception as e:
             logger.error(f"Erro no streaming VIVA: {str(e)}")

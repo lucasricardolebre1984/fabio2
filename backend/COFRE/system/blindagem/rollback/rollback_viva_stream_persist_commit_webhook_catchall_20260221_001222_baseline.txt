@@ -1,0 +1,8 @@
+Rollback baseline criado em 2026-02-21 00:12:22
+Commit baseline: f222df4
+Escopo alvo:
+- backend/app/services/viva_chat_orchestrator_service.py
+- backend/app/api/v1/webhook.py
+- backend/COFRE/system/blindagem/audit/VIVA_STREAM_PERSISTENCE_WEBHOOK_CATCHALL_2026-02-21.md
+- backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
+- docs/STATUS.md

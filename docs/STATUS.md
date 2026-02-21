@@ -81,6 +81,9 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
 - Fix de stream OpenAI para modelos com parametros restritos:
   - Causa raiz: `chat_stream` enviava `temperature` customizada para modelos que aceitam apenas valor padrao.
   - Correcao: fallback automatico no stream para reenviar sem `temperature/max_completion_tokens` ao receber `400/422 unsupported_value`.
+- Fix de persistencia do chat VIVA (stream + non-stream):
+  - Causa raiz: mensagens `ia` eram inseridas no banco, mas nao eram commitadas (e no streaming o `done` era emitido antes de persistir).
+  - Correcao: commit explicito apos `append_chat_message`/memoria e `done` somente apos persistencia.
 - Fix de templates de contratos no deploy AWS:
   - Causa raiz: backend em container sem acesso a `./contratos/templates`, caindo no fallback sem clausulas (`CLÁUSULAS NÃO CADASTRADAS`).
   - Correcao: mount read-only de `./contratos` para `/app/contratos` no backend em `docker-compose.prod.yml` e `docker-compose-prod.yml`.

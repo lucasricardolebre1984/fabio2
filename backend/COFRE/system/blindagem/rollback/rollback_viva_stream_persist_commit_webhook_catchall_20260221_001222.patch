@@ -1,0 +1,189 @@
+diff --git a/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md b/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
+index b4f832c..e815adb 100644
+--- a/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
++++ b/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
+@@ -1,6 +1,6 @@
+ # BLINDAGEM - Indice Canonico (COFRE)
+ 
+-Atualizado em: 2026-02-20
++Atualizado em: 2026-02-21
+ 
+ Este arquivo centraliza os artefatos institucionais de blindagem para homologacao.
+ 
+@@ -40,6 +40,7 @@ Este arquivo centraliza os artefatos institucionais de blindagem para homologaca
+ - `backend/COFRE/system/blindagem/audit/CONTRATOS_LOGO_LAYOUT_2026-02-20.md`
+ - `backend/COFRE/system/blindagem/audit/VIVA_WHATSAPP_IA_DELIVERY_HOTFIX_2026-02-20.md`
+ - `backend/COFRE/system/blindagem/audit/WHATSAPP_WEBHOOK_DB_POOL_GUARD_2026-02-21.md`
++- `backend/COFRE/system/blindagem/audit/VIVA_STREAM_PERSISTENCE_WEBHOOK_CATCHALL_2026-02-21.md`
+ 
+ ## Rollbacks
+ - `backend/COFRE/system/blindagem/rollback/rollback_gate2_cca7e3d.patch`
+diff --git a/backend/app/api/v1/webhook.py b/backend/app/api/v1/webhook.py
+index 43899d3..94d947c 100644
+--- a/backend/app/api/v1/webhook.py
++++ b/backend/app/api/v1/webhook.py
+@@ -31,6 +31,31 @@ async def evolution_webhook(
+         raise HTTPException(status_code=400, detail=str(e))
+ 
+ 
++@router.post("/evolution/{path:path}")
++async def evolution_webhook_catchall(
++    path: str,
++    request: Request,
++    db: AsyncSession = Depends(get_db),
++):
++    """Compatibilidade: Evolution pode enviar webhooks por evento em paths diferentes.
++
++    Exemplos vistos em producao:
++    - /api/v1/webhook/evolution/messages-upsert
++    - /api/v1/webhook/evolution/connection-update
++    - /api/v1/webhook/evolution/chats-upsert
++    """
++    try:
++        data = await request.json()
++        if isinstance(data, dict) and not data.get("event"):
++            event_hint = str((path or "").strip("/").split("/")[-1] or "").strip()
++            if event_hint:
++                data["event"] = event_hint.replace("-", ".").replace("_", ".")
++        processado = await webhook_service.processar_webhook(data, db)
++        return {"status": "received", "processed": processado}
++    except Exception as e:
++        raise HTTPException(status_code=400, detail=str(e))
++
++
+ @router.get("/evolution")
+ async def evolution_webhook_verify():
+     """Health simples do webhook para testes."""
+diff --git a/backend/app/services/viva_chat_orchestrator_service.py b/backend/app/services/viva_chat_orchestrator_service.py
+index 284e612..7f7e675 100644
+--- a/backend/app/services/viva_chat_orchestrator_service.py
++++ b/backend/app/services/viva_chat_orchestrator_service.py
+@@ -4,6 +4,7 @@ Extrai a orquestracao pesada do endpoint /chat para reduzir acoplamento em rota.
+ """
+ 
+ import logging
++import asyncio
+ from typing import Any, Dict, List, Optional
+ from uuid import UUID, uuid4
+ from datetime import datetime, timezone
+@@ -204,6 +205,11 @@ class VivaChatOrchestratorService:
+                         modo=modo,
+                         meta={"source": "viva_chat_finalize", **final_meta},
+                     )
++                try:
++                    await db.commit()
++                except Exception:
++                    await db.rollback()
++                    raise
+                 return ChatResponse(resposta=resposta, midia=midia, session_id=session_id)
+ 
+             await append_chat_message(
+@@ -765,7 +771,8 @@ class VivaChatOrchestratorService:
+                 await _release_db_before_remote_call(db)
+                 resposta = await viva_model_service.chat(
+                     messages=messages,
+-                    temperature=0.45,
++                    # Alguns modelos aceitam somente comportamento padrao (temperature=1).
++                    temperature=1.0,
+                     max_tokens=220,
+                 )
+                 if not resposta or resposta.strip().lower().startswith(("erro", "error")):
+@@ -863,26 +870,53 @@ class VivaChatOrchestratorService:
+             # Stream da resposta
+             full_response = ""
+             await _release_db_before_remote_call(db)
+-            async for chunk in openai_service.chat_stream(
+-                messages=messages,
+-                temperature=0.45,
+-                max_tokens=220,
+-            ):
+-                chunk_text = str(chunk or "")
+-                normalized_chunk = chunk_text.strip().lower()
+-                if normalized_chunk.startswith(("erro", "error")):
+-                    yield {"error": chunk_text.strip() or "Erro no streaming da VIVA"}
+-                    return
+-                full_response += chunk_text
+-                yield {"content": chunk_text}
++            try:
++                async for chunk in openai_service.chat_stream(
++                    messages=messages,
++                    # Alguns modelos aceitam somente comportamento padrao (temperature=1).
++                    temperature=1.0,
++                    max_tokens=220,
++                ):
++                    chunk_text = str(chunk or "")
++                    normalized_chunk = chunk_text.strip().lower()
++                    if normalized_chunk.startswith(("erro", "error")):
++                        yield {"error": chunk_text.strip() or "Erro no streaming da VIVA"}
++                        return
++                    full_response += chunk_text
++                    yield {"content": chunk_text}
++            except asyncio.CancelledError:
++                # Best-effort: se o cliente desconectar no meio, tenta persistir o que ja foi gerado.
++                if full_response.strip():
++                    try:
++                        await append_chat_message(
++                            db=db,
++                            session_id=session_id,
++                            user_id=current_user.id,
++                            tipo="ia",
++                            conteudo=full_response,
++                            modo=modo,
++                            anexos=None,
++                            meta={"stream": True, "cancelled": True},
++                        )
++                        if bool(getattr(settings, "VIVA_MEMORY_ENABLED", False)):
++                            await viva_memory_service.append_memory(
++                                db=db,
++                                user_id=current_user.id,
++                                session_id=session_id,
++                                tipo="ia",
++                                conteudo=full_response,
++                                modo=modo,
++                                meta={"source": "viva_chat_stream_cancelled"},
++                            )
++                        await db.commit()
++                    except Exception:
++                        await db.rollback()
++                raise
+ 
+             if not full_response.strip():
+                 yield {"error": "Streaming finalizado sem resposta da IA"}
+                 return
+ 
+-            # Sinalizar fim do streaming
+-            yield {"done": True, "session_id": str(session_id)}
+-
+             # Persistir resposta completa
+             await append_chat_message(
+                 db=db,
+@@ -906,6 +940,15 @@ class VivaChatOrchestratorService:
+                     meta={"source": "viva_chat_stream_finalize"},
+                 )
+ 
++            try:
++                await db.commit()
++            except Exception:
++                await db.rollback()
++                raise
++
++            # Sinalizar fim do streaming (apos persistencia)
++            yield {"done": True, "session_id": str(session_id)}
++
+         except Exception as e:
+             logger.error(f"Erro no streaming VIVA: {str(e)}")
+             yield {"error": f"Erro: {str(e)}"}
+diff --git a/docs/STATUS.md b/docs/STATUS.md
+index 36f5a98..c44e897 100644
+--- a/docs/STATUS.md
++++ b/docs/STATUS.md
+@@ -81,6 +81,9 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
+ - Fix de stream OpenAI para modelos com parametros restritos:
+   - Causa raiz: `chat_stream` enviava `temperature` customizada para modelos que aceitam apenas valor padrao.
+   - Correcao: fallback automatico no stream para reenviar sem `temperature/max_completion_tokens` ao receber `400/422 unsupported_value`.
++- Fix de persistencia do chat VIVA (stream + non-stream):
++  - Causa raiz: mensagens `ia` eram inseridas no banco, mas nao eram commitadas (e no streaming o `done` era emitido antes de persistir).
++  - Correcao: commit explicito apos `append_chat_message`/memoria e `done` somente apos persistencia.
+ - Fix de templates de contratos no deploy AWS:
+   - Causa raiz: backend em container sem acesso a `./contratos/templates`, caindo no fallback sem clausulas (`CL?USULAS N?O CADASTRADAS`).
+   - Correcao: mount read-only de `./contratos` para `/app/contratos` no backend em `docker-compose.prod.yml` e `docker-compose-prod.yml`.
