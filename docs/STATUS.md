@@ -95,6 +95,7 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
   - Causa raiz 2: `ensure_chat_tables()` executava DDL por request, gerando lock em relacao e saturacao da pool (`QueuePool timeout`) no `/api/v1/viva/chat/stream`.
   - Correcao:
     - auto-healing de webhook em `whatsapp_service` (`/webhook/find` -> `/webhook/set`) com fallback institucional `http://backend:8000/api/v1/webhook/evolution`.
+    - padronizacao `byEvents=false` para evitar rotas inexistentes (`/webhook/evolution/<evento>`) e garantir ingestao no endpoint unico implementado.
     - guarda de inicializacao em `ensure_chat_tables()` com lock assíncrono e flag de execucao unica por processo.
   - Evidencia: `backend/COFRE/system/blindagem/audit/WHATSAPP_WEBHOOK_DB_POOL_GUARD_2026-02-21.md`.
 

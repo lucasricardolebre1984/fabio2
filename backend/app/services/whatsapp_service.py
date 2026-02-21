@@ -215,7 +215,7 @@ class WhatsAppService:
                 current_by_events = bool(
                     webhook_payload.get("webhookByEvents", webhook_payload.get("byEvents", False))
                 )
-                if current_enabled and current_by_events and current_url == desired_url:
+                if current_enabled and (not current_by_events) and current_url == desired_url:
                     return {"configured": True, "updated": False, "url": current_url}
 
             payload = {
@@ -224,7 +224,7 @@ class WhatsAppService:
                     "url": desired_url,
                     "events": DEFAULT_WEBHOOK_EVENTS,
                     "base64": False,
-                    "byEvents": True,
+                    "byEvents": False,
                 }
             }
             set_response = await self._request(

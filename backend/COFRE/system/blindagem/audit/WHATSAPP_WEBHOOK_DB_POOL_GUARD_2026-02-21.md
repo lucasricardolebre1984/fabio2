@@ -38,6 +38,10 @@
     - valida webhook atual (`/webhook/find/{instance}`);
     - aplica webhook (`/webhook/set/{instance}`) se ausente/incorreto.
   - `get_status()` e `connect()` agora garantem webhook automaticamente quando a instancia estiver `open`.
+  - Ajuste complementar de entrega:
+    - `byEvents=false` no webhook canonico.
+    - Motivo: com `byEvents=true`, a Evolution envia para sufixos como `/webhook/evolution/chats-upsert`, que nao existem no backend atual e retornam `404`.
+    - Com `byEvents=false`, todos os eventos chegam em `/api/v1/webhook/evolution` (contrato implementado).
 
 ## Validacao operacional executada
 
@@ -58,4 +62,3 @@
 
 - `backend/app/services/viva_chat_session_service.py`
 - `backend/app/services/whatsapp_service.py`
-
