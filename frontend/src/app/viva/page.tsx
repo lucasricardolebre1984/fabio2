@@ -292,6 +292,7 @@ export default function VivaChatPage() {
   const [vozVivaAtiva, setVozVivaAtiva] = useState(true)
   const [ttsProviderConfigured, setTtsProviderConfigured] = useState(false)
   const [ttsMissingEnv, setTtsMissingEnv] = useState<string[]>([])
+  const [ttsProviderName, setTtsProviderName] = useState('openai')
   const [escutaContinuaAtiva, setEscutaContinuaAtiva] = useState(false)
   const [transcricaoParcial, setTranscricaoParcial] = useState('')
   const [avatarFallback, setAvatarFallback] = useState(false)
@@ -795,16 +796,20 @@ export default function VivaChatPage() {
     const loadTtsStatus = async () => {
       try {
         const response = await api.get('/viva/status')
-        const configured = Boolean(response?.data?.tts?.configured)
-        const missing = Array.isArray(response?.data?.tts?.missing_env) ? response.data.tts.missing_env : []
+        const ttsData = response?.data?.tts || {}
+        const configured = Boolean(ttsData.configured)
+        const missing = Array.isArray(ttsData.missing_env) ? ttsData.missing_env : []
+        const provider = String(ttsData.provider || 'openai').toLowerCase()
         if (mounted) {
           setTtsProviderConfigured(configured)
           setTtsMissingEnv(missing)
+          setTtsProviderName(provider)
         }
       } catch {
         if (mounted) {
           setTtsProviderConfigured(false)
           setTtsMissingEnv([])
+          setTtsProviderName('openai')
         }
       }
     }
@@ -922,16 +927,17 @@ export default function VivaChatPage() {
     const speakWithMinimax = async (): Promise<boolean> => {
       const maxRetries = 2
       const timeoutMs = 30_000
+      const currentProviderLabel = ttsProviderName === 'minimax' ? 'MiniMax TTS' : 'OpenAI TTS'
 
       const describeFailure = (err: any) => {
         const status = err?.response?.status
         const detail = String(err?.response?.data?.detail || '').trim()
         if (status === 401) return 'Nao autenticado. Recarregue a pagina e faca login novamente.'
         if (status === 403) return 'Sem permissao para usar a voz institucional.'
-        if (status === 502) return detail || 'Falha no provedor MiniMax TTS.'
+        if (status === 502) return detail || 'Falha no provedor de voz.'
         if (status) return `Falha no TTS (HTTP ${status}).`
-        if (String(err?.code || '') === 'ECONNABORTED') return 'Timeout ao chamar MiniMax TTS.'
-        return 'Falha de rede ao chamar MiniMax TTS.'
+        if (String(err?.code || '') === 'ECONNABORTED') return 'Timeout ao chamar provedor de voz.'
+        return 'Falha de rede ao chamar provedor de voz.'
       }
 
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -976,7 +982,7 @@ export default function VivaChatPage() {
             continue
           }
           if (ttsProviderConfigured) {
-            setErroAudio(`MiniMax indisponivel: ${describeFailure(err)}`)
+            setErroAudio(`${currentProviderLabel} indisponivel: ${describeFailure(err)}`)
           }
           return false
         }
@@ -1003,13 +1009,14 @@ export default function VivaChatPage() {
       cancelled = true
       stopAssistantPlayback()
     }
-  }, [mensagens, modoConversacaoAtivo, vozVivaAtiva, startContinuousConversation, stopContinuousConversation, stopAssistantPlayback, ttsProviderConfigured])
+  }, [mensagens, modoConversacaoAtivo, vozVivaAtiva, startContinuousConversation, stopContinuousConversation, stopAssistantPlayback, ttsProviderConfigured, ttsProviderName])
 
   const handleSendStream = useCallback(async (
     mensagemComReferencia: string,
     contexto: any[],
     sessionIdAtual: string | null
   ) => {
+    let assistantMsgId: string | null = null
     try {
       const response = await fetch('/api/v1/viva/chat/stream', {
         method: 'POST',
@@ -1036,9 +1043,10 @@ export default function VivaChatPage() {
       const decoder = new TextDecoder()
 
       // Criar mensagem do assistente que será atualizada
-      const assistantMsgId = (Date.now() + 1).toString()
+      const streamMsgId = (Date.now() + 1).toString()
+      assistantMsgId = streamMsgId
       setMensagens(prev => [...prev, {
-        id: assistantMsgId,
+        id: streamMsgId,
         tipo: 'ia',
         conteudo: '',
         timestamp: new Date(),
@@ -1047,6 +1055,8 @@ export default function VivaChatPage() {
 
       let fullResponse = ''
       let buffer = ''
+      let streamFinished = false
+      let streamError: string | null = null
 
       while (true) {
         const { done, value } = await reader.read()
@@ -1059,43 +1069,74 @@ export default function VivaChatPage() {
         for (const line of lines) {
           if (!line.trim() || !line.startsWith('data: ')) continue
 
+          const rawPayload = line.slice(6)
+          let data: any
           try {
-            const data = JSON.parse(line.slice(6))
-
-            if (data.error) {
-              throw new Error(data.error)
-            }
-
-            if (data.content) {
-              fullResponse += data.content
-              setMensagens(prev => prev.map(msg =>
-                msg.id === assistantMsgId
-                  ? { ...msg, conteudo: fullResponse }
-                  : msg
-              ))
-            }
-
-            if (data.done) {
-              setMensagens(prev => prev.map(msg =>
-                msg.id === assistantMsgId
-                  ? { ...msg, streaming: false }
-                  : msg
-              ))
-              if (data.session_id) {
-                setSessionId(data.session_id)
-                void loadSessions(data.session_id)
-              }
-              return true
-            }
+            data = JSON.parse(rawPayload)
           } catch (e) {
             console.error('Error parsing SSE:', e)
+            continue
+          }
+
+          if (data?.error) {
+            streamError = String(data.error || 'Erro no streaming')
+            break
+          }
+
+          if (typeof data?.content === 'string' && data.content.length > 0) {
+            fullResponse += data.content
+            setMensagens(prev => prev.map(msg =>
+              msg.id === streamMsgId
+                ? { ...msg, conteudo: fullResponse }
+                : msg
+            ))
+          }
+
+          if (data?.done) {
+            streamFinished = true
+            setMensagens(prev => prev.map(msg =>
+              msg.id === streamMsgId
+                ? { ...msg, streaming: false, conteudo: fullResponse }
+                : msg
+            ))
+            if (data.session_id) {
+              setSessionId(data.session_id)
+              void loadSessions(data.session_id)
+            }
+            break
           }
         }
+
+        if (streamFinished || streamError) {
+          break
+        }
+      }
+
+      if (streamError) {
+        setMensagens(prev => prev.filter(msg => msg.id !== streamMsgId))
+        return false
+      }
+
+      if (!streamFinished) {
+        if (fullResponse.trim()) {
+          setMensagens(prev => prev.map(msg =>
+            msg.id === streamMsgId
+              ? { ...msg, streaming: false, conteudo: fullResponse }
+              : msg
+          ))
+          return true
+        }
+
+        setMensagens(prev => prev.filter(msg => msg.id !== streamMsgId))
+        return false
       }
 
       return true
     } catch (error) {
       console.error('Streaming error:', error)
+      if (assistantMsgId) {
+        setMensagens(prev => prev.filter(msg => msg.id !== assistantMsgId))
+      }
       return false
     }
   }, [loadSessions, setMensagens, setSessionId])
