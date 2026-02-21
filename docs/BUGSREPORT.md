@@ -36,6 +36,15 @@
    - `BUG-116`, `BUG-117`, `BUG-120`
    - Motivo: hardening continuo de dependencias, type-check e politica CORS.
 
+### Regra obrigatoria de gate + rollback (a partir desta rodada)
+
+Para qualquer mudanca de status funcional (`Em validacao` -> `Resolvido`), executar nesta ordem:
+1. Gerar baseline/patch de rollback em `backend/COFRE/system/blindagem/rollback/`.
+2. Executar prova tecnica do bug (teste/endpoint/log reproduzivel).
+3. Aplicar correcao e reexecutar a mesma prova.
+4. Atualizar tabela + secao detalhada do bug no mesmo commit.
+5. Registrar evidencia em `backend/COFRE/system/blindagem/audit/` e citar no `docs/STATUS.md`.
+
 ## Bugs Ativos
 
 | ID | Severidade | MÃ³dulo | DescriÃ§Ã£o | Status |
@@ -80,15 +89,15 @@
 | BUG-051 | Media | Documentacao/API | `docs/DEPLOY_UBUNTU_DOCKER.md` referencia `GET /api/v1/health`, endpoint inexistente no runtime atual | Resolvido |
 | BUG-052 | Media | Documentacao/API | `docs/API.md` informa ausencia de auth em `/whatsapp-chat/*`, mas o backend exige token (`require_operador`) | Resolvido |
 | BUG-053 | Baixa | Frontend/Tooling | `npm run lint` abre wizard interativo do Next.js (ESLint nao inicializado), impedindo lint automatizado | Resolvido |
-| BUG-054 | Alta | VIVA/Persona | Contrato de persona da VIVA (concierge do Fabio) e da Viviane (secretaria humana) nao esta explicitamente separado por dominio, gerando ambiguidade de comportamento | Resolvido |
+| BUG-054 | Alta | VIVA/Persona | Contrato de persona da VIVA (concierge do Fabio) e da Viviane (secretaria humana) nao esta explicitamente separado por dominio, gerando ambiguidade de comportamento | Em validacao |
 | BUG-055 | Alta | VIVA/Prompts | Pastas/arquivos de prompt duplicados (`frontend/public/PROMPTS`, `docs/PROMPTS`, `src/app/viva/PROMPTS`) aumentam drift e confusao operacional | Resolvido |
-| BUG-056 | Alta | VIVA/Memoria | Memoria persistida existe, mas contexto do modelo no chat interno ainda depende do recorte do frontend (janela curta), sem reconstrucao server-side robusta por sessao | Resolvido |
-| BUG-057 | Media | VIVA/Agenda | Interpretacao de agenda em linguagem natural ainda depende de regex/comandos rigidos em parte dos casos, elevando atrito conversacional | Resolvido |
+| BUG-056 | Alta | VIVA/Memoria | Memoria persistida existe, mas contexto do modelo no chat interno ainda depende do recorte do frontend (janela curta), sem reconstrucao server-side robusta por sessao | Em validacao |
+| BUG-057 | Media | VIVA/Agenda | Interpretacao de agenda em linguagem natural ainda depende de regex/comandos rigidos em parte dos casos, elevando atrito conversacional | Em validacao |
 | BUG-058 | Alta | VIVA/RAG | Ausencia de camada vetorial moderna (RAG) para memoria/conhecimento evolutivo de longo prazo no piloto | Resolvido |
 | BUG-059 | Alta | Frontend/NextDev | `next dev` pode quebrar com `MODULE_NOT_FOUND` apontando para rota removida (`/api/viva/prompts/[promptId]/route`) por cache `.next` stale | Resolvido |
 | BUG-060 | Alta | Frontend/Auth+Docs | Login no front exibe erro generico para qualquer falha e README publica senha de teste divergente do runtime local | Resolvido |
 | BUG-061 | Alta | VIVA/Campanhas | Geracao de imagem pode ignorar tema do brief (ex.: Carnaval sem dividas) e cair em cena corporativa generica (senhor de terno em escritorio) | Resolvido (variation_id salt no seed para diversidade) |
-| BUG-062 | Alta | VIVA/Arquitetura | Router VIVA ainda concentra muita responsabilidade de dominio (chat+agenda+campanhas+midia) e exige fatiamento progressivo para manutencao segura | Resolvido |
+| BUG-062 | Alta | VIVA/Arquitetura | Router VIVA ainda concentra muita responsabilidade de dominio (chat+agenda+campanhas+midia) e exige fatiamento progressivo para manutencao segura | Ativo |
 | BUG-063 | Alta | VIVA/Agenda UX | Fallback rigido de agenda exige formato textual prescritivo, reduz fluidez conversacional e gera efeito de "bot travado" | Resolvido |
 | BUG-064 | Alta | VIVA->Viviane Orquestracao | Nao existe handoff operacional completo para aviso programado no WhatsApp (agenda da VIVA disparando persona Viviane no horario) | Resolvido |
 | BUG-065 | Alta | VIVA/Handoff API | `GET /api/v1/viva/handoff` retorna `500` quando `meta_json` vem serializado como string e quebra validacao do schema | Resolvido |
@@ -99,19 +108,19 @@
 | BUG-070 | Alta | VIVA/Audio UX | Audio era transcrito no front, mas sem texto digitado a transcricao nao era enviada para `/viva/chat`, entao VIVA nao respondia ao conteudo falado | Resolvido |
 | BUG-071 | Media | VIVA/Audio UX | Gravacao de audio ainda ficava anexada aguardando Enter, em vez de fluxo direto institucional (parar > transcrever > enviar) | Resolvido |
 | BUG-072 | Media | VIVA/UI+Audio UX | Atualizacao holografica ficou pouco perceptivel (avatar dentro da area rolavel) e audio gravado durante resposta podia voltar para anexo manual | Resolvido |
-| BUG-073 | Alta | VIVA/Agenda NLU | Consulta de agenda em linguagem natural podia cair indevidamente no fluxo de criacao (loop de "me diga quando") | Em validacao (rodada query-existence fix) |
+| BUG-073 | Alta | VIVA/Agenda NLU | Consulta de agenda em linguagem natural podia cair indevidamente no fluxo de criacao (loop de "me diga quando") | Resolvido |
 | BUG-074 | Media | VIVA/UI Holograma | Bloco de estilo do holograma ficava acoplado ao JSX da pagina e o cerebro 3D nao era interativo para iniciar conversa | Resolvido |
 | BUG-075 | Alta | LP/HTML | Landing page externa exibindo trecho de JavaScript como texto por bloco duplicado apos fechamento estrutural do documento | Resolvido |
-| BUG-076 | Alta | VIVA/UI Conversacao | Modo de conversacao da VIVA ficou acoplado ao chat normal (topo da pagina) em vez de ativacao dedicada por botao lateral/submenu | Resolvido |
-| BUG-077 | Alta | VIVA/UI Conversacao | Conversa continua por voz + avatar central dedicado ainda nao atingiu experiencia institucional final | Resolvido |
-| BUG-081 | Alta | Contratos/Templates Runtime | Clausulas nao aparecem no preview/PDF porque backend no container nao encontra `contratos/templates/*.json` e responde fallback vazio | Em validacao (runtime corrigido) |
+| BUG-076 | Alta | VIVA/UI Conversacao | Modo de conversacao da VIVA ficou acoplado ao chat normal (topo da pagina) em vez de ativacao dedicada por botao lateral/submenu | Em pausa (prioridade campanhas) |
+| BUG-077 | Alta | VIVA/UI Conversacao | Conversa continua por voz + avatar central dedicado ainda nao atingiu experiencia institucional final | Em pausa (prioridade campanhas) |
+| BUG-081 | Alta | Contratos/Templates Runtime | Clausulas nao aparecem no preview/PDF porque backend no container nao encontra `contratos/templates/*.json` e responde fallback vazio | Resolvido |
 | BUG-082 | Alta | Contratos/Modelos MD | Modelos `rating_full_pj` e `jusbrasil` enviados em `.md` nao estao operacionais ponta a ponta (template/menu/criacao), impedindo uso funcional completo | Resolvido |
 | BUG-083 | Media | Contratos/Encoding | Clausulas exibem simbolos residuais (`�`) em alguns titulos/textos no preview/PDF por decodificacao incompleta de mojibake CP1252/UTF-8 | Resolvido |
 | BUG-084 | Alta | Contratos/Parcelamento UX+Regra | Formulario exige prazos manuais e nao atende venda a vista/1x fluida; precisa trabalhar com qtd de parcelas (1..12), entrada opcional e calculo automatico institucional | Resolvido |
 | BUG-085 | Media | Contratos/Templates Base | Templates legados `bacen`, `cadin` e `cnh` permaneceram fora do metodo padrao novo (estrutura heterogenea e placeholders inconsistentes) | Resolvido |
 | BUG-089 | Alta | VIVA/Campanhas | Em modo `FC/REZETA`, conversa comum podia ser sequestrada para fluxo de campanha por inferencia ampla de tema livre | Resolvido |
 | BUG-090 | Alta | VIVA/UI Chat | Recuperacao de chats antigos indisponivel no frontend (somente snapshot da sessao mais recente) | Resolvido |
-| BUG-091 | Alta | VIVA/RAG Runtime | RAG semantico indisponivel no runtime atual (reindex sem indexacao e search vazio), com dependencia de embeddings OpenAI sem saldo | Resolvido |
+| BUG-091 | Alta | VIVA/RAG Runtime | RAG semantico indisponivel no runtime atual (reindex sem indexacao e search vazio), com dependencia de embeddings OpenAI sem saldo | Ativo |
 | BUG-092 | Alta | VIVA/Fala Continua | Conversa por voz dependia de APIs nativas do navegador (SpeechRecognition + speechSynthesis), com qualidade/estabilidade variavel e sem pipeline realtime institucional | Resolvido |
 | BUG-093 | Media | VIVA/Avatar | Avatar do modo Conversa VIVA ainda usa fallback local antigo e nao o asset institucional novo enviado pelo cliente | Resolvido |
 | BUG-094 | Alta | VIVA/RAG Qualidade | RAG roda com fallback local sem embeddings OpenAI, mas ainda sem homologacao semantica premium para operacao comercial | Em validacao (rodada hybrid rerank + telemetria de tier semantico) |

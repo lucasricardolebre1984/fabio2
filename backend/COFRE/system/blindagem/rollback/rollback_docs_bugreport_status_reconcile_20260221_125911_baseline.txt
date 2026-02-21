@@ -1,0 +1,3 @@
+17da7dafe299c64d4ddefcef57d863f9b59d2f3e
+ M docs/BUGSREPORT.md
+?? backend/COFRE/system/blindagem/rollback/rollback_docs_bugreport_status_reconcile_20260221_125911_baseline.txt
