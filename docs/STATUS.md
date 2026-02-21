@@ -33,6 +33,7 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
 
 ## Pendencias criticas abertas
 
+- BUG-133: WhatsApp/SaaS conversas sem consistencia de exibicao/resposta (sintoma de homologacao em curso)
 - BUG-099: latencia alta no chat interno da VIVA
 - BUG-104: em validacao apos ajuste de consulta de agenda (`liste`/`lite agenda`) e estabilizacao de saudacao
 - BUG-105: em validacao apos ajuste de roteamento de contratos (modelos vs emitidos por cliente)

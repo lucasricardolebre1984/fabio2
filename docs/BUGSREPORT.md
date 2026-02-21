@@ -5,6 +5,37 @@
 
 ---
 
+## Validacao ponta a ponta (Ubuntu) - 2026-02-21
+
+- Ambiente validado: EC2 `ubuntu@56.124.101.16`
+- Branch/hash validado: `main @ 201db21`
+- Arquivo validado: `docs/BUGSREPORT.md` (mesma base de codigo local + git)
+- Contagem atual no quadro principal:
+  - linhas de status: `98`
+  - resolvidos: `75`
+  - abertos/em validacao: `23`
+
+### Bugs aparentes no momento (fila real de homologacao)
+
+- Em validacao: `BUG-015, BUG-016, BUG-073, BUG-081, BUG-094, BUG-095, BUG-096, BUG-097, BUG-098, BUG-104, BUG-105, BUG-106, BUG-107, BUG-112, BUG-113, BUG-114, BUG-115`
+- Abertos: `BUG-099, BUG-116, BUG-117, BUG-118, BUG-119, BUG-120`
+- Sintoma novo observado em homologacao (SaaS): `BUG-133` (conversa WhatsApp nao aparece/nao responde de forma consistente, apesar de status conectado)
+
+### Ordem de reparo inteligente (execucao rapida)
+
+1. `P0 - Integridade operacional imediata`
+   - `BUG-133`, `BUG-119`, `BUG-118`
+   - Motivo: bloqueiam atendimento real e elevam risco de seguranca/regressao.
+2. `P1 - Confiabilidade da IA (verdade de dominio + contexto)`
+   - `BUG-104`, `BUG-105`, `BUG-106`, `BUG-107`, `BUG-112`, `BUG-113`, `BUG-114`, `BUG-115`, `BUG-099`
+   - Motivo: evitam alucinacao, perda de contexto e resposta fora de rota canonica.
+3. `P2 - Qualidade de experiencia e acabamento`
+   - `BUG-015`, `BUG-016`, `BUG-073`, `BUG-081`, `BUG-094`, `BUG-095`, `BUG-096`, `BUG-097`, `BUG-098`
+   - Motivo: melhora UX e aderencia visual/voz sem travar operacao nuclear.
+4. `P3 - Divida tecnica de plataforma`
+   - `BUG-116`, `BUG-117`, `BUG-120`
+   - Motivo: hardening continuo de dependencias, type-check e politica CORS.
+
 ## Bugs Ativos
 
 | ID | Severidade | MÃ³dulo | DescriÃ§Ã£o | Status |
@@ -107,6 +138,7 @@
 | BUG-123 | Alta | VIVA/Agenda NLU | Comando natural sem data explicita (`viva marque ... as 17 horas`) falhava com pedido de data/hora e quebrava fluxo operacional | Resolvido |
 | BUG-124 | Critica | Viviane/WhatsApp | Fluxo comercial repetia perguntas de nome/cidade/transferencia, perdia contexto e gerava cancelamento de lead no handoff humano | Resolvido |
 | BUG-125 | Alta | Viviane/WhatsApp UX | Tom muito rigido: resposta com preco espontaneo e baixa empatia em perguntas sociais ("voce e robo?", "ficar rico"), gerando desconforto e risco de abandono | Resolvido |
+| BUG-133 | Critica | WhatsApp/SaaS Conversas | Conversas do WhatsApp nao aparecem com consistencia em `/whatsapp/conversas` e respostas nao retornam no SaaS, apesar de `whatsapp/status` conectado/open e webhook configurado | Aberto |
 
 ---
 
