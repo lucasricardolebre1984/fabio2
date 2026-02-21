@@ -46,8 +46,9 @@ FLUXO COMERCIAL OBRIGATORIO:
 4) Proximo passo claro.
 
 DADOS OBRIGATORIOS DA QUALIFICACAO:
-- nome, telefone, servico desejado, cidade e urgencia.
-- Se faltar dado, faca uma pergunta objetiva para coletar.
+- nome, telefone, cidade e urgencia.
+- servico e desejavel, mas pode ser inferido da conversa.
+- Se faltar dado obrigatorio, faca uma pergunta objetiva para coletar.
 
 REGRAS DE NEGOCIO:
 - Nao prometer taxa, prazo, aprovacao ou condicao sem validacao humana.
@@ -97,9 +98,6 @@ ESCALA PARA HUMANO:
             "procon",
             "processo",
             "advogado",
-            "urgente",
-            "hoje ainda",
-            "agora",
             "desconto",
             "negociar valor",
             "nao consigo pagar",
@@ -671,7 +669,20 @@ ESCALA PARA HUMANO:
             ("Limpa Nome", ("limpa nome", "limpar meu nome", "nome sujo", "tirar nome", "tirar restricao")),
             ("Aumento de Score", ("aumento de score", "aumentar score", "subir score")),
             ("Rating", ("rating", "melhorar rating")),
-            ("Diagnostico 360", ("diagnostico 360", "diagnostico", "analise 360", "analise completa")),
+            (
+                "Diagnostico 360",
+                (
+                    "diagnostico 360",
+                    "diagnostico",
+                    "analise 360",
+                    "analise completa",
+                    "divida",
+                    "negativado",
+                    "spc",
+                    "serasa",
+                    "protesto",
+                ),
+            ),
         )
         for servico, keywords in mapping:
             if any(keyword in texto_normalizado for keyword in keywords):
@@ -775,7 +786,6 @@ ESCALA PARA HUMANO:
             labels = {
                 "nome": "seu nome",
                 "telefone": "seu telefone com DDD",
-                "servico": "o servico desejado",
                 "cidade": "sua cidade",
                 "urgencia": "qual sua urgencia",
             }
@@ -856,7 +866,6 @@ ESCALA PARA HUMANO:
         labels = {
             "nome": "seu nome",
             "telefone": "seu telefone com DDD",
-            "servico": "o servico desejado",
             "cidade": "sua cidade",
             "urgencia": "sua urgencia",
         }
@@ -1029,7 +1038,7 @@ ESCALA PARA HUMANO:
         )
 
     def _lead_missing_fields(self, lead: Dict[str, str]) -> List[str]:
-        required = ["nome", "telefone", "servico", "cidade", "urgencia"]
+        required = ["nome", "telefone", "cidade", "urgencia"]
         return [field for field in required if not str(lead.get(field, "")).strip()]
 
     async def _get_historico(
