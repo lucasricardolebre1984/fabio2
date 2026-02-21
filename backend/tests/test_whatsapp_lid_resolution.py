@@ -140,3 +140,17 @@ async def test_resolve_lid_uses_unique_profile_picture_match(monkeypatch):
     )
 
     assert resolved == "5516982223333"
+
+
+def test_has_required_webhook_events_requires_messages_and_connection():
+    service = WhatsAppService()
+
+    ok_payload = {
+        "events": ["MESSAGES_UPSERT", "CONNECTION_UPDATE", "CHATS_UPSERT"],
+    }
+    missing_payload = {
+        "events": ["CONNECTION_UPDATE"],
+    }
+
+    assert service._has_required_webhook_events(ok_payload) is True
+    assert service._has_required_webhook_events(missing_payload) is False

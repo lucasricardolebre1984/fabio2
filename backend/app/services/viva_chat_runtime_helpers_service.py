@@ -96,6 +96,18 @@ def _sanitize_fake_asset_delivery_reply(resposta: str, modo: Optional[str]) -> s
 
     lower = (resposta or "").lower()
     normalized = _normalize_key(resposta or "")
+    has_fake_campaign_delivery = (
+        "campanha criada" in normalized
+        and any(
+            token in normalized
+            for token in (
+                "formatos gerados",
+                "local salvo",
+                "campanhas fc",
+                "campanhas rezeta",
+            )
+        )
+    )
     has_fake_signal = (
         "http://" in lower
         or "https://" in lower
@@ -106,13 +118,14 @@ def _sanitize_fake_asset_delivery_reply(resposta: str, modo: Optional[str]) -> s
         or "publiquei os arquivos" in normalized
         or "enviei ao projeto" in normalized
         or "subi no projeto" in normalized
+        or has_fake_campaign_delivery
     )
     if not has_fake_signal:
         return resposta
 
     return (
-        "Nao consigo publicar arquivos nem gerar links externos diretamente pelo chat. "
-        "Consigo gerar a imagem aqui no fluxo da VIVA e anexar no proprio chat para revisao/download."
+        "Ainda nao confirmei criacao real da campanha no SaaS por este texto. "
+        "Para gerar e salvar de verdade agora, me diga: 'gere a campanha agora'."
     )
 
 

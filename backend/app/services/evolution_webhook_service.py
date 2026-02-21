@@ -75,6 +75,9 @@ class EvolutionWebhookService:
             message_wrapper = self._extrair_message_wrapper(payload_data)
             if not message_wrapper:
                 return True
+            if self._is_from_me_message(message_wrapper):
+                logging.info("Webhook ignorado: mensagem outbound (fromMe=true).")
+                return True
 
             remote_jid = self._extrair_remote_jid(message_wrapper, payload_data)
             numero = self._extrair_numero(message_wrapper, payload_data)
@@ -319,17 +322,26 @@ class EvolutionWebhookService:
 
         messages_data = payload_data.get("messages")
         if isinstance(messages_data, list):
+            fallback_candidate: Optional[Dict[str, Any]] = None
             for item in messages_data:
                 if not isinstance(item, dict):
                     continue
                 if isinstance(item.get("key"), dict):
                     if isinstance(item.get("message"), dict):
-                        return item
+                        if not self._is_from_me_message(item):
+                            return item
+                        fallback_candidate = fallback_candidate or item
+                        continue
                     if any(
                         key in item
                         for key in ("conversation", "extendedTextMessage", "imageMessage", "audioMessage")
                     ):
-                        return {"key": item.get("key"), "message": item}
+                        candidate = {"key": item.get("key"), "message": item}
+                        if not self._is_from_me_message(candidate):
+                            return candidate
+                        fallback_candidate = fallback_candidate or candidate
+            if fallback_candidate:
+                return fallback_candidate
 
         if isinstance(payload_data.get("key"), dict):
             if isinstance(payload_data.get("message"), dict):
@@ -350,6 +362,10 @@ class EvolutionWebhookService:
                 return {"key": payload_data.get("key"), "message": message_data}
 
         return None
+
+    def _is_from_me_message(self, message_wrapper: Dict[str, Any]) -> bool:
+        key_data = message_wrapper.get("key") if isinstance(message_wrapper.get("key"), dict) else {}
+        return bool(key_data.get("fromMe"))
 
     def _extrair_numero(self, message_wrapper: Dict[str, Any], payload_data: Dict[str, Any]) -> str:
         remote_jid = self._extrair_remote_jid(message_wrapper, payload_data)

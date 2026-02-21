@@ -188,6 +188,18 @@ class WhatsAppService:
             return configured
         return "http://backend:8000/api/v1/webhook/evolution"
 
+    def _has_required_webhook_events(self, webhook_payload: Dict[str, Any]) -> bool:
+        events = webhook_payload.get("events")
+        if not isinstance(events, list) or not events:
+            return False
+        normalized = {
+            str(event or "").strip().upper().replace(".", "_")
+            for event in events
+            if str(event or "").strip()
+        }
+        required = {"MESSAGES_UPSERT", "CONNECTION_UPDATE"}
+        return required.issubset(normalized)
+
     async def _ensure_instance_webhook(
         self,
         client: httpx.AsyncClient,
@@ -215,7 +227,8 @@ class WhatsAppService:
                 current_by_events = bool(
                     webhook_payload.get("webhookByEvents", webhook_payload.get("byEvents", False))
                 )
-                if current_enabled and (not current_by_events) and current_url == desired_url:
+                has_required_events = self._has_required_webhook_events(webhook_payload)
+                if current_enabled and (not current_by_events) and current_url == desired_url and has_required_events:
                     return {"configured": True, "updated": False, "url": current_url}
 
             payload = {
@@ -881,11 +894,69 @@ class WhatsAppService:
                 if numero_alt and self._is_plausible_phone_number(numero_alt):
                     candidate_numbers.append(numero_alt)
 
-        # Nao usar heuristica de nome/foto para converter @lid.
-        # Esse "chute" pode redirecionar mensagem para outro cliente com nome parecido.
-        # Para @lid, aceitamos apenas origem explicita/confiavel:
-        # - numero preferencial validado no contexto
-        # - metadado alternativo vindo do proprio evento/contato
+        # Match por foto de perfil so quando houver correspondencia unica.
+        current_pic = ""
+        if current_contact:
+            current_pic = str(current_contact.get("profilePicUrl") or "").strip()
+        if current_pic:
+            same_pic_candidates: List[str] = []
+            for item in contacts:
+                jid = str(item.get("remoteJid") or "")
+                if not jid or jid.lower().endswith("@lid"):
+                    continue
+                pic = str(item.get("profilePicUrl") or "").strip()
+                if not pic or pic != current_pic:
+                    continue
+                numero_pic = self._extrair_numero_de_jid(jid)
+                if numero_pic and self._is_plausible_phone_number(numero_pic):
+                    same_pic_candidates.append(numero_pic)
+            if len(same_pic_candidates) == 1:
+                candidate_numbers.append(same_pic_candidates[0])
+
+        # Match por similaridade de nome + proximidade temporal de chats.
+        chats = await self._fetch_chats(client, instance)
+        lid_chat = next(
+            (
+                row
+                for row in chats
+                if str(row.get("remoteJid") or "").lower() == numero.lower()
+            ),
+            None,
+        )
+        base_name = str(context_push_name or "").strip()
+        if not base_name:
+            base_name = str((lid_chat or {}).get("pushName") or "").strip()
+        if not base_name and current_contact:
+            base_name = str(current_contact.get("pushName") or "").strip()
+
+        lid_updated_at = self._parse_iso_datetime((lid_chat or {}).get("updatedAt")) if lid_chat else None
+        scored_chat_candidates: List[Dict[str, Any]] = []
+        if base_name:
+            for row in chats:
+                jid = str(row.get("remoteJid") or "")
+                if not jid or jid.lower().endswith("@lid"):
+                    continue
+                numero_chat = self._extrair_numero_de_jid(jid)
+                if not numero_chat or not self._is_plausible_phone_number(numero_chat):
+                    continue
+
+                score = self._name_similarity_score(base_name, str(row.get("pushName") or ""))
+                if score < 60:
+                    continue
+
+                row_updated_at = self._parse_iso_datetime(row.get("updatedAt"))
+                if lid_updated_at and row_updated_at:
+                    delta_seconds = abs((row_updated_at - lid_updated_at).total_seconds())
+                    if delta_seconds <= 300:
+                        score += 30
+                    elif delta_seconds <= 3600:
+                        score += 10
+
+                scored_chat_candidates.append({"number": numero_chat, "score": score})
+
+        if scored_chat_candidates:
+            scored_chat_candidates.sort(key=lambda item: int(item.get("score") or 0), reverse=True)
+            candidate_numbers.append(str(scored_chat_candidates[0].get("number") or ""))
 
         unique_candidates: List[str] = []
         for candidate in candidate_numbers:

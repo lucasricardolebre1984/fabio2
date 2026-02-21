@@ -33,6 +33,7 @@ from app.services.viva_chat_domain_service import (
     _infer_mode_from_message,
     _is_campaign_reset_intent,
     _is_direct_generation_intent,
+    _is_generation_confirmation,
     _is_image_request,
     _is_logo_request,
     _mode_hint,
@@ -159,6 +160,34 @@ def _is_campaign_rule_memory_intent(message: str) -> bool:
         )
     )
     return has_campaign_context and has_save_request and has_instruction_shape
+
+
+def _mentions_agenda_creation_confirmation(normalized_reply: str) -> bool:
+    if not normalized_reply:
+        return False
+    agenda_tokens = (
+        "agendamento criado",
+        "compromisso criado",
+        "marquei compromisso",
+        "marquei na agenda",
+        "criei compromisso",
+        "criei na agenda",
+        "agendei compromisso",
+        "agendei na agenda",
+    )
+    return any(token in normalized_reply for token in agenda_tokens)
+
+
+def _should_generate_pending_campaign_followup(
+    message: str,
+    pending_campaign: bool,
+    explicit_fields: Dict[str, str],
+) -> bool:
+    if not pending_campaign:
+        return False
+    if explicit_fields:
+        return True
+    return _is_generation_confirmation(message)
 
 
 class VivaChatOrchestratorService:
@@ -580,6 +609,8 @@ class VivaChatOrchestratorService:
                 )
 
             campaign_flow_requested = False
+            pending_campaign = False
+            campaign_followup_generate = False
             campaign_fields: Dict[str, str] = {}
             campaign_prompt_source = request.mensagem
             reset_campaign_memory_intent = _is_campaign_reset_intent(request.mensagem)
@@ -612,6 +643,11 @@ class VivaChatOrchestratorService:
                     _infer_campaign_fields_from_free_text(request.mensagem) if (has_campaign_signal or pending_campaign) else {}
                 )
                 explicit_fields = _extract_campaign_brief_fields(request.mensagem) if (has_campaign_signal or pending_campaign) else {}
+                campaign_followup_generate = _should_generate_pending_campaign_followup(
+                    message=request.mensagem,
+                    pending_campaign=pending_campaign,
+                    explicit_fields=explicit_fields,
+                )
                 campaign_fields.update(explicit_fields)
                 if has_campaign_signal:
                     campaign_fields.update(inferred_fields)
@@ -635,7 +671,7 @@ class VivaChatOrchestratorService:
 
             should_generate_image = _is_image_request(request.mensagem) or (
                 campaign_flow_requested
-                and _is_direct_generation_intent(request.mensagem)
+                and (_is_direct_generation_intent(request.mensagem) or campaign_followup_generate)
                 and not suggestion_first_intent
                 and not _is_greeting(request.mensagem)
             )
@@ -802,15 +838,23 @@ class VivaChatOrchestratorService:
             resposta = _sanitize_fake_asset_delivery_reply(resposta, modo)
             safe_resposta = _ensure_fabio_greeting(request.mensagem, resposta)
             normalized_safe = _normalize_key(safe_resposta)
-            if not agenda_created and any(
-                token in normalized_safe
-                for token in ("agendamento criado", "compromisso criado", "marquei ", "criei ")
+            agenda_operation_requested = bool(
+                agenda_query_intent
+                or agenda_created
+                or agenda_checked
+                or agenda_command is not None
+                or agenda_natural_command is not None
+            )
+            if (
+                agenda_operation_requested
+                and not agenda_created
+                and _mentions_agenda_creation_confirmation(normalized_safe)
             ):
                 safe_resposta = (
                     "Nao consegui confirmar criacao de compromisso na agenda. "
                     "Informe data e hora exatas (DD/MM/AAAA HH:MM) que eu executo novamente."
                 )
-            elif not agenda_checked and any(
+            elif agenda_operation_requested and not agenda_checked and any(
                 token in normalized_safe
                 for token in ("consultei sua agenda", "calendario checado", "nao ha compromissos")
             ):

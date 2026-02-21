@@ -60,6 +60,28 @@ Status: consolidacao final de homologacao local (WhatsApp/VIVA/Viviane) + ajuste
   - `docker-compose.prod.yml`
   - `docker-compose-prod.yml`
   - `docs/BUGSREPORT.md` (BUG-129)
+- Correcao de verdade operacional no webhook WhatsApp:
+  - `backend/app/services/evolution_webhook_service.py`
+  - filtro de outbound (`fromMe=true`) no webhook;
+  - parser de lote `messages[]` prioriza inbound real.
+- Correcao de contexto de campanha no chat VIVA:
+  - `backend/app/services/assistant/intents/campanhas.py`
+  - `backend/app/services/viva_chat_orchestrator_service.py`
+  - `backend/app/services/viva_chat_runtime_helpers_service.py`
+  - `backend/tests/test_viva_chat_orchestrator_guards.py`
+  - `backend/tests/test_viva_chat_runtime_sanitizers.py`
+  - `docs/BUGSREPORT.md` (BUG-130, BUG-131)
+  - `backend/COFRE/system/blindagem/audit/VIVA_CAMPAIGN_CONTEXT_TRUTH_GUARD_2026-02-21.md`
+  - `docs/AUDIT/WHATSAPP_CAMPAIGN_ENDPOINT_TRACE_2026-02-21.md`
+  - `docs/AUDIT/COMPONENT_COMMON_DOMAIN_DETECTION_2026-02-21.md`
+- Hardening final de entrega WhatsApp para `@lid`:
+  - `backend/app/services/whatsapp_service.py`
+  - resolucao `@lid` com candidatos por:
+    - contexto preferencial validado;
+    - match unico por `profilePicUrl`;
+    - similaridade de nome + proximidade temporal de chats;
+  - validacao obrigatoria de numero em `chat/whatsappNumbers` antes de enviar.
+  - `backend/COFRE/system/blindagem/audit/WHATSAPP_LID_RESOLUTION_HARDENING_2026-02-21.md`
 
 ## Novos bugs abertos nesta auditoria
 

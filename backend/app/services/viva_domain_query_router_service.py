@@ -36,6 +36,15 @@ def _is_direct_confirmation(message: str) -> bool:
     normalized = _normalize_key(message or "")
     return normalized in {
         "sim",
+        "ok",
+        "quero",
+        "quero mostrar",
+        "quero mostre",
+        "quero sim",
+        "pode listar",
+        "com numero",
+        "numero",
+        "com numero do contrato",
         "todos",
         "todos registrados",
         "aqui no chat",
@@ -103,6 +112,82 @@ def _extract_name_from_pending_reference(contexto: List[Dict[str, Any]]) -> Opti
         match = re.search(r'voce se refere a\s+"([^"]+)"', content, flags=re.IGNORECASE)
         if match:
             return str(match.group(1)).strip()
+    return None
+
+
+def _clean_client_name_candidate(value: str) -> Optional[str]:
+    candidate = re.sub(r"[\]\[\)\(\.,;:!?]+$", "", str(value or "").strip())
+    candidate = re.sub(r"\s+", " ", candidate).strip()
+    normalized = _normalize_key(candidate)
+    if not candidate or normalized in {"ele", "ela", "dele", "dela", "todos", "ativos", "encerrados"}:
+        return None
+    return candidate
+
+
+def _is_waiting_client_name_for_contracts(contexto: List[Dict[str, Any]]) -> bool:
+    for msg in reversed(contexto[-6:]):
+        if str(msg.get("tipo") or "") != "ia":
+            continue
+        normalized = _normalize_key(str(msg.get("conteudo") or ""))
+        if not normalized:
+            continue
+        if "informe o nome do cliente" in normalized and "contrato" in normalized:
+            return True
+        if "qual cliente" in normalized and "contrato" in normalized:
+            return True
+    return False
+
+
+def _is_waiting_client_name_for_detail(contexto: List[Dict[str, Any]]) -> bool:
+    for msg in reversed(contexto[-6:]):
+        if str(msg.get("tipo") or "") != "ia":
+            continue
+        normalized = _normalize_key(str(msg.get("conteudo") or ""))
+        if not normalized:
+            continue
+        if "dados completos desse cliente" in normalized:
+            return True
+        if "dados do cliente" in normalized and any(token in normalized for token in ("quer", "deseja", "mostro")):
+            return True
+        if "mostrar dados" in normalized and "cliente" in normalized:
+            return True
+    return False
+
+
+def _extract_last_client_name_from_context(contexto: List[Dict[str, Any]]) -> Optional[str]:
+    ia_patterns = (
+        r"contratos emitidos para\s+([^:\n]+)",
+        r"resumo do cliente\s+([^:\n]+)",
+        r"o cliente\s+([^.,\n]+?)\s+tem\s+\d+",
+        r"consulta executada:\s*([^.,\n]+?)\s+tem\s+\d+",
+    )
+    for msg in reversed(contexto[-14:]):
+        content = str(msg.get("conteudo") or "").strip()
+        if not content:
+            continue
+        tipo = str(msg.get("tipo") or "")
+        if tipo == "usuario":
+            candidate = (
+                extract_client_name_for_contract_query(content)
+                or extract_client_name_for_detail_query(content)
+            )
+            cleaned = _clean_client_name_candidate(candidate or "")
+            if cleaned:
+                return cleaned
+            continue
+        if tipo == "ia":
+            quoted = re.search(r'cliente\s+"([^"]+)"', content, flags=re.IGNORECASE)
+            if quoted:
+                cleaned = _clean_client_name_candidate(str(quoted.group(1)))
+                if cleaned:
+                    return cleaned
+            for pattern in ia_patterns:
+                match = re.search(pattern, content, flags=re.IGNORECASE)
+                if not match:
+                    continue
+                cleaned = _clean_client_name_candidate(str(match.group(1)))
+                if cleaned:
+                    return cleaned
     return None
 
 
@@ -218,6 +303,13 @@ def _is_count_contracts_request(message: str) -> bool:
     return has_contract and has_count
 
 
+def _is_count_clients_request(message: str) -> bool:
+    normalized = _normalize_key(message or "")
+    has_client = "cliente" in normalized or "clientes" in normalized
+    has_count = any(token in normalized for token in ("quantos", "quantidade", "total", "qtd", "numero"))
+    return has_client and has_count
+
+
 def _wants_all_records(message: str) -> bool:
     normalized = _normalize_key(message or "")
     return any(token in normalized for token in ("todos", "todas", "geral", "emitidos", "incluindo"))
@@ -229,12 +321,17 @@ async def _resolve_client_from_message(
     message: str,
     contexto_efetivo: List[Dict[str, Any]],
     explicit_name: Optional[str] = None,
+    allow_context_fallback: bool = False,
 ) -> Optional[Dict[str, Any]]:
     requested_name = explicit_name or (
         extract_client_name_for_contract_query(message) or extract_client_name_for_detail_query(message)
     )
     if not requested_name and _is_direct_confirmation(message):
         requested_name = _extract_name_from_pending_reference(contexto_efetivo)
+    if allow_context_fallback and (
+        not requested_name or _normalize_key(str(requested_name)) in {"ele", "ela", "dele", "dela"}
+    ):
+        requested_name = _extract_last_client_name_from_context(contexto_efetivo)
 
     items: List[Dict[str, Any]] = []
     if requested_name:
@@ -278,6 +375,7 @@ class VivaDomainQueryRouterService:
                 cliente_service=cliente_service,
                 message=message,
                 contexto_efetivo=contexto_efetivo,
+                allow_context_fallback=True,
             )
             if not best:
                 return "Nao encontrei cliente para montar o resumo de cadastro e contratos."
@@ -285,8 +383,22 @@ class VivaDomainQueryRouterService:
             filtered_items = await cliente_service.get_contratos(cliente_id) if cliente_id else []
             return _format_client_contracts_summary(best, filtered_items)
 
+        explicit_contract_client_name = (
+            extract_client_name_for_contract_query(message) or extract_client_name_for_detail_query(message)
+        )
+        waiting_client_name_for_contracts = _is_waiting_client_name_for_contracts(contexto_efetivo)
+        context_client_name = _extract_last_client_name_from_context(contexto_efetivo)
         contract_templates_intent = is_contract_templates_intent(message)
         contracts_by_client_intent = is_contracts_by_client_intent(message)
+        if not contracts_by_client_intent and waiting_client_name_for_contracts and explicit_contract_client_name:
+            contracts_by_client_intent = True
+        if (
+            not contracts_by_client_intent
+            and pending_list_domain == "contratos_emitidos"
+            and _is_direct_confirmation(message)
+            and context_client_name
+        ):
+            contracts_by_client_intent = True
         contract_count_intent = _is_count_contracts_request(message) and not contracts_by_client_intent
         contract_list_intent = (is_contract_list_intent(message) and not contract_templates_intent) or (
             _is_direct_confirmation(message) and pending_list_domain == "contratos_emitidos"
@@ -302,6 +414,8 @@ class VivaDomainQueryRouterService:
                     cliente_service=cliente_service,
                     message=message,
                     contexto_efetivo=contexto_efetivo,
+                    explicit_name=explicit_contract_client_name or context_client_name,
+                    allow_context_fallback=True,
                 )
                 if not best:
                     return "Informe o nome do cliente para eu listar os contratos emitidos."
@@ -409,28 +523,38 @@ class VivaDomainQueryRouterService:
             lines.extend(f"- {title}" for title in titles)
             return "\n".join(lines)
 
-        client_detail_intent = is_client_detail_intent(message)
+        waiting_client_name_for_detail = _is_waiting_client_name_for_detail(contexto_efetivo)
+        explicit_detail_client_name = (
+            extract_client_name_for_detail_query(message) or extract_client_name_for_contract_query(message)
+        )
+        client_detail_intent = is_client_detail_intent(message) or (
+            waiting_client_name_for_detail and bool(explicit_detail_client_name)
+        )
         if client_detail_intent:
             cliente_service = ClienteService(db)
             best = await _resolve_client_from_message(
                 cliente_service=cliente_service,
                 message=message,
                 contexto_efetivo=contexto_efetivo,
-                explicit_name=extract_client_name_for_detail_query(message),
+                explicit_name=explicit_detail_client_name,
+                allow_context_fallback=True,
             )
             if not best:
                 return "Nao encontrei cliente com esse nome."
             return _format_client_detail(best)
 
+        client_count_intent = _is_count_clients_request(message)
         client_list_intent = is_client_list_intent(message) or (
             _is_direct_confirmation(message) and pending_list_domain == "clientes"
         )
-        if client_list_intent:
+        if client_count_intent or client_list_intent:
             cliente_service = ClienteService(db)
             payload = await cliente_service.list(search=None, page=1, page_size=200)
             clients = list(payload.get("items", []))
             if not clients:
                 return "Nao ha clientes registrados no sistema."
+            if client_count_intent:
+                return f"Total de clientes registrados: {len(clients)}."
             lines = ["Clientes registrados:"]
             for item in clients:
                 if isinstance(item, dict):

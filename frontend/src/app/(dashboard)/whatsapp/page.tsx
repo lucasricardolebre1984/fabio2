@@ -67,6 +67,7 @@ export default function WhatsAppPage() {
   const [qrCode, setQrCode] = useState<string | null>(null)
   const [chatStats, setChatStats] = useState<WhatsAppChatStats>({ conversas_ativas: 0, mensagens_hoje: 0 })
   const [conversasRecentes, setConversasRecentes] = useState<WhatsAppConversa[]>([])
+  const [showingArchivedFallback, setShowingArchivedFallback] = useState(false)
   const [funnelCounts, setFunnelCounts] = useState({
     ativa: 0,
     aguardando: 0,
@@ -114,9 +115,16 @@ export default function WhatsAppPage() {
       const aguardando = aguardandoResp.data || []
       const arquivadas = arquivadasResp.data || []
       const handoffItems = handoffResp.data?.items || []
+      const abertas = [...ativas, ...aguardando]
 
       setChatStats(statsResp.data || { conversas_ativas: 0, mensagens_hoje: 0 })
-      setConversasRecentes(ativas.slice(0, 8))
+      if (abertas.length > 0) {
+        setConversasRecentes(abertas.slice(0, 8))
+        setShowingArchivedFallback(false)
+      } else {
+        setConversasRecentes(arquivadas.slice(0, 8))
+        setShowingArchivedFallback(arquivadas.length > 0)
+      }
       setFunnelCounts({
         ativa: ativas.length,
         aguardando: aguardando.length,
@@ -147,6 +155,14 @@ export default function WhatsAppPage() {
       setLoading(false)
     }
     run()
+  }, [carregarStatus, carregarCrm])
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      void Promise.all([carregarStatus(), carregarCrm()])
+    }, 15000)
+
+    return () => clearInterval(timer)
   }, [carregarStatus, carregarCrm])
 
   const handleConectar = async () => {
@@ -247,6 +263,11 @@ export default function WhatsAppPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {showingArchivedFallback && (
+            <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Exibindo conversas arquivadas (nenhuma conversa ativa no momento).
+            </div>
+          )}
           {crmLoading ? (
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <RefreshCw className="h-4 w-4 animate-spin" />

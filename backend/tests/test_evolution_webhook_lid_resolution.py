@@ -34,3 +34,55 @@ def test_extract_number_from_lid_metadata_remote_jid_alt():
     }
     payload_data = {}
     assert service._extract_number_from_lid_metadata(message_wrapper, payload_data) == "5516981234567"
+
+
+def test_extract_message_wrapper_supports_messages_list_payload():
+    service = EvolutionWebhookService()
+    payload_data = {
+        "messages": [
+            {
+                "key": {
+                    "id": "ABCD1234",
+                    "remoteJid": "5516999999999@s.whatsapp.net",
+                },
+                "message": {"conversation": "oi"},
+                "pushName": "Lucas",
+            }
+        ]
+    }
+    wrapper = service._extrair_message_wrapper(payload_data)
+    assert isinstance(wrapper, dict)
+    assert wrapper.get("key", {}).get("remoteJid") == "5516999999999@s.whatsapp.net"
+
+
+def test_extract_message_wrapper_prefers_inbound_when_messages_batch_has_from_me():
+    service = EvolutionWebhookService()
+    payload_data = {
+        "messages": [
+            {
+                "key": {
+                    "id": "OUTBOUND001",
+                    "remoteJid": "5516999999999@s.whatsapp.net",
+                    "fromMe": True,
+                },
+                "message": {"conversation": "mensagem enviada pelo proprio bot"},
+            },
+            {
+                "key": {
+                    "id": "INBOUND001",
+                    "remoteJid": "5516888888888@s.whatsapp.net",
+                    "fromMe": False,
+                },
+                "message": {"conversation": "mensagem real do cliente"},
+            },
+        ]
+    }
+    wrapper = service._extrair_message_wrapper(payload_data)
+    assert isinstance(wrapper, dict)
+    assert wrapper.get("key", {}).get("id") == "INBOUND001"
+
+
+def test_is_from_me_message_helper():
+    service = EvolutionWebhookService()
+    assert service._is_from_me_message({"key": {"fromMe": True}}) is True
+    assert service._is_from_me_message({"key": {"fromMe": False}}) is False

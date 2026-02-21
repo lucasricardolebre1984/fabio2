@@ -15,7 +15,21 @@ def is_client_list_intent(message: str) -> bool:
     has_client = ("cliente" in normalized) or ("clientes" in normalized)
     has_list_signal = any(
         token in normalized
-        for token in ("listar", "liste", "lista", "quais", "todos", "registrados", "mostre", "lite", "list", "cadastro")
+        for token in (
+            "listar",
+            "liste",
+            "lista",
+            "quais",
+            "todos",
+            "registrados",
+            "cadastrado",
+            "cadastrados",
+            "base",
+            "mostre",
+            "lite",
+            "list",
+            "cadastro",
+        )
     )
     return has_client and has_list_signal
 

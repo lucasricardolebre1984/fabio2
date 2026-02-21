@@ -118,7 +118,30 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
   - Correcao:
     - fallback de listagem na central para `arquivada` quando nao houver `ativa/aguardando`;
     - sanitizacao de resposta tecnica no webhook antes do envio outbound;
-    - default local de `WA_INSTANCE_NAME=fc-solucoes-local` para reduzir colisao local x producao quando env nao definido.
+  - default local de `WA_INSTANCE_NAME=fc-solucoes-local` para reduzir colisao local x producao quando env nao definido.
+- Fix de verdade operacional no webhook WhatsApp (anti-loop outbound):
+  - `backend/app/services/evolution_webhook_service.py`
+  - mensagens `fromMe=true` agora sao ignoradas no processamento inbound;
+  - parser de lote `data.messages[]` agora prioriza mensagem inbound (`fromMe=false`), reduzindo loop/ruido de conversa.
+- Hardening de resolucao `@lid` no envio outbound WhatsApp:
+  - `backend/app/services/whatsapp_service.py`
+  - match seguro por similaridade de nome + proximidade temporal de chat;
+  - match por foto de perfil apenas quando unico;
+  - validacao obrigatoria de candidato em `POST /chat/whatsappNumbers/{instance}` antes de enviar.
+- Fix de contexto de campanha no chat VIVA:
+  - `backend/app/services/assistant/intents/campanhas.py`
+  - `backend/app/services/viva_chat_orchestrator_service.py`
+  - `backend/app/services/viva_chat_runtime_helpers_service.py`
+  - endurecimento de intent de contagem para evitar falso positivo em briefing;
+  - guard de agenda aplicado apenas quando ha operacao de agenda;
+  - follow-up de CTA em campanha pendente passa a destravar geracao real;
+  - bloqueio de resposta textual "campanha criada/local salvo" sem execucao real.
+- Evidencias de blindagem desta rodada:
+  - `backend/COFRE/system/blindagem/audit/VIVA_CAMPAIGN_CONTEXT_TRUTH_GUARD_2026-02-21.md`
+  - `backend/COFRE/system/blindagem/audit/WHATSAPP_VISIBILITY_RUNTIME_GUARD_2026-02-21.md`
+  - `backend/COFRE/system/blindagem/audit/WHATSAPP_LID_RESOLUTION_HARDENING_2026-02-21.md`
+  - `docs/AUDIT/WHATSAPP_CAMPAIGN_ENDPOINT_TRACE_2026-02-21.md`
+  - `docs/AUDIT/COMPONENT_COMMON_DOMAIN_DETECTION_2026-02-21.md`
 
 ## Diretriz de deploy institucional
 

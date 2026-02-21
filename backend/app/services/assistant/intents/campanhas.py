@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Optional
 
 from app.services.viva_chat_domain_service import _is_direct_generation_intent, _is_image_request
@@ -26,27 +27,18 @@ def is_campaign_count_intent(message: str) -> bool:
     if not normalized:
         return False
     has_campaign = "campanha" in normalized or "campanhas" in normalized
-    has_count = any(
-        token in normalized
-        for token in (
-            "quantas",
-            "quanto",
-            "total",
-            "numero",
-            "qtd",
-            "quantidade",
-            "feitas",
-            "criadas",
-            "alguma",
-            "algum",
-            "temos",
-            "tem",
-            "existe",
-            "ativa",
-            "ativas",
-            "ativva",
-        )
+    count_patterns = (
+        r"\bquant(?:a|as)\b.*\bcampanh",
+        r"\btotal(?:\s+geral)?(?:\s+de)?\s+campanh",
+        r"\bquantidade(?:\s+de)?\s+campanh",
+        r"\bnumero(?:\s+de)?\s+campanh",
+        r"\bqtd(?:\s+de)?\s+campanh",
+        r"\bcampanh(?:a|as)\s+(?:feitas|criadas|registradas)\b",
+        r"\btemos?\s+(?:alguma[s]?\s+)?campanh",
+        r"\bexiste(?:m)?\s+(?:alguma[s]?\s+)?campanh",
+        r"\bha\s+(?:alguma[s]?\s+)?campanh",
     )
+    has_count = any(re.search(pattern, normalized) for pattern in count_patterns)
     has_generate_signal = bool(_is_image_request(message) or _is_direct_generation_intent(message))
     return has_campaign and has_count and not has_generate_signal
 

@@ -36,6 +36,12 @@ def test_campaign_count_intent_simple_direct():
     assert is_campaign_count_intent("campanhas feitas") is True
     assert is_campaign_count_intent("quero saber quantas campanhas temos feitas") is True
     assert is_campaign_count_intent("gere campanha de carnaval") is False
+    assert (
+        is_campaign_count_intent(
+            "Como no Brasil o ano so comeca depois do carnaval, agora e a hora de voce comecar com o pe direito"
+        )
+        is False
+    )
 
 
 def test_visual_proof_request_guard_intent():
@@ -296,3 +302,140 @@ async def test_domain_router_returns_contract_count_by_client(monkeypatch):
     assert "Fabio D C da Silva" in response
     assert "2 contratos ativos" in response
     assert "3 contratos emitidos" in response
+
+
+@pytest.mark.asyncio
+async def test_domain_router_contracts_by_client_accepts_pending_name_followup(monkeypatch):
+    client_id = UUID("33333333-3333-3333-3333-333333333333")
+
+    class _FakeStatus:
+        def __init__(self, value):
+            self.value = value
+
+    class _FakeContrato:
+        def __init__(self, numero, template_nome, status, created_at):
+            self.numero = numero
+            self.template_nome = template_nome
+            self.status = _FakeStatus(status)
+            self.created_at = created_at
+
+    class _FakeClienteService:
+        def __init__(self, db):
+            self.db = db
+
+        async def list(self, search=None, page=1, page_size=20):
+            if search:
+                assert "lucas" in str(search).lower()
+            return {"items": [{"id": client_id, "nome": "Lucas Lebre"}], "total": 1}
+
+        async def get_contratos(self, cliente_id):
+            assert cliente_id == client_id
+            return [
+                _FakeContrato("CNT-2026-0005", "Contrato A", "rascunho", datetime(2026, 2, 21)),
+                _FakeContrato("CNT-2026-0004", "Contrato B", "rascunho", datetime(2026, 2, 20)),
+            ]
+
+    monkeypatch.setattr(
+        "app.services.viva_domain_query_router_service.ClienteService",
+        _FakeClienteService,
+    )
+
+    response = await viva_domain_query_router_service.handle_domain_query(
+        db=object(),
+        user_id="00000000-0000-0000-0000-000000000000",
+        message="para Lucas",
+        contexto_efetivo=[
+            {"tipo": "ia", "conteudo": "Informe o nome do cliente para eu listar os contratos emitidos."}
+        ],
+    )
+
+    assert response is not None
+    assert "Contratos emitidos para Lucas Lebre:" in response
+    assert "CNT-2026-0005" in response
+    assert "CNT-2026-0004" in response
+
+
+@pytest.mark.asyncio
+async def test_domain_router_contracts_by_client_uses_context_on_short_confirmation(monkeypatch):
+    client_id = UUID("44444444-4444-4444-4444-444444444444")
+
+    class _FakeStatus:
+        def __init__(self, value):
+            self.value = value
+
+    class _FakeContrato:
+        def __init__(self, numero, template_nome, status, created_at):
+            self.numero = numero
+            self.template_nome = template_nome
+            self.status = _FakeStatus(status)
+            self.created_at = created_at
+
+    class _FakeClienteService:
+        def __init__(self, db):
+            self.db = db
+
+        async def list(self, search=None, page=1, page_size=20):
+            if search:
+                assert "lucas" in str(search).lower()
+            return {"items": [{"id": client_id, "nome": "Lucas Lebre"}], "total": 1}
+
+        async def get_contratos(self, cliente_id):
+            assert cliente_id == client_id
+            return [
+                _FakeContrato("CNT-2026-0005", "Contrato A", "rascunho", datetime(2026, 2, 21)),
+            ]
+
+    monkeypatch.setattr(
+        "app.services.viva_domain_query_router_service.ClienteService",
+        _FakeClienteService,
+    )
+
+    response = await viva_domain_query_router_service.handle_domain_query(
+        db=object(),
+        user_id="00000000-0000-0000-0000-000000000000",
+        message="com numero",
+        contexto_efetivo=[
+            {"tipo": "usuario", "conteudo": "para Lucas"},
+            {
+                "tipo": "ia",
+                "conteudo": (
+                    "Consulta executada: Lucas tem 5 contratos (ativos + encerrados). "
+                    "Deseja que eu liste os contratos com status e datas?"
+                ),
+            },
+        ],
+    )
+
+    assert response is not None
+    assert "Contratos emitidos para Lucas Lebre:" in response
+    assert "CNT-2026-0005" in response
+
+
+@pytest.mark.asyncio
+async def test_domain_router_returns_client_count_when_requested(monkeypatch):
+    class _FakeClienteService:
+        def __init__(self, db):
+            self.db = db
+
+        async def list(self, search=None, page=1, page_size=20):
+            return {
+                "items": [
+                    {"id": "1", "nome": "Lucas Lebre"},
+                    {"id": "2", "nome": "Fabio Silva"},
+                ],
+                "total": 2,
+            }
+
+    monkeypatch.setattr(
+        "app.services.viva_domain_query_router_service.ClienteService",
+        _FakeClienteService,
+    )
+
+    response = await viva_domain_query_router_service.handle_domain_query(
+        db=object(),
+        user_id="00000000-0000-0000-0000-000000000000",
+        message="quantos clientes temos no sistema?",
+        contexto_efetivo=[],
+    )
+
+    assert response == "Total de clientes registrados: 2."

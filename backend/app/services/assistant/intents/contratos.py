@@ -47,6 +47,7 @@ def extract_client_name_for_contract_query(message: str) -> Optional[str]:
         return None
 
     patterns = [
+        r"(?:pro|para|pra)\s+(.+)$",
         r"(?:pro|para|do|da|de)\s+cliente\s+(.+)$",
         r"cliente\s+(.+)$",
     ]
@@ -55,6 +56,6 @@ def extract_client_name_for_contract_query(message: str) -> Optional[str]:
         if match:
             name = re.sub(r"[\]\[\)\(\.,;:!?]+$", "", match.group(1).strip())
             name = re.sub(r"\s+", " ", name).strip()
-            if name:
+            if name and _normalize_key(name) not in {"ele", "ela", "dele", "dela"}:
                 return name
     return None

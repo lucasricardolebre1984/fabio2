@@ -44,6 +44,10 @@ Este arquivo centraliza os artefatos institucionais de blindagem para homologaca
 - `backend/COFRE/system/blindagem/audit/VIVA_AGENDA_NLU_COHERENCE_2026-02-21.md`
 - `backend/COFRE/system/blindagem/audit/VIVA_AGENDA_TRUTH_GUARD_2026-02-21.md`
 - `backend/COFRE/system/blindagem/audit/VIVA_STREAM_CANONICAL_ORCHESTRATION_2026-02-21.md`
+- `backend/COFRE/system/blindagem/audit/VIVA_DOMAIN_FOLLOWUP_TRUTH_GUARD_2026-02-21.md`
+- `backend/COFRE/system/blindagem/audit/VIVA_CAMPAIGN_CONTEXT_TRUTH_GUARD_2026-02-21.md`
+- `backend/COFRE/system/blindagem/audit/WHATSAPP_VISIBILITY_RUNTIME_GUARD_2026-02-21.md`
+- `backend/COFRE/system/blindagem/audit/WHATSAPP_LID_RESOLUTION_HARDENING_2026-02-21.md`
 
 ## Rollbacks
 - `backend/COFRE/system/blindagem/rollback/rollback_gate2_cca7e3d.patch`

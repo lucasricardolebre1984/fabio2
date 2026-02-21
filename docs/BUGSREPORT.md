@@ -2529,3 +2529,68 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
 - `docker-compose.prod.yml` e `docker-compose-prod.yml`
   - default de `WA_INSTANCE_NAME` alterado para `fc-solucoes-local` quando variavel nao for definida, reduzindo colisao local x producao em testes.
 **Status:** Resolvido
+
+### BUG-130: Fluxo de campanha perde contexto e cai em agenda/contagem indevida
+**Data:** 2026-02-21
+**Severidade:** Critica
+**Descricao:** Durante briefing de campanha no chat `/viva` (tema/chamada/CTA), a resposta podia desviar para agenda (`Nao consegui confirmar criacao de compromisso...`) ou para contagem de campanhas (`Total geral...`) sem relacao com o comando atual.
+**Sintoma real observado:**
+- perda de contexto entre mensagens consecutivas de campanha;
+- confirmacao textual de campanha sem execucao real no SaaS.
+**Causa raiz:**
+- intent de contagem de campanhas ampla demais (falso positivo em texto de tema);
+- guard de agenda aplicado fora de contexto de agenda;
+- follow-up de campanha pendente (ex.: resposta de CTA) sem gatilho de geracao real;
+- sanitizacao de "sucesso fake" incompleta.
+**Correcao aplicada:**
+- `backend/app/services/assistant/intents/campanhas.py`
+  - `is_campaign_count_intent` endurecido com regex contextual.
+- `backend/app/services/viva_chat_orchestrator_service.py`
+  - guard de agenda condicionado a operacao real de agenda;
+  - follow-up de campanha pendente passa a aceitar resposta de campo (CTA) para gerar.
+- `backend/app/services/viva_chat_runtime_helpers_service.py`
+  - bloqueio de resposta textual fake de campanha criada/local salvo sem execucao.
+- `backend/tests/test_viva_domain_intents.py`
+- `backend/tests/test_viva_chat_orchestrator_guards.py`
+- `backend/tests/test_viva_chat_runtime_sanitizers.py`
+- `backend/COFRE/system/blindagem/audit/VIVA_CAMPAIGN_CONTEXT_TRUTH_GUARD_2026-02-21.md`
+**Status:** Resolvido
+
+### BUG-131: Webhook WhatsApp processava outbound e gerava loop/ruido de conversa
+**Data:** 2026-02-21
+**Severidade:** Critica
+**Descricao:** Payload em lote podia priorizar mensagem `fromMe=true`, levando o backend a processar evento outbound como se fosse inbound. Isso amplificava ruido no canal e prejudicava visibilidade/estado real das conversas no SaaS.
+**Sintoma real observado:**
+- repeticao de respostas no WhatsApp;
+- comportamento inconsistente na central de conversas.
+**Causa raiz:**
+- selecao do wrapper de mensagem em `data.messages[]` sem priorizacao de inbound;
+- ausencia de guard explicito para ignorar `fromMe=true`.
+**Correcao aplicada:**
+- `backend/app/services/evolution_webhook_service.py`
+  - guard para ignorar outbound (`fromMe=true`);
+  - em lotes, prioriza mensagem inbound e usa outbound apenas como fallback tecnico.
+- `backend/tests/test_evolution_webhook_lid_resolution.py`
+  - regressao para lote misto (`fromMe=true/false`) e helper `fromMe`.
+**Status:** Resolvido
+
+### BUG-132: Resolucao `@lid` regressiva deixava conversa sem resposta
+**Data:** 2026-02-21
+**Severidade:** Critica
+**Descricao:** Mesmo com webhook ativo, alguns contatos chegavam como `remoteJid=@lid` sem metadado alternativo explicito e o backend nao resolvia numero entregavel, mantendo silencio no WhatsApp.
+**Sintoma real observado:**
+- mensagem inbound chegava no webhook, mas outbound ficava sem envio util;
+- central do SaaS podia ficar sem conversa ativa mesmo com mensagens no dia.
+**Causa raiz:**
+- estrategia conservadora de `_resolve_lid_number` aceitava apenas candidatos explicitos (`context_preferred_number` + `remoteJidAlt`);
+- cenarios sem esses campos retornavam `None` e bloqueavam envio.
+**Correcao aplicada:**
+- `backend/app/services/whatsapp_service.py`
+  - reativado match seguro por `profilePicUrl` somente quando unico;
+  - reativado match por similaridade de nome com bonus de proximidade temporal (`updatedAt`);
+  - mantida validacao obrigatoria em `POST /chat/whatsappNumbers/{instance}` antes de enviar.
+- `backend/COFRE/system/blindagem/audit/WHATSAPP_LID_RESOLUTION_HARDENING_2026-02-21.md`
+- `backend/tests/test_whatsapp_lid_resolution.py`
+**Validacao tecnica:**
+- `pytest tests/test_whatsapp_lid_resolution.py tests/test_evolution_webhook_lid_resolution.py tests/test_viva_domain_intents.py tests/test_viva_chat_orchestrator_guards.py tests/test_viva_chat_runtime_sanitizers.py -q` => `33 passed`.
+**Status:** Resolvido
