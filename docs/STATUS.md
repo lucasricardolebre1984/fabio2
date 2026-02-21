@@ -7,6 +7,12 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
 
 - Persona canonica VIVA: `backend/COFRE/persona-skills/viva/AGENT.md`
 - Persona canonica VIVIANE: `backend/COFRE/persona-skills/viviane/AGENT.md`
+- Limite de escopo: VIVA = orquestrador interno; atendimento comercial humano externo = VIVIANE.
+- Referencia compartilhada de dominios: `backend/COFRE/persona-skills/references/saas-domains.md`
+- Base comercial Rezeta (Viviane): `backend/COFRE/persona-skills/references/rezeta-servicos.md`
+- Catalogo de endpoints para execucao da Viviane: `backend/COFRE/persona-skills/references/saas-endpoints-catalog.md`
+- Principios de conversa natural da Viviane: `backend/COFRE/persona-skills/references/conversation-principles.md`
+- Logica ODT operacional da VIVA: `backend/COFRE/persona-skills/references/viva-odt-logic.md`
 - Memorias canonicas: `backend/COFRE/memories/<tabela>/`
 - Protocolo: `docs/COFRE_RAG_PROTOCOL.md`
 
@@ -145,6 +151,9 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
   - `backend/COFRE/system/blindagem/audit/WHATSAPP_SAAS_INTERMITTENCY_VALIDATION_2026-02-21.md`
   - `docs/AUDIT/WHATSAPP_CAMPAIGN_ENDPOINT_TRACE_2026-02-21.md`
   - `docs/AUDIT/COMPONENT_COMMON_DOMAIN_DETECTION_2026-02-21.md`
+- Fechamento do redesign de personas VIVA/VIVIANE:
+  - `docs/AUDIT/VIVA_VIVIANE_AGENTS_REDESIGN_2026-02-21.md`
+  - `docs/AUDIT/CONTEXT_SOURCE_OF_TRUTH_2026-02-21.md`
 
 ## Diretriz de deploy institucional
 

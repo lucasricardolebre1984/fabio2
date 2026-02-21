@@ -1,4 +1,4 @@
-﻿# Docs - Fonte de Verdade
+# Docs - Fonte de Verdade
 
 Data de consolidacao: 2026-02-16
 Escopo: estrutura ativa de documentacao institucional do SaaS FC Solucoes Financeiras.
@@ -23,6 +23,7 @@ Escopo: estrutura ativa de documentacao institucional do SaaS FC Solucoes Financ
 - `docs/BUGSREPORT.md`
 - `docs/RUNBOOK.md`
 - `docs/DECISIONS.md`
+- `docs/ROADMAP_NX.md` (roadmap de modularizacao Nx)
 
 ## Manuais operacionais
 
@@ -30,6 +31,9 @@ Escopo: estrutura ativa de documentacao institucional do SaaS FC Solucoes Financ
 
 ## Auditoria documental
 
+- Verificacao de saude (Git + Ubuntu): `docs/AUDIT/PROJECT_HEALTH_VERIFICATION_2026-02-21.md`
+- Redesign de personas VIVA/VIVIANE (skills 1-6): `docs/AUDIT/VIVA_VIVIANE_AGENTS_REDESIGN_2026-02-21.md`
+- Contexto fonte da verdade da rodada: `docs/AUDIT/CONTEXT_SOURCE_OF_TRUTH_2026-02-21.md`
 - Matriz menu -> API -> banco -> COFRE: `backend/COFRE/system/blindagem/audit/menu-endpoint-matrix.md`
 - Auditoria de documentacao desta rodada: `backend/COFRE/system/blindagem/audit/DOCS_AUDIT_2026-02-16.md`
 - Auditoria de qualidade web (perf/a11y/seo/best-practices + seguranca): `backend/COFRE/system/blindagem/audit/WEB_QUALITY_AUDIT_2026-02-16.md`

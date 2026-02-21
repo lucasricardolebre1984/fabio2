@@ -1,4 +1,4 @@
-﻿# SESSION - contexto da rodada atual
+# SESSION - contexto da rodada atual
 
 Data da rodada: 2026-02-21
 Branch: main
@@ -92,6 +92,45 @@ Status: consolidacao final de homologacao local (WhatsApp/VIVA/Viviane) + ajuste
     - similaridade de nome + proximidade temporal de chats;
   - validacao obrigatoria de numero em `chat/whatsappNumbers` antes de enviar.
   - `backend/COFRE/system/blindagem/audit/WHATSAPP_LID_RESOLUTION_HARDENING_2026-02-21.md`
+
+## Redesign VIVA/VIVIANE (2026-02-21)
+
+- Criado `docs/AUDIT/VIVA_VIVIANE_AGENTS_REDESIGN_2026-02-21.md` conforme GODMOD.
+- Contexto fonte da verdade salvo em:
+  - `docs/AUDIT/CONTEXT_SOURCE_OF_TRUTH_2026-02-21.md`
+- Skills 1–6 concluidas:
+  - domain-analysis
+  - domain-identification-grouping
+  - component-common-domain-detection
+  - skill-creator
+  - subagent-creator
+  - docs-writer
+- Entregas da rodada:
+  - `backend/COFRE/persona-skills/viva/AGENT.md` (v4.0)
+  - `backend/COFRE/persona-skills/viviane/AGENT.md` (v4.0)
+  - `backend/COFRE/persona-skills/references/saas-domains.md`
+  - `backend/COFRE/persona-skills/references/rezeta-servicos.md`
+- Ajuste de alinhamento de persona (retificacao):
+  - insumo de "sabedoria" aplicado apenas na VIVIANE;
+  - VIVA mantida como orquestrador interno, sem persona de atendimento comercial externo.
+- Refino adicional da VIVIANE com base literal no contexto de servicos Rezeta:
+  - `backend/COFRE/persona-skills/viviane/AGENT.md` atualizado para formato obrigatorio de explicacao comercial (o que e / para quem / como funciona / diferenciais).
+  - `backend/COFRE/persona-skills/references/rezeta-servicos.md` expandido com fichas por servico e script de fala comercial.
+- Evolucao para perfil "JARVIS pessoal" da VIVIANE (execucao direta sem confirmacao):
+  - `backend/COFRE/persona-skills/viviane/AGENT.md` atualizado para v5.0.
+  - novo catalogo operacional de endpoints: `backend/COFRE/persona-skills/references/saas-endpoints-catalog.md`.
+  - novos principios de conversa natural: `backend/COFRE/persona-skills/references/conversation-principles.md`.
+- Reforco por literatura (conversacao + vendas + ODT):
+  - `backend/COFRE/persona-skills/viviane/AGENT.md` atualizado para v5.1 com secao de persuasao consultiva.
+  - `backend/COFRE/persona-skills/references/conversation-principles.md` ampliado com SPIN, Cialdini e OARS.
+  - `backend/COFRE/persona-skills/viva/AGENT.md` atualizado para v4.1 com logica ODT operacional.
+  - nova referencia ODT: `backend/COFRE/persona-skills/references/viva-odt-logic.md`.
+
+## Verificação de saúde institucional (2026-02-21)
+
+- Criado `docs/AUDIT/PROJECT_HEALTH_VERIFICATION_2026-02-21.md` conforme protocolo GODMOD.
+- Git (Windows): saudável — main, limpo, sincronizado com origin/main.
+- Ubuntu: script de diagnóstico disponível no audit; Lucas deve executar no servidor e reportar.
 
 ## Novos bugs abertos nesta auditoria
 
