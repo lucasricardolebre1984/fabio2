@@ -1,6 +1,8 @@
 """PDF service - Gera contratos em PDF usando WeasyPrint."""
 import os
-from datetime import datetime
+import re
+import html as html_lib
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, Any, Optional
 from uuid import UUID
@@ -10,6 +12,7 @@ from weasyprint import HTML, CSS
 
 from app.config import settings
 from app.services.extenso_service import ExtensoService
+from app.services.contrato_annex_loader import list_fixed_annexes_for_template
 
 
 class PDFService:
@@ -115,11 +118,181 @@ class PDFService:
     .testemunhas {
         margin-top: 1cm;
     }
+
+    .anexo-fixo {
+        page-break-before: always;
+        margin-top: 0.5cm;
+        text-align: justify;
+        font-size: 11pt;
+    }
+
+    .anexo-fixo h2, .anexo-fixo h3, .anexo-fixo h4 {
+        margin: 0 0 0.3cm 0;
+        text-transform: uppercase;
+        font-weight: bold;
+        color: #102a43;
+    }
+
+    .anexo-fixo p {
+        margin: 0.2cm 0;
+    }
+
+    .anexo-fixo ul {
+        margin: 0.2cm 0;
+        padding-left: 0.8cm;
+    }
+
+    .anexo-fixo blockquote {
+        margin: 0.2cm 0;
+        padding-left: 0.3cm;
+        border-left: 2px solid #718096;
+        color: #2d3748;
+    }
     """
     
     def __init__(self):
         self.storage_path = settings.STORAGE_LOCAL_PATH
         os.makedirs(self.storage_path, exist_ok=True)
+
+    @staticmethod
+    def _format_document(documento: str) -> str:
+        clean = "".join(ch for ch in str(documento or "") if ch.isdigit())
+        if len(clean) == 11:
+            return f"{clean[:3]}.{clean[3:6]}.{clean[6:9]}-{clean[9:]}"
+        if len(clean) == 14:
+            return f"{clean[:2]}.{clean[2:5]}.{clean[5:8]}/{clean[8:12]}-{clean[12:]}"
+        return str(documento or "")
+
+    @staticmethod
+    def _extract_markdown_payload(value: str) -> str:
+        text = str(value or "").strip()
+        if not text:
+            return ""
+        match = re.search(r"```(?:markdown)?\s*([\s\S]*?)```", text, flags=re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+        return text
+
+    @staticmethod
+    def _format_contract_date(dados: Dict[str, Any]) -> str:
+        date_value = str(dados.get("data_assinatura") or "").strip()
+        if re.match(r"^\d{2}/\d{2}/\d{4}$", date_value):
+            return date_value
+        if date_value:
+            try:
+                parsed = datetime.fromisoformat(date_value.replace("Z", "+00:00"))
+                return parsed.strftime("%d/%m/%Y")
+            except Exception:
+                pass
+        return datetime.now().strftime("%d/%m/%Y")
+
+    def _format_date_plus_days(self, dados: Dict[str, Any], days: int) -> str:
+        contract_date = self._format_contract_date(dados)
+        try:
+            parsed = datetime.strptime(contract_date, "%d/%m/%Y")
+            return (parsed + timedelta(days=days)).strftime("%d/%m/%Y")
+        except Exception:
+            return contract_date
+
+    def _replace_annex_header_tokens(self, markdown: str, dados: Dict[str, Any]) -> str:
+        mapped = {
+            "[NOME COMPLETO DO CLIENTE]": str(dados.get("contratante_nome") or ""),
+            "[NÚMERO DO DOCUMENTO]": self._format_document(str(dados.get("contratante_documento") or "")),
+            "[NUMERO DO DOCUMENTO]": self._format_document(str(dados.get("contratante_documento") or "")),
+            "[NÚMERO DO CONTRATO]": str(dados.get("numero") or ""),
+            "[NUMERO DO CONTRATO]": str(dados.get("numero") or ""),
+            "[DATA + 7 DIAS]": self._format_date_plus_days(dados, 7),
+            "[DATA]": self._format_contract_date(dados),
+        }
+
+        lines = markdown.splitlines()
+        output_lines: list[str] = []
+        header_open = True
+        for line in lines:
+            current = line
+            if header_open:
+                for token, replacement in mapped.items():
+                    current = current.replace(token, replacement)
+            output_lines.append(current)
+            if line.strip() == "---":
+                header_open = False
+        return "\n".join(output_lines)
+
+    @staticmethod
+    def _render_markdown_inline_html(value: str) -> str:
+        escaped = html_lib.escape(value)
+        escaped = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped)
+        escaped = re.sub(r"__(.+?)__", r"<strong>\1</strong>", escaped)
+        escaped = re.sub(r"`(.+?)`", r"<code>\1</code>", escaped)
+        return escaped
+
+    def _render_annex_markdown_to_html(self, markdown: str, dados: Dict[str, Any]) -> str:
+        source = self._extract_markdown_payload(markdown)
+        normalized = self._replace_annex_header_tokens(source, dados)
+        if not normalized.strip():
+            return ""
+
+        nodes: list[str] = []
+        list_items: list[str] = []
+
+        def flush_list() -> None:
+            nonlocal list_items
+            if not list_items:
+                return
+            nodes.append(
+                "<ul>"
+                + "".join(f"<li>{self._render_markdown_inline_html(item)}</li>" for item in list_items)
+                + "</ul>"
+            )
+            list_items = []
+
+        for raw_line in normalized.splitlines():
+            line = raw_line.strip()
+            if not line:
+                flush_list()
+                continue
+            if line == "---":
+                flush_list()
+                nodes.append("<hr>")
+                continue
+            if line.startswith(">"):
+                flush_list()
+                nodes.append(
+                    f"<blockquote>{self._render_markdown_inline_html(line.lstrip('>').strip())}</blockquote>"
+                )
+                continue
+
+            heading = re.match(r"^(#{1,3})\s+(.*)$", line)
+            if heading:
+                flush_list()
+                level = len(heading.group(1))
+                tag = "h2" if level == 1 else "h3" if level == 2 else "h4"
+                nodes.append(f"<{tag}>{self._render_markdown_inline_html(heading.group(2).strip())}</{tag}>")
+                continue
+
+            if re.match(r"^[-*]\s+", line):
+                list_items.append(re.sub(r"^[-*]\s+", "", line).strip())
+                continue
+
+            flush_list()
+            nodes.append(f"<p>{self._render_markdown_inline_html(line)}</p>")
+
+        flush_list()
+        return "".join(nodes)
+
+    def _render_fixed_annexes_html(self, dados: Dict[str, Any]) -> str:
+        template_id = str(dados.get("template_id") or "").strip().lower()
+        annexes = list_fixed_annexes_for_template(template_id)
+        if not annexes:
+            return ""
+
+        blocks: list[str] = []
+        for annex in sorted(annexes, key=lambda item: int(item.get("ordem") or 0)):
+            body = self._render_annex_markdown_to_html(str(annex.get("conteudo_markdown") or ""), dados)
+            if not body:
+                continue
+            blocks.append(f'<section class="anexo-fixo">{body}</section>')
+        return "".join(blocks)
     
     def generate_contrato_bacen(
         self,
@@ -151,6 +324,7 @@ class PDFService:
     
     def _render_template_bacen(self, dados: Dict[str, Any]) -> str:
         """Render Bacen contract HTML template."""
+        anexos_html = self._render_fixed_annexes_html(dados)
         
         template_html = """
         <!DOCTYPE html>
@@ -336,9 +510,11 @@ class PDFService:
                        CPF:</p>
                 </div>
             </div>
+
+            {{ anexos_html }}
         </body>
         </html>
         """
         
         template = Template(template_html)
-        return template.render(**dados)
+        return template.render(**dados, anexos_html=anexos_html)

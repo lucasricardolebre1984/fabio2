@@ -1,0 +1,1156 @@
+diff --git a/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md b/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
+index b5542ad..c8234df 100644
+--- a/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
++++ b/backend/COFRE/system/blindagem/BLINDAGEM_INDEX.md
+@@ -48,6 +48,7 @@ Este arquivo centraliza os artefatos institucionais de blindagem para homologaca
+ - `backend/COFRE/system/blindagem/audit/VIVA_CAMPAIGN_CONTEXT_TRUTH_GUARD_2026-02-21.md`
+ - `backend/COFRE/system/blindagem/audit/WHATSAPP_VISIBILITY_RUNTIME_GUARD_2026-02-21.md`
+ - `backend/COFRE/system/blindagem/audit/WHATSAPP_LID_RESOLUTION_HARDENING_2026-02-21.md`
++- `backend/COFRE/system/blindagem/audit/CONTRATOS_ANEXOS_FIXOS_2026-03-11.md`
+ 
+ ## Rollbacks
+ - `backend/COFRE/system/blindagem/rollback/rollback_gate2_cca7e3d.patch`
+@@ -68,6 +69,8 @@ Este arquivo centraliza os artefatos institucionais de blindagem para homologaca
+ - `backend/COFRE/system/blindagem/rollback/rollback_viva_agenda_nlu_coherence_20260221_005642.patch`
+ - `backend/COFRE/system/blindagem/rollback/rollback_viva_stream_canonical_20260221_022500_baseline.txt`
+ - `backend/COFRE/system/blindagem/rollback/rollback_viva_stream_canonical_20260221_022500.patch`
++- `backend/COFRE/system/blindagem/rollback/rollback_contratos_anexos_fixos_20260311_111327_pre_fix_baseline.txt`
++- `backend/COFRE/system/blindagem/rollback/rollback_contratos_anexos_fixos_20260311_111327.patch`
+ 
+ ## Regra
+ - Novos relatorios de auditoria devem entrar em `backend/COFRE/system/blindagem/audit/`.
+diff --git a/backend/app/schemas/contrato.py b/backend/app/schemas/contrato.py
+index 014df56..46ba678 100644
+--- a/backend/app/schemas/contrato.py
++++ b/backend/app/schemas/contrato.py
+@@ -111,6 +111,7 @@ class ContratoTemplateResponse(BaseModel):
+     campos: List[Dict[str, Any]]
+     secoes: List[Dict[str, Any]]
+     clausulas: Optional[List[Dict[str, Any]]] = None
++    anexos_fixos: Optional[List[Dict[str, Any]]] = None
+     created_at: Optional[datetime] = None
+     updated_at: Optional[datetime] = None
+ 
+diff --git a/backend/app/services/contrato_service.py b/backend/app/services/contrato_service.py
+index b3fd6ac..1e2de08 100644
+--- a/backend/app/services/contrato_service.py
++++ b/backend/app/services/contrato_service.py
+@@ -19,6 +19,7 @@ from app.services.contrato_template_loader import (
+     load_contract_template,
+     normalize_template_payload,
+ )
++from app.services.contrato_annex_loader import list_fixed_annexes_for_template
+ from app.services.extenso_service import ExtensoService
+ from app.services.viva_shared_service import _normalize_mojibake_text
+ 
+@@ -239,6 +240,7 @@ class ContratoService:
+ 
+         file_template = load_contract_template(template_key)
+         if file_template:
++            file_template["anexos_fixos"] = list_fixed_annexes_for_template(template_key)
+             return file_template
+ 
+         # Try database when file template is unavailable.
+@@ -268,11 +270,15 @@ class ContratoService:
+                 "created_at": template.created_at,
+                 "updated_at": template.updated_at
+             }
+-            return normalize_template_payload(template_payload)
++            normalized_payload = normalize_template_payload(template_payload)
++            normalized_payload["anexos_fixos"] = list_fixed_annexes_for_template(template_key)
++            return normalized_payload
+         
+         template_fallback = FALLBACK_TEMPLATES.get(template_key)
+         if template_fallback:
+-            return template_fallback
++            fallback_payload = dict(template_fallback)
++            fallback_payload["anexos_fixos"] = list_fixed_annexes_for_template(template_key)
++            return fallback_payload
+         
+         return None
+ 
+diff --git a/backend/app/services/pdf_service.py b/backend/app/services/pdf_service.py
+index 1020b51..17a32e2 100644
+--- a/backend/app/services/pdf_service.py
++++ b/backend/app/services/pdf_service.py
+@@ -1,6 +1,8 @@
+ """PDF service - Gera contratos em PDF usando WeasyPrint."""
+ import os
+-from datetime import datetime
++import re
++import html as html_lib
++from datetime import datetime, timedelta
+ from decimal import Decimal
+ from typing import Dict, Any, Optional
+ from uuid import UUID
+@@ -10,6 +12,7 @@ from weasyprint import HTML, CSS
+ 
+ from app.config import settings
+ from app.services.extenso_service import ExtensoService
++from app.services.contrato_annex_loader import list_fixed_annexes_for_template
+ 
+ 
+ class PDFService:
+@@ -115,11 +118,181 @@ class PDFService:
+     .testemunhas {
+         margin-top: 1cm;
+     }
++
++    .anexo-fixo {
++        page-break-before: always;
++        margin-top: 0.5cm;
++        text-align: justify;
++        font-size: 11pt;
++    }
++
++    .anexo-fixo h2, .anexo-fixo h3, .anexo-fixo h4 {
++        margin: 0 0 0.3cm 0;
++        text-transform: uppercase;
++        font-weight: bold;
++        color: #102a43;
++    }
++
++    .anexo-fixo p {
++        margin: 0.2cm 0;
++    }
++
++    .anexo-fixo ul {
++        margin: 0.2cm 0;
++        padding-left: 0.8cm;
++    }
++
++    .anexo-fixo blockquote {
++        margin: 0.2cm 0;
++        padding-left: 0.3cm;
++        border-left: 2px solid #718096;
++        color: #2d3748;
++    }
+     """
+     
+     def __init__(self):
+         self.storage_path = settings.STORAGE_LOCAL_PATH
+         os.makedirs(self.storage_path, exist_ok=True)
++
++    @staticmethod
++    def _format_document(documento: str) -> str:
++        clean = "".join(ch for ch in str(documento or "") if ch.isdigit())
++        if len(clean) == 11:
++            return f"{clean[:3]}.{clean[3:6]}.{clean[6:9]}-{clean[9:]}"
++        if len(clean) == 14:
++            return f"{clean[:2]}.{clean[2:5]}.{clean[5:8]}/{clean[8:12]}-{clean[12:]}"
++        return str(documento or "")
++
++    @staticmethod
++    def _extract_markdown_payload(value: str) -> str:
++        text = str(value or "").strip()
++        if not text:
++            return ""
++        match = re.search(r"```(?:markdown)?\s*([\s\S]*?)```", text, flags=re.IGNORECASE)
++        if match:
++            return match.group(1).strip()
++        return text
++
++    @staticmethod
++    def _format_contract_date(dados: Dict[str, Any]) -> str:
++        date_value = str(dados.get("data_assinatura") or "").strip()
++        if re.match(r"^\d{2}/\d{2}/\d{4}$", date_value):
++            return date_value
++        if date_value:
++            try:
++                parsed = datetime.fromisoformat(date_value.replace("Z", "+00:00"))
++                return parsed.strftime("%d/%m/%Y")
++            except Exception:
++                pass
++        return datetime.now().strftime("%d/%m/%Y")
++
++    def _format_date_plus_days(self, dados: Dict[str, Any], days: int) -> str:
++        contract_date = self._format_contract_date(dados)
++        try:
++            parsed = datetime.strptime(contract_date, "%d/%m/%Y")
++            return (parsed + timedelta(days=days)).strftime("%d/%m/%Y")
++        except Exception:
++            return contract_date
++
++    def _replace_annex_header_tokens(self, markdown: str, dados: Dict[str, Any]) -> str:
++        mapped = {
++            "[NOME COMPLETO DO CLIENTE]": str(dados.get("contratante_nome") or ""),
++            "[NÚMERO DO DOCUMENTO]": self._format_document(str(dados.get("contratante_documento") or "")),
++            "[NUMERO DO DOCUMENTO]": self._format_document(str(dados.get("contratante_documento") or "")),
++            "[NÚMERO DO CONTRATO]": str(dados.get("numero") or ""),
++            "[NUMERO DO CONTRATO]": str(dados.get("numero") or ""),
++            "[DATA + 7 DIAS]": self._format_date_plus_days(dados, 7),
++            "[DATA]": self._format_contract_date(dados),
++        }
++
++        lines = markdown.splitlines()
++        output_lines: list[str] = []
++        header_open = True
++        for line in lines:
++            current = line
++            if header_open:
++                for token, replacement in mapped.items():
++                    current = current.replace(token, replacement)
++            output_lines.append(current)
++            if line.strip() == "---":
++                header_open = False
++        return "\n".join(output_lines)
++
++    @staticmethod
++    def _render_markdown_inline_html(value: str) -> str:
++        escaped = html_lib.escape(value)
++        escaped = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped)
++        escaped = re.sub(r"__(.+?)__", r"<strong>\1</strong>", escaped)
++        escaped = re.sub(r"`(.+?)`", r"<code>\1</code>", escaped)
++        return escaped
++
++    def _render_annex_markdown_to_html(self, markdown: str, dados: Dict[str, Any]) -> str:
++        source = self._extract_markdown_payload(markdown)
++        normalized = self._replace_annex_header_tokens(source, dados)
++        if not normalized.strip():
++            return ""
++
++        nodes: list[str] = []
++        list_items: list[str] = []
++
++        def flush_list() -> None:
++            nonlocal list_items
++            if not list_items:
++                return
++            nodes.append(
++                "<ul>"
++                + "".join(f"<li>{self._render_markdown_inline_html(item)}</li>" for item in list_items)
++                + "</ul>"
++            )
++            list_items = []
++
++        for raw_line in normalized.splitlines():
++            line = raw_line.strip()
++            if not line:
++                flush_list()
++                continue
++            if line == "---":
++                flush_list()
++                nodes.append("<hr>")
++                continue
++            if line.startswith(">"):
++                flush_list()
++                nodes.append(
++                    f"<blockquote>{self._render_markdown_inline_html(line.lstrip('>').strip())}</blockquote>"
++                )
++                continue
++
++            heading = re.match(r"^(#{1,3})\s+(.*)$", line)
++            if heading:
++                flush_list()
++                level = len(heading.group(1))
++                tag = "h2" if level == 1 else "h3" if level == 2 else "h4"
++                nodes.append(f"<{tag}>{self._render_markdown_inline_html(heading.group(2).strip())}</{tag}>")
++                continue
++
++            if re.match(r"^[-*]\s+", line):
++                list_items.append(re.sub(r"^[-*]\s+", "", line).strip())
++                continue
++
++            flush_list()
++            nodes.append(f"<p>{self._render_markdown_inline_html(line)}</p>")
++
++        flush_list()
++        return "".join(nodes)
++
++    def _render_fixed_annexes_html(self, dados: Dict[str, Any]) -> str:
++        template_id = str(dados.get("template_id") or "").strip().lower()
++        annexes = list_fixed_annexes_for_template(template_id)
++        if not annexes:
++            return ""
++
++        blocks: list[str] = []
++        for annex in sorted(annexes, key=lambda item: int(item.get("ordem") or 0)):
++            body = self._render_annex_markdown_to_html(str(annex.get("conteudo_markdown") or ""), dados)
++            if not body:
++                continue
++            blocks.append(f'<section class="anexo-fixo">{body}</section>')
++        return "".join(blocks)
+     
+     def generate_contrato_bacen(
+         self,
+@@ -151,6 +324,7 @@ class PDFService:
+     
+     def _render_template_bacen(self, dados: Dict[str, Any]) -> str:
+         """Render Bacen contract HTML template."""
++        anexos_html = self._render_fixed_annexes_html(dados)
+         
+         template_html = """
+         <!DOCTYPE html>
+@@ -336,9 +510,11 @@ class PDFService:
+                        CPF:</p>
+                 </div>
+             </div>
++
++            {{ anexos_html }}
+         </body>
+         </html>
+         """
+         
+         template = Template(template_html)
+-        return template.render(**dados)
++        return template.render(**dados, anexos_html=anexos_html)
+diff --git a/backend/app/services/pdf_service_playwright.py b/backend/app/services/pdf_service_playwright.py
+index bdd795b..bbefb05 100644
+--- a/backend/app/services/pdf_service_playwright.py
++++ b/backend/app/services/pdf_service_playwright.py
+@@ -2,7 +2,7 @@
+ import base64
+ import html
+ import re
+-from datetime import datetime
++from datetime import datetime, timedelta
+ from pathlib import Path
+ from typing import Any, Dict, List, Optional
+ from uuid import UUID
+@@ -12,6 +12,7 @@ from sqlalchemy import select
+ from sqlalchemy.ext.asyncio import AsyncSession
+ 
+ from app.models.contrato import Contrato
++from app.services.contrato_annex_loader import list_fixed_annexes_for_template
+ from app.services.contrato_template_loader import load_contract_template
+ 
+ 
+@@ -117,6 +118,146 @@ class PDFService:
+         text = re.sub(r"`(.*?)`", r"\1", text)
+         return text.strip()
+ 
++    @staticmethod
++    def _extract_markdown_payload(value: str) -> str:
++        text = str(value or "").strip()
++        if not text:
++            return ""
++
++        match = re.search(r"```(?:markdown)?\s*([\s\S]*?)```", text, flags=re.IGNORECASE)
++        if match:
++            return match.group(1).strip()
++        return text
++
++    @staticmethod
++    def _format_contract_date(date_value: Optional[str], fallback_dt: datetime) -> str:
++        text = str(date_value or "").strip()
++        if text:
++            if re.match(r"^\d{2}/\d{2}/\d{4}$", text):
++                return text
++            try:
++                parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
++                return parsed.strftime("%d/%m/%Y")
++            except Exception:
++                pass
++        return fallback_dt.strftime("%d/%m/%Y")
++
++    def _date_plus_days(self, date_value: Optional[str], fallback_dt: datetime, days: int) -> str:
++        contract_date = self._format_contract_date(date_value, fallback_dt)
++        try:
++            parsed = datetime.strptime(contract_date, "%d/%m/%Y")
++            return (parsed + timedelta(days=days)).strftime("%d/%m/%Y")
++        except Exception:
++            return contract_date
++
++    def _replace_annex_header_tokens(self, markdown: str, contrato: Contrato) -> str:
++        if not markdown:
++            return ""
++
++        contract_date = self._format_contract_date(contrato.data_assinatura, contrato.created_at)
++        plus_seven_days = self._date_plus_days(contrato.data_assinatura, contrato.created_at, 7)
++
++        mapped = {
++            "[NOME COMPLETO DO CLIENTE]": str(contrato.contratante_nome or ""),
++            "[NÚMERO DO DOCUMENTO]": self._format_document(contrato.contratante_documento),
++            "[NUMERO DO DOCUMENTO]": self._format_document(contrato.contratante_documento),
++            "[NÚMERO DO CONTRATO]": str(contrato.numero or ""),
++            "[NUMERO DO CONTRATO]": str(contrato.numero or ""),
++            "[DATA + 7 DIAS]": plus_seven_days,
++            "[DATA]": contract_date,
++        }
++
++        lines = markdown.splitlines()
++        output_lines: List[str] = []
++        header_open = True
++
++        for line in lines:
++            current = line
++            if header_open:
++                for token, replacement in mapped.items():
++                    current = current.replace(token, replacement)
++            output_lines.append(current)
++            if line.strip() == "---":
++                header_open = False
++
++        return "\n".join(output_lines)
++
++    @staticmethod
++    def _render_markdown_inline_html(value: str) -> str:
++        escaped = html.escape(value)
++        escaped = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped)
++        escaped = re.sub(r"__(.+?)__", r"<strong>\1</strong>", escaped)
++        escaped = re.sub(r"`(.+?)`", r"<code>\1</code>", escaped)
++        return escaped
++
++    def _render_markdown_document_html(self, contrato: Contrato, markdown: str) -> str:
++        normalized_source = self._normalize_mojibake_text(self._extract_markdown_payload(markdown))
++        content = self._replace_annex_header_tokens(normalized_source, contrato)
++        if not content:
++            return ""
++
++        nodes: List[str] = []
++        list_items: List[str] = []
++
++        def flush_list() -> None:
++            nonlocal list_items
++            if not list_items:
++                return
++            nodes.append(
++                "<ul>"
++                + "".join(f"<li>{self._render_markdown_inline_html(item)}</li>" for item in list_items)
++                + "</ul>"
++            )
++            list_items = []
++
++        for raw_line in content.splitlines():
++            line = raw_line.strip()
++            if not line:
++                flush_list()
++                continue
++
++            if line == "---":
++                flush_list()
++                nodes.append("<hr>")
++                continue
++
++            if line.startswith(">"):
++                flush_list()
++                quote_text = line.lstrip(">").strip()
++                nodes.append(f"<blockquote>{self._render_markdown_inline_html(quote_text)}</blockquote>")
++                continue
++
++            heading_match = re.match(r"^(#{1,3})\s+(.*)$", line)
++            if heading_match:
++                flush_list()
++                level = len(heading_match.group(1))
++                tag = "h2" if level == 1 else "h3" if level == 2 else "h4"
++                nodes.append(f"<{tag}>{self._render_markdown_inline_html(heading_match.group(2).strip())}</{tag}>")
++                continue
++
++            if re.match(r"^[-*]\s+", line):
++                list_items.append(re.sub(r"^[-*]\s+", "", line).strip())
++                continue
++
++            flush_list()
++            nodes.append(f"<p>{self._render_markdown_inline_html(line)}</p>")
++
++        flush_list()
++        return "".join(nodes)
++
++    def _render_annexes_html(self, contrato: Contrato, annexes: List[Dict[str, Any]]) -> str:
++        if not annexes:
++            return ""
++
++        blocks: List[str] = []
++        for annex in sorted(annexes, key=lambda item: int(item.get("ordem") or 0)):
++            markdown = str(annex.get("conteudo_markdown") or "")
++            annex_html = self._render_markdown_document_html(contrato, markdown)
++            if not annex_html:
++                continue
++            blocks.append(f'<section class="annex-page">{annex_html}</section>')
++        return "".join(blocks)
++
+     def _replace_tokens(self, value: str, contrato: Contrato) -> str:
+         dados_extras = contrato.dados_extras if isinstance(contrato.dados_extras, dict) else {}
+         cnh_numero = str(dados_extras.get("cnh_numero") or "-")
+@@ -125,6 +266,10 @@ class PDFService:
+             "[NOME COMPLETO DO CLIENTE]": str(contrato.contratante_nome or ""),
+             "[NÚMERO DO DOCUMENTO]": self._format_document(contrato.contratante_documento),
+             "[NUMERO DO DOCUMENTO]": self._format_document(contrato.contratante_documento),
++            "[NÚMERO DO CONTRATO]": str(contrato.numero or ""),
++            "[NUMERO DO CONTRATO]": str(contrato.numero or ""),
++            "[DATA]": self._format_contract_date(contrato.data_assinatura, contrato.created_at),
++            "[DATA + 7 DIAS]": self._date_plus_days(contrato.data_assinatura, contrato.created_at, 7),
+             "[E-MAIL DO CLIENTE]": str(contrato.contratante_email or ""),
+             "[TELEFONE DO CLIENTE]": str(contrato.contratante_telefone or "-"),
+             "[ENDEREÇO COMPLETO DO CLIENTE]": str(contrato.contratante_endereco or ""),
+@@ -261,6 +406,10 @@ class PDFService:
+ 
+         clauses = template_data.get("clausulas") if isinstance(template_data.get("clausulas"), list) else []
+         clauses_html = self._render_clauses_html(contrato, clauses)
++        annexes = template_data.get("anexos_fixos") if isinstance(template_data.get("anexos_fixos"), list) else []
++        if not annexes:
++            annexes = list_fixed_annexes_for_template(template_id)
++        annexes_html = self._render_annexes_html(contrato, annexes)
+         dados_extras = contrato.dados_extras if isinstance(contrato.dados_extras, dict) else {}
+         extras_html = "".join(
+             f"<p><strong>{html.escape(str(key).replace('_', ' ').title())}:</strong> {html.escape(str(value))}</p>"
+@@ -425,6 +574,41 @@ class PDFService:
+                     font-size: 8pt;
+                     color: #666;
+                 }}
++                .annex-page {{
++                    page-break-before: always;
++                    break-before: page;
++                    margin-top: 10px;
++                    font-size: 11pt;
++                    text-align: justify;
++                }}
++                .annex-page h2,
++                .annex-page h3,
++                .annex-page h4 {{
++                    margin: 0 0 8px 0;
++                    font-weight: 700;
++                    text-transform: uppercase;
++                }}
++                .annex-page p {{
++                    margin: 8px 0;
++                }}
++                .annex-page ul {{
++                    margin: 6px 0;
++                    padding-left: 24px;
++                }}
++                .annex-page li {{
++                    margin: 3px 0;
++                }}
++                .annex-page blockquote {{
++                    margin: 8px 0;
++                    padding-left: 10px;
++                    border-left: 3px solid #888;
++                    color: #333;
++                }}
++                .annex-page hr {{
++                    border: 0;
++                    border-top: 1px solid #bbb;
++                    margin: 10px 0;
++                }}
+             </style>
+         </head>
+         <body>
+@@ -507,6 +691,8 @@ class PDFService:
+                 </div>
+             </div>
+ 
++            {annexes_html}
++
+             <div class="footer">
+                 FC Soluções Financeiras - CNPJ: 57.815.628/0001-62<br>
+                 Documento gerado em {datetime.now().strftime('%d/%m/%Y')}
+diff --git a/docs/BUGSREPORT.md b/docs/BUGSREPORT.md
+index 7704968..e923b8d 100644
+--- a/docs/BUGSREPORT.md
++++ b/docs/BUGSREPORT.md
+@@ -2669,3 +2669,40 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
+ **Leitura tecnica atual:** sintoma permanece tratado como intermitente; nesta rodada nao houve reproducao continua de falha estrutural do pipeline.
+ **Status:** Em validacao
+ 
++### BUG-134: Contratos sem anexos institucionais obrigatorios na impressao/PDF
++**Data:** 2026-03-11
++**Severidade:** Alta
++**Descricao:** Os contratos nao estavam anexando automaticamente os termos institucionais obrigatorios no layout final de impressao/PDF, o que inviabiliza a formalizacao padrao exigida pelo cliente proprietario.
++**Escopo requerido:**
++- inserir `TERMODECIENCIAGERAL` em todos os contratos;
++- inserir `TERMODECIENCIARATING` apenas em:
++  - `aumento_score`
++  - `rating_convencional`
++  - `rating_express_pj`
++  - `rating_full_pj`
++- preencher apenas cabecalho com dados do contrato/cliente;
++- manter layout institucional atual de contratos.
++**Status:** Resolvido
++
++### Atualizacao 2026-03-11 (BUG-134 - anexos fixos em contratos)
++**Correcao aplicada:**
++- anexos canonicos versionados em:
++  - `contratos/anexos/TERMODECIENCIAGERAL.md`
++  - `contratos/anexos/TERMODECIENCIARATING.md`
++- regra de anexacao automatica centralizada no backend:
++  - `backend/app/services/contrato_annex_loader.py`
++  - anexo geral para todos os templates;
++  - anexo rating para `aumento_score`, `rating_convencional`, `rating_express_pj`, `rating_full_pj`.
++- render de PDF/impressao atualizado para incluir anexos mantendo layout:
++  - `frontend/src/lib/pdf.ts`
++  - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`
++  - `backend/app/services/pdf_service_playwright.py`
++  - `backend/app/services/pdf_service.py` (fallback WeasyPrint).
++- schema/API de template atualizado para expor anexos fixos:
++  - `backend/app/schemas/contrato.py`
++  - `backend/app/services/contrato_service.py`
++**Validacao:**
++- lint frontend sem erros;
++- py_compile dos arquivos backend alterados OK;
++- teste novo de regra de anexos (`2 passed`).
++
+diff --git a/docs/SESSION.md b/docs/SESSION.md
+index bf07ffd..594964a 100644
+--- a/docs/SESSION.md
++++ b/docs/SESSION.md
+@@ -132,6 +132,27 @@ Status: consolidacao final de homologacao local (WhatsApp/VIVA/Viviane) + ajuste
+ - Git (Windows): saudável — main, limpo, sincronizado com origin/main.
+ - Ubuntu: script de diagnóstico disponível no audit; Lucas deve executar no servidor e reportar.
+ 
++## Planejamento estrutural - modularizacao neutra (2026-03-09)
++
++- Criado `docs/PLANO_MODULARIZACAO_SAAS_NEUTRO_GATES.md`.
++- Plano reforcado com protocolo anti-drift, checklist de conformidade, pacote minimo por gate e condicoes de parada obrigatoria.
++- Criado `.specs/project/CONTEXT.md` como contexto base para gerar `spec.md`, `design.md` e `tasks.md` sem drift.
++- Criados `.specs/project/PROJECT.md`, `.specs/project/ROADMAP.md` e `.specs/project/STATE.md` para fechamento do pacote de contexto auditavel de novo chat.
++- Atualizado `AGENTS.md` com bootstrap obrigatorio de contexto para garantir carregamento consistente em nova sessao.
++- Objetivo desta rodada documental:
++  - definir o SaaS alvo em linguagem neutra;
++  - separar core, orquestracao, atendimento externo, configuracoes e auditoria;
++  - congelar gates de aprovacao antes de qualquer implementacao.
++- Diretriz aprovada para a proxima fase:
++  - `Concierge` sera a Persona 1 e orquestrador interno;
++  - `Persona 2` ficara restrita a atendimento WhatsApp e agendamentos;
++  - `Configuracoes` sera o dono de prompts, branding, temas e layout;
++  - `Financeiro` passa a ser dominio formal do produto.
++- Regra de execucao desta trilha:
++  - nao iniciar codigo sem aprovacao explicita do gate correspondente;
++  - nao fazer refatoracao lateral fora do contrato aprovado;
++  - usar eventos e APIs entre modulos, evitando acoplamento semantico novo.
++
+ ## Novos bugs abertos nesta auditoria
+ 
+ - BUG-116: vulnerabilidades criticas/altas no frontend (`next`, `axios`)
+@@ -145,4 +166,40 @@ Status: consolidacao final de homologacao local (WhatsApp/VIVA/Viviane) + ajuste
+ O historico tecnico antigo permanece preservado em arquivos de rollback e em documentos no VAULT.
+ Este arquivo passa a registrar apenas o contexto corrente de sessao.
+ 
+-Atualizado em: 2026-02-21
++Atualizado em: 2026-03-09
++
++## Atualizacao de sessao (2026-03-09)
++
++- Iniciada trilha documental do Gate 0 (linguagem e visao do produto), sem alteracoes de codigo.
++- Criado pacote de feature: `.specs/features/gate-0-linguagem-visao/` com `spec.md`, `design.md` e `tasks.md`.
++- `STATE.md` atualizado para refletir Gate 0 em elaboracao documental.
++- Proximo marco: aprovacao explicita do usuario para fechamento do Gate 0.
++
++## Atualizacao de sessao (2026-03-11) - pre-Gate0 contratos/anexos
++
++- Solicitacao aprovada pelo usuario para mudanca operacional antes da trilha de Gate 0:
++  - anexar termo geral em todos os contratos;
++  - anexar termo rating em templates especificos de rating.
++- BUG registrado antes da correcao: `BUG-134` em `docs/BUGSREPORT.md`.
++- Execucao institucional prevista nesta rodada:
++  - baseline de rollback no COFRE;
++  - implementacao em render de contratos (frontend + backend);
++  - auditoria e patch de rollback;
++  - commit e push da entrega.
++
++## Fechamento tecnico (2026-03-11) - contratos/anexos
++
++- Implementacao concluida com anexos fixos em contratos:
++  - anexo geral em todos os templates;
++  - anexo rating em `aumento_score`, `rating_convencional`, `rating_express_pj`, `rating_full_pj`.
++- Regra de preenchimento aplicada apenas no cabecalho dos anexos (dados do cliente/contrato).
++- Layout institucional preservado em:
++  - preview frontend;
++  - PDF frontend (print);
++  - PDF backend Playwright;
++  - fallback backend WeasyPrint.
++- Auditoria registrada em:
++  - `backend/COFRE/system/blindagem/audit/CONTRATOS_ANEXOS_FIXOS_2026-03-11.md`.
++- Rollback institucional registrado em:
++  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_anexos_fixos_20260311_111327_pre_fix_baseline.txt`
++  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_anexos_fixos_20260311_111327.patch`
+diff --git a/docs/STATUS.md b/docs/STATUS.md
+index d4fa2d2..5459009 100644
+--- a/docs/STATUS.md
++++ b/docs/STATUS.md
+@@ -3,6 +3,15 @@
+ Data: 2026-02-21
+ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA/Viviane funcionais e layout de contratos estabilizado para homologacao final; documentacao institucional normalizada (FOUNDATION + caminhos COFRE), drift operacional do Ubuntu limpo e persistindo como pendencia principal a intermitencia especifica no fluxo WhatsApp.
+ 
++## Planejamento estrutural pendente de aprovacao
++
++- Plano documental criado para neutralizacao e modularizacao do produto:
++  - `docs/PLANO_MODULARIZACAO_SAAS_NEUTRO_GATES.md`
++- Escopo do plano:
++  - separar core do SaaS, orquestracao interna, atendimento externo, configuracoes, financeiro, integracoes e auditoria;
++  - congelar contratos de API e eventos antes da fase de codigo;
++  - impedir drift de implementacao por gate nao aprovado.
++
+ ## Fonte de verdade ativa
+ 
+ - Persona canonica VIVA: `backend/COFRE/persona-skills/viva/AGENT.md`
+@@ -154,10 +163,37 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
+ - Fechamento do redesign de personas VIVA/VIVIANE:
+   - `docs/AUDIT/VIVA_VIVIANE_AGENTS_REDESIGN_2026-02-21.md`
+   - `docs/AUDIT/CONTEXT_SOURCE_OF_TRUTH_2026-02-21.md`
++- Planejamento de modularizacao neutra por gates:
++  - `docs/PLANO_MODULARIZACAO_SAAS_NEUTRO_GATES.md`
++  - plano reforcado com protocolo anti-drift, checklist obrigatorio, pacote minimo por gate e condicoes de parada.
++- Contexto base para specs:
++  - `.specs/project/CONTEXT.md`
++  - `.specs/project/PROJECT.md`
++  - `.specs/project/ROADMAP.md`
++  - `.specs/project/STATE.md`
++- Bootstrap de contexto refletido em:
++  - `AGENTS.md`
+ 
+ ## Diretriz de deploy institucional
+ 
+ - Alvo principal: Ubuntu AWS virgem (stack Docker)
+ - Nao usar Vercel como alvo institucional desta operacao
+ 
+-Atualizado em: 2026-02-21
++Atualizado em: 2026-03-09
++
++## Atualizacao 2026-03-09 (Gate 0)
++
++- Gate 0 iniciado em modo documental (sem execucao de codigo).
++- Pacote de especificacao criado em `.specs/features/gate-0-linguagem-visao/`.
++- Estado do projeto segue restrito a leitura/auditoria/documentacao ate aprovacao explicita de gate.
++
++## Atualizacao 2026-03-11 (pre-Gate0 contratos/anexos)
++
++- Mudanca operacional aprovada pelo usuario para contratos antes da trilha de Gate 0.
++- Objetivo da rodada: anexar termos institucionais fixos no PDF/impressao sem alterar layout base.
++- BUG-134 registrado como rastreio da correcao.
++- Execucao concluida com protocolo institucional de rollback e auditoria no COFRE.
++- Auditoria: `backend/COFRE/system/blindagem/audit/CONTRATOS_ANEXOS_FIXOS_2026-03-11.md`.
++- Rollback:
++  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_anexos_fixos_20260311_111327_pre_fix_baseline.txt`
++  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_anexos_fixos_20260311_111327.patch`
+diff --git a/frontend/src/app/(dashboard)/contratos/[id]/page.tsx b/frontend/src/app/(dashboard)/contratos/[id]/page.tsx
+index f2d449b..7ecfc41 100644
+--- a/frontend/src/app/(dashboard)/contratos/[id]/page.tsx
++++ b/frontend/src/app/(dashboard)/contratos/[id]/page.tsx
+@@ -50,6 +50,14 @@ interface TemplateClause {
+   paragrafos?: string[]
+ }
+ 
++interface TemplateAnnex {
++  id?: string
++  nome?: string
++  arquivo?: string
++  conteudo_markdown?: string
++  ordem?: number
++}
++
+ interface ContratoTemplateData {
+   id: string
+   nome: string
+@@ -58,6 +66,7 @@ interface ContratoTemplateData {
+   categoria?: string
+   subtitulo?: string
+   clausulas?: TemplateClause[]
++  anexos_fixos?: TemplateAnnex[]
+ }
+ 
+ const CP1252_UNICODE_TO_BYTE: Record<number, number> = {
+@@ -156,6 +165,36 @@ function formatPrazoExtensoDisplay(value: number, extenso?: string): string {
+   return String(extenso || '')
+ }
+ 
++function formatContractDate(contract?: Contrato | null): string {
++  const raw = String(contract?.data_assinatura || '').trim()
++  if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) return raw
++  if (raw) {
++    const parsed = new Date(raw)
++    if (!Number.isNaN(parsed.getTime())) return parsed.toLocaleDateString('pt-BR')
++  }
++  return new Date().toLocaleDateString('pt-BR')
++}
++
++function formatDatePlusDaysPtBr(dateBr: string, days: number): string {
++  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dateBr)
++  if (!match) return dateBr
++
++  const day = Number(match[1])
++  const month = Number(match[2]) - 1
++  const year = Number(match[3])
++  const date = new Date(year, month, day)
++  date.setDate(date.getDate() + days)
++  return date.toLocaleDateString('pt-BR')
++}
++
++function extractMarkdownPayload(value?: string): string {
++  const text = String(value || '').trim()
++  if (!text) return ''
++  const match = text.match(/```(?:markdown)?\s*([\s\S]*?)```/i)
++  if (match && match[1]) return match[1].trim()
++  return text
++}
++
+ function getClauseContent(clause?: TemplateClause): string {
+   const content = String(clause?.conteudo || '').trim()
+   if (content) return content
+@@ -270,11 +309,17 @@ export default function VisualizarContratoPage() {
+       'cnh_numero' in contrato.dados_extras
+         ? String(contrato.dados_extras.cnh_numero || '-')
+         : '-'
++    const contractDate = formatContractDate(contrato)
++    const plusSevenDays = formatDatePlusDaysPtBr(contractDate, 7)
+ 
+     const mapped: Record<string, string> = {
+       '[NOME COMPLETO DO CLIENTE]': contrato.contratante_nome,
+       '[NÚMERO DO DOCUMENTO]': formatCPF(contrato.contratante_documento),
+       '[NUMERO DO DOCUMENTO]': formatCPF(contrato.contratante_documento),
++      '[NÚMERO DO CONTRATO]': contrato.numero,
++      '[NUMERO DO CONTRATO]': contrato.numero,
++      '[DATA]': contractDate,
++      '[DATA + 7 DIAS]': plusSevenDays,
+       '[E-MAIL DO CLIENTE]': contrato.contratante_email,
+       '[TELEFONE DO CLIENTE]': contrato.contratante_telefone || '-',
+       '[ENDEREÇO COMPLETO DO CLIENTE]': contrato.contratante_endereco,
+@@ -300,6 +345,35 @@ export default function VisualizarContratoPage() {
+     }, value)
+   }
+ 
++  const replaceAnnexHeaderTokens = (value: string) => {
++    const contractDate = formatContractDate(contrato)
++    const plusSevenDays = formatDatePlusDaysPtBr(contractDate, 7)
++    const mapped: Record<string, string> = {
++      '[NOME COMPLETO DO CLIENTE]': contrato.contratante_nome,
++      '[NÚMERO DO DOCUMENTO]': formatCPF(contrato.contratante_documento),
++      '[NUMERO DO DOCUMENTO]': formatCPF(contrato.contratante_documento),
++      '[NÚMERO DO CONTRATO]': contrato.numero,
++      '[NUMERO DO CONTRATO]': contrato.numero,
++      '[DATA + 7 DIAS]': plusSevenDays,
++      '[DATA]': contractDate,
++    }
++
++    const lines = value.split('\n')
++    let headerOpen = true
++    return lines
++      .map((line) => {
++        let out = line
++        if (headerOpen) {
++          Object.entries(mapped).forEach(([token, replacement]) => {
++            out = out.split(token).join(replacement)
++          })
++        }
++        if (line.trim() === '---') headerOpen = false
++        return out
++      })
++      .join('\n')
++  }
++
+   const renderClauseBody = (content?: string) => {
+     const text = replaceTemplateTokens(normalizeMojibakeText(content || ''))
+     const lines = text.split('\n')
+@@ -343,9 +417,85 @@ export default function VisualizarContratoPage() {
+     return nodes
+   }
+ 
++  const renderAnnexBody = (content?: string) => {
++    const source = normalizeMojibakeText(extractMarkdownPayload(content))
++    const text = replaceAnnexHeaderTokens(source)
++    const lines = text.split('\n')
++
++    const nodes: JSX.Element[] = []
++    let bullets: string[] = []
++
++    const flushBullets = (keyPrefix: string) => {
++      if (!bullets.length) return
++      nodes.push(
++        <ul key={`${keyPrefix}-list-${nodes.length}`} className="list-disc space-y-1 pl-6">
++          {bullets.map((item, idx) => (
++            <li key={`${keyPrefix}-item-${idx}`}>{normalizeMarkdownInline(item)}</li>
++          ))}
++        </ul>
++      )
++      bullets = []
++    }
++
++    lines.forEach((rawLine, idx) => {
++      const line = rawLine.trim()
++      if (!line) {
++        flushBullets(`blank-${idx}`)
++        return
++      }
++
++      if (line === '---') {
++        flushBullets(`hr-${idx}`)
++        nodes.push(<hr key={`hr-${idx}`} className="my-2 border-gray-300" />)
++        return
++      }
++
++      if (/^>\s?/.test(line)) {
++        flushBullets(`quote-${idx}`)
++        nodes.push(
++          <blockquote key={`quote-${idx}`} className="my-2 border-l-4 border-gray-400 pl-3 text-gray-700">
++            {normalizeMarkdownInline(line.replace(/^>\s?/, ''))}
++          </blockquote>
++        )
++        return
++      }
++
++      const heading = /^(#{1,3})\s+(.*)$/.exec(line)
++      if (heading) {
++        flushBullets(`heading-${idx}`)
++        const level = heading[1].length
++        const textValue = normalizeMarkdownInline(heading[2])
++        if (level === 1) {
++          nodes.push(<h2 key={`h2-${idx}`} className="text-lg font-bold uppercase">{textValue}</h2>)
++          return
++        }
++        if (level === 2) {
++          nodes.push(<h3 key={`h3-${idx}`} className="text-base font-bold uppercase">{textValue}</h3>)
++          return
++        }
++        nodes.push(<h4 key={`h4-${idx}`} className="text-sm font-bold uppercase">{textValue}</h4>)
++        return
++      }
++
++      if (/^[-*]\s+/.test(line)) {
++        bullets.push(line.replace(/^[-*]\s+/, '').trim())
++        return
++      }
++
++      flushBullets(`line-${idx}`)
++      nodes.push(<p key={`annex-p-${idx}`}>{normalizeMarkdownInline(line)}</p>)
++    })
++
++    flushBullets('annex-end')
++    return nodes
++  }
++
+   const extraEntries = Object.entries(contrato.dados_extras || {}).filter(
+     ([key, value]) => key !== 'forma_pagamento' && value != null && String(value).trim() !== ''
+   )
++  const fixedAnnexes = Array.isArray(templateData?.anexos_fixos)
++    ? [...templateData!.anexos_fixos].sort((a, b) => Number(a?.ordem || 0) - Number(b?.ordem || 0))
++    : []
+ 
+   const renderContratoPreview = () => {
+     return (
+@@ -468,6 +618,14 @@ export default function VisualizarContratoPage() {
+           </div>
+         </div>
+ 
++        {fixedAnnexes.map((annex, idx) => (
++          <div key={`annex-${annex.id || idx}`} className="mt-12 break-before-page border-t border-gray-400 pt-6 text-justify text-base leading-relaxed">
++            <div className="space-y-2">
++              {renderAnnexBody(annex.conteudo_markdown)}
++            </div>
++          </div>
++        ))}
++
+         <div className="mt-8 border-t border-gray-300 pt-3 text-center text-xs text-gray-500">
+           <p>FC Soluções Financeiras - CNPJ: 57.815.628/0001-62</p>
+           <p>Documento gerado em {formatDate(new Date().toISOString())}</p>
+diff --git a/frontend/src/lib/pdf.ts b/frontend/src/lib/pdf.ts
+index 94ebe83..e7891b5 100644
+--- a/frontend/src/lib/pdf.ts
++++ b/frontend/src/lib/pdf.ts
+@@ -9,9 +9,18 @@ interface TemplateClause {
+   paragrafos?: string[]
+ }
+ 
++interface TemplateAnnex {
++  id?: string
++  nome?: string
++  arquivo?: string
++  conteudo_markdown?: string
++  ordem?: number
++}
++
+ interface ContractTemplatePayload {
+   subtitulo?: string
+   clausulas?: TemplateClause[]
++  anexos_fixos?: TemplateAnnex[]
+ }
+ 
+ const CP1252_UNICODE_TO_BYTE: Record<number, number> = {
+@@ -131,13 +140,45 @@ function formatPrazoExtensoDisplay(value: unknown, extenso: unknown): string {
+   return String(extenso || '')
+ }
+ 
++function formatContractDate(contractData: any): string {
++  const raw = String(contractData?.data_assinatura || '').trim()
++  if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) return raw
++
++  if (raw) {
++    const parsed = new Date(raw)
++    if (!Number.isNaN(parsed.getTime())) {
++      return parsed.toLocaleDateString('pt-BR')
++    }
++  }
++
++  return new Date().toLocaleDateString('pt-BR')
++}
++
++function formatDatePlusDaysPtBr(dateBr: string, days: number): string {
++  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dateBr)
++  if (!match) return dateBr
++
++  const day = Number(match[1])
++  const month = Number(match[2]) - 1
++  const year = Number(match[3])
++  const date = new Date(year, month, day)
++  date.setDate(date.getDate() + days)
++  return date.toLocaleDateString('pt-BR')
++}
++
+ function replaceTemplateTokens(value: string, contractData: any): string {
+   const cnhNumero = String(contractData?.dados_extras?.cnh_numero || '-')
++  const contractDate = formatContractDate(contractData)
++  const plusSevenDays = formatDatePlusDaysPtBr(contractDate, 7)
+ 
+   const mapped: Record<string, string> = {
+     '[NOME COMPLETO DO CLIENTE]': String(contractData?.contratante_nome || ''),
+     '[NÚMERO DO DOCUMENTO]': formatDocument(contractData?.contratante_documento),
+     '[NUMERO DO DOCUMENTO]': formatDocument(contractData?.contratante_documento),
++    '[NÚMERO DO CONTRATO]': String(contractData?.numero || ''),
++    '[NUMERO DO CONTRATO]': String(contractData?.numero || ''),
++    '[DATA]': contractDate,
++    '[DATA + 7 DIAS]': plusSevenDays,
+     '[E-MAIL DO CLIENTE]': String(contractData?.contratante_email || ''),
+     '[TELEFONE DO CLIENTE]': String(contractData?.contratante_telefone || '-'),
+     '[ENDEREÇO COMPLETO DO CLIENTE]': String(contractData?.contratante_endereco || ''),
+@@ -233,6 +274,121 @@ function buildClausesHtml(contractData: any, templateData?: ContractTemplatePayl
+     .join('')
+ }
+ 
++function extractMarkdownPayload(value: string): string {
++  const text = String(value || '').trim()
++  if (!text) return ''
++  const match = text.match(/```(?:markdown)?\s*([\s\S]*?)```/i)
++  if (match && match[1]) return match[1].trim()
++  return text
++}
++
++function replaceAnnexHeaderTokens(markdown: string, contractData: any): string {
++  const contractDate = formatContractDate(contractData)
++  const plusSevenDays = formatDatePlusDaysPtBr(contractDate, 7)
++  const mapped: Record<string, string> = {
++    '[NOME COMPLETO DO CLIENTE]': String(contractData?.contratante_nome || ''),
++    '[NÚMERO DO DOCUMENTO]': formatDocument(contractData?.contratante_documento),
++    '[NUMERO DO DOCUMENTO]': formatDocument(contractData?.contratante_documento),
++    '[NÚMERO DO CONTRATO]': String(contractData?.numero || ''),
++    '[NUMERO DO CONTRATO]': String(contractData?.numero || ''),
++    '[DATA + 7 DIAS]': plusSevenDays,
++    '[DATA]': contractDate,
++  }
++
++  const lines = markdown.split('\n')
++  let headerOpen = true
++  return lines
++    .map((line) => {
++      let out = line
++      if (headerOpen) {
++        Object.entries(mapped).forEach(([token, replacement]) => {
++          out = out.split(token).join(replacement)
++        })
++      }
++      if (line.trim() === '---') headerOpen = false
++      return out
++    })
++    .join('\n')
++}
++
++function renderMarkdownInlineHtml(value: string): string {
++  let escaped = escapeHtml(value)
++  escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
++  escaped = escaped.replace(/__(.+?)__/g, '<strong>$1</strong>')
++  escaped = escaped.replace(/`(.+?)`/g, '<code>$1</code>')
++  return escaped
++}
++
++function renderAnnexMarkdownToHtml(contractData: any, markdown: string): string {
++  const source = normalizeMojibakeText(extractMarkdownPayload(markdown))
++  const normalized = replaceAnnexHeaderTokens(source, contractData)
++  if (!normalized.trim()) return ''
++
++  const lines = normalized.split('\n')
++  const htmlParts: string[] = []
++  let listItems: string[] = []
++
++  const flushList = () => {
++    if (!listItems.length) return
++    htmlParts.push(`<ul>${listItems.map((item) => `<li>${renderMarkdownInlineHtml(item)}</li>`).join('')}</ul>`)
++    listItems = []
++  }
++
++  lines.forEach((rawLine) => {
++    const line = rawLine.trim()
++    if (!line) {
++      flushList()
++      return
++    }
++
++    if (line === '---') {
++      flushList()
++      htmlParts.push('<hr>')
++      return
++    }
++
++    if (line.startsWith('>')) {
++      flushList()
++      htmlParts.push(`<blockquote>${renderMarkdownInlineHtml(line.replace(/^>\s?/, ''))}</blockquote>`)
++      return
++    }
++
++    const heading = /^(#{1,3})\s+(.*)$/.exec(line)
++    if (heading) {
++      flushList()
++      const level = heading[1].length
++      const tag = level === 1 ? 'h2' : level === 2 ? 'h3' : 'h4'
++      htmlParts.push(`<${tag}>${renderMarkdownInlineHtml(heading[2])}</${tag}>`)
++      return
++    }
++
++    if (/^[-*]\s+/.test(line)) {
++      listItems.push(line.replace(/^[-*]\s+/, '').trim())
++      return
++    }
++
++    flushList()
++    htmlParts.push(`<p>${renderMarkdownInlineHtml(line)}</p>`)
++  })
++
++  flushList()
++  return htmlParts.join('')
++}
++
++function buildAnnexesHtml(contractData: any, templateData?: ContractTemplatePayload | null): string {
++  const annexes = Array.isArray(templateData?.anexos_fixos) ? templateData!.anexos_fixos : []
++  if (!annexes.length) return ''
++
++  return [...annexes]
++    .sort((a, b) => Number(a?.ordem || 0) - Number(b?.ordem || 0))
++    .map((annex) => {
++      const body = renderAnnexMarkdownToHtml(contractData, String(annex?.conteudo_markdown || ''))
++      if (!body) return ''
++      return `<section class="annex-page">${body}</section>`
++    })
++    .join('')
++}
++
+ export function generateContractPDF(contractData: any, templateData?: ContractTemplatePayload | null) {
+   const printWindow = window.open('', '_blank')
+ 
+@@ -254,6 +410,7 @@ export function generateContractPDF(contractData: any, templateData?: ContractTe
+ 
+   const logoUrl = `${window.location.origin}/logo2-tight.png`
+   const clausesHtml = buildClausesHtml(contractData, templateData)
++  const annexesHtml = buildAnnexesHtml(contractData, templateData)
+ 
+   const html = `
+     <!DOCTYPE html>
+@@ -285,6 +442,13 @@ export function generateContractPDF(contractData: any, templateData?: ContractTe
+         .signatures { margin-top: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 50px; }
+         .signature { text-align: center; }
+         .signature-line { border-top: 1px solid #000; margin-top: 50px; padding-top: 5px; }
++        .annex-page { page-break-before: always; break-before: page; margin-top: 10px; font-size: 11pt; text-align: justify; }
++        .annex-page h2, .annex-page h3, .annex-page h4 { margin: 0 0 8px 0; font-weight: 700; text-transform: uppercase; }
++        .annex-page p { margin: 8px 0; }
++        .annex-page ul { margin: 6px 0; padding-left: 24px; }
++        .annex-page li { margin: 3px 0; }
++        .annex-page blockquote { margin: 8px 0; padding-left: 10px; border-left: 3px solid #888; color: #333; }
++        .annex-page hr { border: 0; border-top: 1px solid #bbb; margin: 10px 0; }
+         @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+       </style>
+     </head>
+@@ -355,6 +519,8 @@ export function generateContractPDF(contractData: any, templateData?: ContractTe
+         </div>
+       </div>
+ 
++      ${annexesHtml}
++
+       <script>
+         window.onload = function() {
+           setTimeout(function() {

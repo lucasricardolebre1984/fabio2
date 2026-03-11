@@ -19,6 +19,7 @@ from app.services.contrato_template_loader import (
     load_contract_template,
     normalize_template_payload,
 )
+from app.services.contrato_annex_loader import list_fixed_annexes_for_template
 from app.services.extenso_service import ExtensoService
 from app.services.viva_shared_service import _normalize_mojibake_text
 
@@ -239,6 +240,7 @@ class ContratoService:
 
         file_template = load_contract_template(template_key)
         if file_template:
+            file_template["anexos_fixos"] = list_fixed_annexes_for_template(template_key)
             return file_template
 
         # Try database when file template is unavailable.
@@ -268,11 +270,15 @@ class ContratoService:
                 "created_at": template.created_at,
                 "updated_at": template.updated_at
             }
-            return normalize_template_payload(template_payload)
+            normalized_payload = normalize_template_payload(template_payload)
+            normalized_payload["anexos_fixos"] = list_fixed_annexes_for_template(template_key)
+            return normalized_payload
         
         template_fallback = FALLBACK_TEMPLATES.get(template_key)
         if template_fallback:
-            return template_fallback
+            fallback_payload = dict(template_fallback)
+            fallback_payload["anexos_fixos"] = list_fixed_annexes_for_template(template_key)
+            return fallback_payload
         
         return None
 

@@ -48,6 +48,7 @@ Este arquivo centraliza os artefatos institucionais de blindagem para homologaca
 - `backend/COFRE/system/blindagem/audit/VIVA_CAMPAIGN_CONTEXT_TRUTH_GUARD_2026-02-21.md`
 - `backend/COFRE/system/blindagem/audit/WHATSAPP_VISIBILITY_RUNTIME_GUARD_2026-02-21.md`
 - `backend/COFRE/system/blindagem/audit/WHATSAPP_LID_RESOLUTION_HARDENING_2026-02-21.md`
+- `backend/COFRE/system/blindagem/audit/CONTRATOS_ANEXOS_FIXOS_2026-03-11.md`
 
 ## Rollbacks
 - `backend/COFRE/system/blindagem/rollback/rollback_gate2_cca7e3d.patch`
@@ -68,6 +69,8 @@ Este arquivo centraliza os artefatos institucionais de blindagem para homologaca
 - `backend/COFRE/system/blindagem/rollback/rollback_viva_agenda_nlu_coherence_20260221_005642.patch`
 - `backend/COFRE/system/blindagem/rollback/rollback_viva_stream_canonical_20260221_022500_baseline.txt`
 - `backend/COFRE/system/blindagem/rollback/rollback_viva_stream_canonical_20260221_022500.patch`
+- `backend/COFRE/system/blindagem/rollback/rollback_contratos_anexos_fixos_20260311_111327_pre_fix_baseline.txt`
+- `backend/COFRE/system/blindagem/rollback/rollback_contratos_anexos_fixos_20260311_111327.patch`
 
 ## Regra
 - Novos relatorios de auditoria devem entrar em `backend/COFRE/system/blindagem/audit/`.

@@ -9,9 +9,18 @@ interface TemplateClause {
   paragrafos?: string[]
 }
 
+interface TemplateAnnex {
+  id?: string
+  nome?: string
+  arquivo?: string
+  conteudo_markdown?: string
+  ordem?: number
+}
+
 interface ContractTemplatePayload {
   subtitulo?: string
   clausulas?: TemplateClause[]
+  anexos_fixos?: TemplateAnnex[]
 }
 
 const CP1252_UNICODE_TO_BYTE: Record<number, number> = {
@@ -131,13 +140,45 @@ function formatPrazoExtensoDisplay(value: unknown, extenso: unknown): string {
   return String(extenso || '')
 }
 
+function formatContractDate(contractData: any): string {
+  const raw = String(contractData?.data_assinatura || '').trim()
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) return raw
+
+  if (raw) {
+    const parsed = new Date(raw)
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString('pt-BR')
+    }
+  }
+
+  return new Date().toLocaleDateString('pt-BR')
+}
+
+function formatDatePlusDaysPtBr(dateBr: string, days: number): string {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dateBr)
+  if (!match) return dateBr
+
+  const day = Number(match[1])
+  const month = Number(match[2]) - 1
+  const year = Number(match[3])
+  const date = new Date(year, month, day)
+  date.setDate(date.getDate() + days)
+  return date.toLocaleDateString('pt-BR')
+}
+
 function replaceTemplateTokens(value: string, contractData: any): string {
   const cnhNumero = String(contractData?.dados_extras?.cnh_numero || '-')
+  const contractDate = formatContractDate(contractData)
+  const plusSevenDays = formatDatePlusDaysPtBr(contractDate, 7)
 
   const mapped: Record<string, string> = {
     '[NOME COMPLETO DO CLIENTE]': String(contractData?.contratante_nome || ''),
     '[NÚMERO DO DOCUMENTO]': formatDocument(contractData?.contratante_documento),
     '[NUMERO DO DOCUMENTO]': formatDocument(contractData?.contratante_documento),
+    '[NÚMERO DO CONTRATO]': String(contractData?.numero || ''),
+    '[NUMERO DO CONTRATO]': String(contractData?.numero || ''),
+    '[DATA]': contractDate,
+    '[DATA + 7 DIAS]': plusSevenDays,
     '[E-MAIL DO CLIENTE]': String(contractData?.contratante_email || ''),
     '[TELEFONE DO CLIENTE]': String(contractData?.contratante_telefone || '-'),
     '[ENDEREÇO COMPLETO DO CLIENTE]': String(contractData?.contratante_endereco || ''),
@@ -233,6 +274,121 @@ function buildClausesHtml(contractData: any, templateData?: ContractTemplatePayl
     .join('')
 }
 
+function extractMarkdownPayload(value: string): string {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  const match = text.match(/```(?:markdown)?\s*([\s\S]*?)```/i)
+  if (match && match[1]) return match[1].trim()
+  return text
+}
+
+function replaceAnnexHeaderTokens(markdown: string, contractData: any): string {
+  const contractDate = formatContractDate(contractData)
+  const plusSevenDays = formatDatePlusDaysPtBr(contractDate, 7)
+  const mapped: Record<string, string> = {
+    '[NOME COMPLETO DO CLIENTE]': String(contractData?.contratante_nome || ''),
+    '[NÚMERO DO DOCUMENTO]': formatDocument(contractData?.contratante_documento),
+    '[NUMERO DO DOCUMENTO]': formatDocument(contractData?.contratante_documento),
+    '[NÚMERO DO CONTRATO]': String(contractData?.numero || ''),
+    '[NUMERO DO CONTRATO]': String(contractData?.numero || ''),
+    '[DATA + 7 DIAS]': plusSevenDays,
+    '[DATA]': contractDate,
+  }
+
+  const lines = markdown.split('\n')
+  let headerOpen = true
+  return lines
+    .map((line) => {
+      let out = line
+      if (headerOpen) {
+        Object.entries(mapped).forEach(([token, replacement]) => {
+          out = out.split(token).join(replacement)
+        })
+      }
+      if (line.trim() === '---') headerOpen = false
+      return out
+    })
+    .join('\n')
+}
+
+function renderMarkdownInlineHtml(value: string): string {
+  let escaped = escapeHtml(value)
+  escaped = escaped.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  escaped = escaped.replace(/__(.+?)__/g, '<strong>$1</strong>')
+  escaped = escaped.replace(/`(.+?)`/g, '<code>$1</code>')
+  return escaped
+}
+
+function renderAnnexMarkdownToHtml(contractData: any, markdown: string): string {
+  const source = normalizeMojibakeText(extractMarkdownPayload(markdown))
+  const normalized = replaceAnnexHeaderTokens(source, contractData)
+  if (!normalized.trim()) return ''
+
+  const lines = normalized.split('\n')
+  const htmlParts: string[] = []
+  let listItems: string[] = []
+
+  const flushList = () => {
+    if (!listItems.length) return
+    htmlParts.push(`<ul>${listItems.map((item) => `<li>${renderMarkdownInlineHtml(item)}</li>`).join('')}</ul>`)
+    listItems = []
+  }
+
+  lines.forEach((rawLine) => {
+    const line = rawLine.trim()
+    if (!line) {
+      flushList()
+      return
+    }
+
+    if (line === '---') {
+      flushList()
+      htmlParts.push('<hr>')
+      return
+    }
+
+    if (line.startsWith('>')) {
+      flushList()
+      htmlParts.push(`<blockquote>${renderMarkdownInlineHtml(line.replace(/^>\s?/, ''))}</blockquote>`)
+      return
+    }
+
+    const heading = /^(#{1,3})\s+(.*)$/.exec(line)
+    if (heading) {
+      flushList()
+      const level = heading[1].length
+      const tag = level === 1 ? 'h2' : level === 2 ? 'h3' : 'h4'
+      htmlParts.push(`<${tag}>${renderMarkdownInlineHtml(heading[2])}</${tag}>`)
+      return
+    }
+
+    if (/^[-*]\s+/.test(line)) {
+      listItems.push(line.replace(/^[-*]\s+/, '').trim())
+      return
+    }
+
+    flushList()
+    htmlParts.push(`<p>${renderMarkdownInlineHtml(line)}</p>`)
+  })
+
+  flushList()
+  return htmlParts.join('')
+}
+
+function buildAnnexesHtml(contractData: any, templateData?: ContractTemplatePayload | null): string {
+  const annexes = Array.isArray(templateData?.anexos_fixos) ? templateData!.anexos_fixos : []
+  if (!annexes.length) return ''
+
+  return [...annexes]
+    .sort((a, b) => Number(a?.ordem || 0) - Number(b?.ordem || 0))
+    .map((annex) => {
+      const body = renderAnnexMarkdownToHtml(contractData, String(annex?.conteudo_markdown || ''))
+      if (!body) return ''
+      return `<section class="annex-page">${body}</section>`
+    })
+    .join('')
+}
+
 export function generateContractPDF(contractData: any, templateData?: ContractTemplatePayload | null) {
   const printWindow = window.open('', '_blank')
 
@@ -254,6 +410,7 @@ export function generateContractPDF(contractData: any, templateData?: ContractTe
 
   const logoUrl = `${window.location.origin}/logo2-tight.png`
   const clausesHtml = buildClausesHtml(contractData, templateData)
+  const annexesHtml = buildAnnexesHtml(contractData, templateData)
 
   const html = `
     <!DOCTYPE html>
@@ -285,6 +442,13 @@ export function generateContractPDF(contractData: any, templateData?: ContractTe
         .signatures { margin-top: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 50px; }
         .signature { text-align: center; }
         .signature-line { border-top: 1px solid #000; margin-top: 50px; padding-top: 5px; }
+        .annex-page { page-break-before: always; break-before: page; margin-top: 10px; font-size: 11pt; text-align: justify; }
+        .annex-page h2, .annex-page h3, .annex-page h4 { margin: 0 0 8px 0; font-weight: 700; text-transform: uppercase; }
+        .annex-page p { margin: 8px 0; }
+        .annex-page ul { margin: 6px 0; padding-left: 24px; }
+        .annex-page li { margin: 3px 0; }
+        .annex-page blockquote { margin: 8px 0; padding-left: 10px; border-left: 3px solid #888; color: #333; }
+        .annex-page hr { border: 0; border-top: 1px solid #bbb; margin: 10px 0; }
         @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
       </style>
     </head>
@@ -354,6 +518,8 @@ export function generateContractPDF(contractData: any, templateData?: ContractTe
           </div>
         </div>
       </div>
+
+      ${annexesHtml}
 
       <script>
         window.onload = function() {

@@ -1,0 +1,15 @@
+Rollback Baseline - Contratos Anexos Fixos
+Data: 2026-03-11 11:13:27 -03:00
+Branch: main
+Head: 1cf236f
+
+Escopo alvo desta rodada:
+- frontend/src/lib/pdf.ts
+- frontend/src/app/(dashboard)/contratos/[id]/page.tsx
+- backend/app/services/pdf_service_playwright.py
+- backend/app/services/pdf_service.py
+- contratos/anexos/TERMODECIENCIAGERAL.md
+- contratos/anexos/TERMODECIENCIARATING.md
+
+Status git pre-fix:
+ M AGENTS.md  M docs/AUDIT/PROJECT_HEALTH_VERIFICATION_2026-02-21.md  M docs/AUDIT/VIVA_VIVIANE_AGENTS_REDESIGN_2026-02-21.md  M docs/BUGSREPORT.md  M docs/DECISIONS.md  M docs/README.md  M docs/ROADMAP_NX.md  M docs/SESSION.md  M docs/STATUS.md ?? .specs/ ?? docs/PLANO_MODULARIZACAO_SAAS_NEUTRO_GATES.md

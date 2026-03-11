@@ -2,7 +2,7 @@
 import base64
 import html
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from uuid import UUID
@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.contrato import Contrato
+from app.services.contrato_annex_loader import list_fixed_annexes_for_template
 from app.services.contrato_template_loader import load_contract_template
 
 
@@ -117,6 +118,146 @@ class PDFService:
         text = re.sub(r"`(.*?)`", r"\1", text)
         return text.strip()
 
+    @staticmethod
+    def _extract_markdown_payload(value: str) -> str:
+        text = str(value or "").strip()
+        if not text:
+            return ""
+
+        match = re.search(r"```(?:markdown)?\s*([\s\S]*?)```", text, flags=re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+        return text
+
+    @staticmethod
+    def _format_contract_date(date_value: Optional[str], fallback_dt: datetime) -> str:
+        text = str(date_value or "").strip()
+        if text:
+            if re.match(r"^\d{2}/\d{2}/\d{4}$", text):
+                return text
+            try:
+                parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+                return parsed.strftime("%d/%m/%Y")
+            except Exception:
+                pass
+        return fallback_dt.strftime("%d/%m/%Y")
+
+    def _date_plus_days(self, date_value: Optional[str], fallback_dt: datetime, days: int) -> str:
+        contract_date = self._format_contract_date(date_value, fallback_dt)
+        try:
+            parsed = datetime.strptime(contract_date, "%d/%m/%Y")
+            return (parsed + timedelta(days=days)).strftime("%d/%m/%Y")
+        except Exception:
+            return contract_date
+
+    def _replace_annex_header_tokens(self, markdown: str, contrato: Contrato) -> str:
+        if not markdown:
+            return ""
+
+        contract_date = self._format_contract_date(contrato.data_assinatura, contrato.created_at)
+        plus_seven_days = self._date_plus_days(contrato.data_assinatura, contrato.created_at, 7)
+
+        mapped = {
+            "[NOME COMPLETO DO CLIENTE]": str(contrato.contratante_nome or ""),
+            "[NÚMERO DO DOCUMENTO]": self._format_document(contrato.contratante_documento),
+            "[NUMERO DO DOCUMENTO]": self._format_document(contrato.contratante_documento),
+            "[NÚMERO DO CONTRATO]": str(contrato.numero or ""),
+            "[NUMERO DO CONTRATO]": str(contrato.numero or ""),
+            "[DATA + 7 DIAS]": plus_seven_days,
+            "[DATA]": contract_date,
+        }
+
+        lines = markdown.splitlines()
+        output_lines: List[str] = []
+        header_open = True
+
+        for line in lines:
+            current = line
+            if header_open:
+                for token, replacement in mapped.items():
+                    current = current.replace(token, replacement)
+            output_lines.append(current)
+            if line.strip() == "---":
+                header_open = False
+
+        return "\n".join(output_lines)
+
+    @staticmethod
+    def _render_markdown_inline_html(value: str) -> str:
+        escaped = html.escape(value)
+        escaped = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", escaped)
+        escaped = re.sub(r"__(.+?)__", r"<strong>\1</strong>", escaped)
+        escaped = re.sub(r"`(.+?)`", r"<code>\1</code>", escaped)
+        return escaped
+
+    def _render_markdown_document_html(self, contrato: Contrato, markdown: str) -> str:
+        normalized_source = self._normalize_mojibake_text(self._extract_markdown_payload(markdown))
+        content = self._replace_annex_header_tokens(normalized_source, contrato)
+        if not content:
+            return ""
+
+        nodes: List[str] = []
+        list_items: List[str] = []
+
+        def flush_list() -> None:
+            nonlocal list_items
+            if not list_items:
+                return
+            nodes.append(
+                "<ul>"
+                + "".join(f"<li>{self._render_markdown_inline_html(item)}</li>" for item in list_items)
+                + "</ul>"
+            )
+            list_items = []
+
+        for raw_line in content.splitlines():
+            line = raw_line.strip()
+            if not line:
+                flush_list()
+                continue
+
+            if line == "---":
+                flush_list()
+                nodes.append("<hr>")
+                continue
+
+            if line.startswith(">"):
+                flush_list()
+                quote_text = line.lstrip(">").strip()
+                nodes.append(f"<blockquote>{self._render_markdown_inline_html(quote_text)}</blockquote>")
+                continue
+
+            heading_match = re.match(r"^(#{1,3})\s+(.*)$", line)
+            if heading_match:
+                flush_list()
+                level = len(heading_match.group(1))
+                tag = "h2" if level == 1 else "h3" if level == 2 else "h4"
+                nodes.append(f"<{tag}>{self._render_markdown_inline_html(heading_match.group(2).strip())}</{tag}>")
+                continue
+
+            if re.match(r"^[-*]\s+", line):
+                list_items.append(re.sub(r"^[-*]\s+", "", line).strip())
+                continue
+
+            flush_list()
+            nodes.append(f"<p>{self._render_markdown_inline_html(line)}</p>")
+
+        flush_list()
+        return "".join(nodes)
+
+    def _render_annexes_html(self, contrato: Contrato, annexes: List[Dict[str, Any]]) -> str:
+        if not annexes:
+            return ""
+
+        blocks: List[str] = []
+        for annex in sorted(annexes, key=lambda item: int(item.get("ordem") or 0)):
+            markdown = str(annex.get("conteudo_markdown") or "")
+            annex_html = self._render_markdown_document_html(contrato, markdown)
+            if not annex_html:
+                continue
+            blocks.append(f'<section class="annex-page">{annex_html}</section>')
+        return "".join(blocks)
+
     def _replace_tokens(self, value: str, contrato: Contrato) -> str:
         dados_extras = contrato.dados_extras if isinstance(contrato.dados_extras, dict) else {}
         cnh_numero = str(dados_extras.get("cnh_numero") or "-")
@@ -125,6 +266,10 @@ class PDFService:
             "[NOME COMPLETO DO CLIENTE]": str(contrato.contratante_nome or ""),
             "[NÚMERO DO DOCUMENTO]": self._format_document(contrato.contratante_documento),
             "[NUMERO DO DOCUMENTO]": self._format_document(contrato.contratante_documento),
+            "[NÚMERO DO CONTRATO]": str(contrato.numero or ""),
+            "[NUMERO DO CONTRATO]": str(contrato.numero or ""),
+            "[DATA]": self._format_contract_date(contrato.data_assinatura, contrato.created_at),
+            "[DATA + 7 DIAS]": self._date_plus_days(contrato.data_assinatura, contrato.created_at, 7),
             "[E-MAIL DO CLIENTE]": str(contrato.contratante_email or ""),
             "[TELEFONE DO CLIENTE]": str(contrato.contratante_telefone or "-"),
             "[ENDEREÇO COMPLETO DO CLIENTE]": str(contrato.contratante_endereco or ""),
@@ -261,6 +406,10 @@ class PDFService:
 
         clauses = template_data.get("clausulas") if isinstance(template_data.get("clausulas"), list) else []
         clauses_html = self._render_clauses_html(contrato, clauses)
+        annexes = template_data.get("anexos_fixos") if isinstance(template_data.get("anexos_fixos"), list) else []
+        if not annexes:
+            annexes = list_fixed_annexes_for_template(template_id)
+        annexes_html = self._render_annexes_html(contrato, annexes)
         dados_extras = contrato.dados_extras if isinstance(contrato.dados_extras, dict) else {}
         extras_html = "".join(
             f"<p><strong>{html.escape(str(key).replace('_', ' ').title())}:</strong> {html.escape(str(value))}</p>"
@@ -425,6 +574,41 @@ class PDFService:
                     font-size: 8pt;
                     color: #666;
                 }}
+                .annex-page {{
+                    page-break-before: always;
+                    break-before: page;
+                    margin-top: 10px;
+                    font-size: 11pt;
+                    text-align: justify;
+                }}
+                .annex-page h2,
+                .annex-page h3,
+                .annex-page h4 {{
+                    margin: 0 0 8px 0;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                }}
+                .annex-page p {{
+                    margin: 8px 0;
+                }}
+                .annex-page ul {{
+                    margin: 6px 0;
+                    padding-left: 24px;
+                }}
+                .annex-page li {{
+                    margin: 3px 0;
+                }}
+                .annex-page blockquote {{
+                    margin: 8px 0;
+                    padding-left: 10px;
+                    border-left: 3px solid #888;
+                    color: #333;
+                }}
+                .annex-page hr {{
+                    border: 0;
+                    border-top: 1px solid #bbb;
+                    margin: 10px 0;
+                }}
             </style>
         </head>
         <body>
@@ -506,6 +690,8 @@ class PDFService:
                     </div>
                 </div>
             </div>
+
+            {annexes_html}
 
             <div class="footer">
                 FC Soluções Financeiras - CNPJ: 57.815.628/0001-62<br>

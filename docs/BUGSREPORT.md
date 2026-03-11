@@ -2669,3 +2669,40 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
 **Leitura tecnica atual:** sintoma permanece tratado como intermitente; nesta rodada nao houve reproducao continua de falha estrutural do pipeline.
 **Status:** Em validacao
 
+### BUG-134: Contratos sem anexos institucionais obrigatorios na impressao/PDF
+**Data:** 2026-03-11
+**Severidade:** Alta
+**Descricao:** Os contratos nao estavam anexando automaticamente os termos institucionais obrigatorios no layout final de impressao/PDF, o que inviabiliza a formalizacao padrao exigida pelo cliente proprietario.
+**Escopo requerido:**
+- inserir `TERMODECIENCIAGERAL` em todos os contratos;
+- inserir `TERMODECIENCIARATING` apenas em:
+  - `aumento_score`
+  - `rating_convencional`
+  - `rating_express_pj`
+  - `rating_full_pj`
+- preencher apenas cabecalho com dados do contrato/cliente;
+- manter layout institucional atual de contratos.
+**Status:** Resolvido
+
+### Atualizacao 2026-03-11 (BUG-134 - anexos fixos em contratos)
+**Correcao aplicada:**
+- anexos canonicos versionados em:
+  - `contratos/anexos/TERMODECIENCIAGERAL.md`
+  - `contratos/anexos/TERMODECIENCIARATING.md`
+- regra de anexacao automatica centralizada no backend:
+  - `backend/app/services/contrato_annex_loader.py`
+  - anexo geral para todos os templates;
+  - anexo rating para `aumento_score`, `rating_convencional`, `rating_express_pj`, `rating_full_pj`.
+- render de PDF/impressao atualizado para incluir anexos mantendo layout:
+  - `frontend/src/lib/pdf.ts`
+  - `frontend/src/app/(dashboard)/contratos/[id]/page.tsx`
+  - `backend/app/services/pdf_service_playwright.py`
+  - `backend/app/services/pdf_service.py` (fallback WeasyPrint).
+- schema/API de template atualizado para expor anexos fixos:
+  - `backend/app/schemas/contrato.py`
+  - `backend/app/services/contrato_service.py`
+**Validacao:**
+- lint frontend sem erros;
+- py_compile dos arquivos backend alterados OK;
+- teste novo de regra de anexos (`2 passed`).
+

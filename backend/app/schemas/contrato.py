@@ -111,6 +111,7 @@ class ContratoTemplateResponse(BaseModel):
     campos: List[Dict[str, Any]]
     secoes: List[Dict[str, Any]]
     clausulas: Optional[List[Dict[str, Any]]] = None
+    anexos_fixos: Optional[List[Dict[str, Any]]] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

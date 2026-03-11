@@ -50,6 +50,14 @@ interface TemplateClause {
   paragrafos?: string[]
 }
 
+interface TemplateAnnex {
+  id?: string
+  nome?: string
+  arquivo?: string
+  conteudo_markdown?: string
+  ordem?: number
+}
+
 interface ContratoTemplateData {
   id: string
   nome: string
@@ -58,6 +66,7 @@ interface ContratoTemplateData {
   categoria?: string
   subtitulo?: string
   clausulas?: TemplateClause[]
+  anexos_fixos?: TemplateAnnex[]
 }
 
 const CP1252_UNICODE_TO_BYTE: Record<number, number> = {
@@ -154,6 +163,36 @@ function formatPrazoDisplay(value: number): string {
 function formatPrazoExtensoDisplay(value: number, extenso?: string): string {
   if (Number(value || 0) <= 0) return 'à vista'
   return String(extenso || '')
+}
+
+function formatContractDate(contract?: Contrato | null): string {
+  const raw = String(contract?.data_assinatura || '').trim()
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) return raw
+  if (raw) {
+    const parsed = new Date(raw)
+    if (!Number.isNaN(parsed.getTime())) return parsed.toLocaleDateString('pt-BR')
+  }
+  return new Date().toLocaleDateString('pt-BR')
+}
+
+function formatDatePlusDaysPtBr(dateBr: string, days: number): string {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dateBr)
+  if (!match) return dateBr
+
+  const day = Number(match[1])
+  const month = Number(match[2]) - 1
+  const year = Number(match[3])
+  const date = new Date(year, month, day)
+  date.setDate(date.getDate() + days)
+  return date.toLocaleDateString('pt-BR')
+}
+
+function extractMarkdownPayload(value?: string): string {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  const match = text.match(/```(?:markdown)?\s*([\s\S]*?)```/i)
+  if (match && match[1]) return match[1].trim()
+  return text
 }
 
 function getClauseContent(clause?: TemplateClause): string {
@@ -270,11 +309,17 @@ export default function VisualizarContratoPage() {
       'cnh_numero' in contrato.dados_extras
         ? String(contrato.dados_extras.cnh_numero || '-')
         : '-'
+    const contractDate = formatContractDate(contrato)
+    const plusSevenDays = formatDatePlusDaysPtBr(contractDate, 7)
 
     const mapped: Record<string, string> = {
       '[NOME COMPLETO DO CLIENTE]': contrato.contratante_nome,
       '[NÚMERO DO DOCUMENTO]': formatCPF(contrato.contratante_documento),
       '[NUMERO DO DOCUMENTO]': formatCPF(contrato.contratante_documento),
+      '[NÚMERO DO CONTRATO]': contrato.numero,
+      '[NUMERO DO CONTRATO]': contrato.numero,
+      '[DATA]': contractDate,
+      '[DATA + 7 DIAS]': plusSevenDays,
       '[E-MAIL DO CLIENTE]': contrato.contratante_email,
       '[TELEFONE DO CLIENTE]': contrato.contratante_telefone || '-',
       '[ENDEREÇO COMPLETO DO CLIENTE]': contrato.contratante_endereco,
@@ -298,6 +343,35 @@ export default function VisualizarContratoPage() {
     return Object.entries(mapped).reduce((acc, [token, replacement]) => {
       return acc.split(token).join(replacement)
     }, value)
+  }
+
+  const replaceAnnexHeaderTokens = (value: string) => {
+    const contractDate = formatContractDate(contrato)
+    const plusSevenDays = formatDatePlusDaysPtBr(contractDate, 7)
+    const mapped: Record<string, string> = {
+      '[NOME COMPLETO DO CLIENTE]': contrato.contratante_nome,
+      '[NÚMERO DO DOCUMENTO]': formatCPF(contrato.contratante_documento),
+      '[NUMERO DO DOCUMENTO]': formatCPF(contrato.contratante_documento),
+      '[NÚMERO DO CONTRATO]': contrato.numero,
+      '[NUMERO DO CONTRATO]': contrato.numero,
+      '[DATA + 7 DIAS]': plusSevenDays,
+      '[DATA]': contractDate,
+    }
+
+    const lines = value.split('\n')
+    let headerOpen = true
+    return lines
+      .map((line) => {
+        let out = line
+        if (headerOpen) {
+          Object.entries(mapped).forEach(([token, replacement]) => {
+            out = out.split(token).join(replacement)
+          })
+        }
+        if (line.trim() === '---') headerOpen = false
+        return out
+      })
+      .join('\n')
   }
 
   const renderClauseBody = (content?: string) => {
@@ -343,9 +417,85 @@ export default function VisualizarContratoPage() {
     return nodes
   }
 
+  const renderAnnexBody = (content?: string) => {
+    const source = normalizeMojibakeText(extractMarkdownPayload(content))
+    const text = replaceAnnexHeaderTokens(source)
+    const lines = text.split('\n')
+
+    const nodes: JSX.Element[] = []
+    let bullets: string[] = []
+
+    const flushBullets = (keyPrefix: string) => {
+      if (!bullets.length) return
+      nodes.push(
+        <ul key={`${keyPrefix}-list-${nodes.length}`} className="list-disc space-y-1 pl-6">
+          {bullets.map((item, idx) => (
+            <li key={`${keyPrefix}-item-${idx}`}>{normalizeMarkdownInline(item)}</li>
+          ))}
+        </ul>
+      )
+      bullets = []
+    }
+
+    lines.forEach((rawLine, idx) => {
+      const line = rawLine.trim()
+      if (!line) {
+        flushBullets(`blank-${idx}`)
+        return
+      }
+
+      if (line === '---') {
+        flushBullets(`hr-${idx}`)
+        nodes.push(<hr key={`hr-${idx}`} className="my-2 border-gray-300" />)
+        return
+      }
+
+      if (/^>\s?/.test(line)) {
+        flushBullets(`quote-${idx}`)
+        nodes.push(
+          <blockquote key={`quote-${idx}`} className="my-2 border-l-4 border-gray-400 pl-3 text-gray-700">
+            {normalizeMarkdownInline(line.replace(/^>\s?/, ''))}
+          </blockquote>
+        )
+        return
+      }
+
+      const heading = /^(#{1,3})\s+(.*)$/.exec(line)
+      if (heading) {
+        flushBullets(`heading-${idx}`)
+        const level = heading[1].length
+        const textValue = normalizeMarkdownInline(heading[2])
+        if (level === 1) {
+          nodes.push(<h2 key={`h2-${idx}`} className="text-lg font-bold uppercase">{textValue}</h2>)
+          return
+        }
+        if (level === 2) {
+          nodes.push(<h3 key={`h3-${idx}`} className="text-base font-bold uppercase">{textValue}</h3>)
+          return
+        }
+        nodes.push(<h4 key={`h4-${idx}`} className="text-sm font-bold uppercase">{textValue}</h4>)
+        return
+      }
+
+      if (/^[-*]\s+/.test(line)) {
+        bullets.push(line.replace(/^[-*]\s+/, '').trim())
+        return
+      }
+
+      flushBullets(`line-${idx}`)
+      nodes.push(<p key={`annex-p-${idx}`}>{normalizeMarkdownInline(line)}</p>)
+    })
+
+    flushBullets('annex-end')
+    return nodes
+  }
+
   const extraEntries = Object.entries(contrato.dados_extras || {}).filter(
     ([key, value]) => key !== 'forma_pagamento' && value != null && String(value).trim() !== ''
   )
+  const fixedAnnexes = Array.isArray(templateData?.anexos_fixos)
+    ? [...templateData!.anexos_fixos].sort((a, b) => Number(a?.ordem || 0) - Number(b?.ordem || 0))
+    : []
 
   const renderContratoPreview = () => {
     return (
@@ -467,6 +617,14 @@ export default function VisualizarContratoPage() {
             </div>
           </div>
         </div>
+
+        {fixedAnnexes.map((annex, idx) => (
+          <div key={`annex-${annex.id || idx}`} className="mt-12 break-before-page border-t border-gray-400 pt-6 text-justify text-base leading-relaxed">
+            <div className="space-y-2">
+              {renderAnnexBody(annex.conteudo_markdown)}
+            </div>
+          </div>
+        ))}
 
         <div className="mt-8 border-t border-gray-300 pt-3 text-center text-xs text-gray-500">
           <p>FC Soluções Financeiras - CNPJ: 57.815.628/0001-62</p>

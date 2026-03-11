@@ -132,6 +132,27 @@ Status: consolidacao final de homologacao local (WhatsApp/VIVA/Viviane) + ajuste
 - Git (Windows): saudável — main, limpo, sincronizado com origin/main.
 - Ubuntu: script de diagnóstico disponível no audit; Lucas deve executar no servidor e reportar.
 
+## Planejamento estrutural - modularizacao neutra (2026-03-09)
+
+- Criado `docs/PLANO_MODULARIZACAO_SAAS_NEUTRO_GATES.md`.
+- Plano reforcado com protocolo anti-drift, checklist de conformidade, pacote minimo por gate e condicoes de parada obrigatoria.
+- Criado `.specs/project/CONTEXT.md` como contexto base para gerar `spec.md`, `design.md` e `tasks.md` sem drift.
+- Criados `.specs/project/PROJECT.md`, `.specs/project/ROADMAP.md` e `.specs/project/STATE.md` para fechamento do pacote de contexto auditavel de novo chat.
+- Atualizado `AGENTS.md` com bootstrap obrigatorio de contexto para garantir carregamento consistente em nova sessao.
+- Objetivo desta rodada documental:
+  - definir o SaaS alvo em linguagem neutra;
+  - separar core, orquestracao, atendimento externo, configuracoes e auditoria;
+  - congelar gates de aprovacao antes de qualquer implementacao.
+- Diretriz aprovada para a proxima fase:
+  - `Concierge` sera a Persona 1 e orquestrador interno;
+  - `Persona 2` ficara restrita a atendimento WhatsApp e agendamentos;
+  - `Configuracoes` sera o dono de prompts, branding, temas e layout;
+  - `Financeiro` passa a ser dominio formal do produto.
+- Regra de execucao desta trilha:
+  - nao iniciar codigo sem aprovacao explicita do gate correspondente;
+  - nao fazer refatoracao lateral fora do contrato aprovado;
+  - usar eventos e APIs entre modulos, evitando acoplamento semantico novo.
+
 ## Novos bugs abertos nesta auditoria
 
 - BUG-116: vulnerabilidades criticas/altas no frontend (`next`, `axios`)
@@ -145,4 +166,40 @@ Status: consolidacao final de homologacao local (WhatsApp/VIVA/Viviane) + ajuste
 O historico tecnico antigo permanece preservado em arquivos de rollback e em documentos no VAULT.
 Este arquivo passa a registrar apenas o contexto corrente de sessao.
 
-Atualizado em: 2026-02-21
+Atualizado em: 2026-03-09
+
+## Atualizacao de sessao (2026-03-09)
+
+- Iniciada trilha documental do Gate 0 (linguagem e visao do produto), sem alteracoes de codigo.
+- Criado pacote de feature: `.specs/features/gate-0-linguagem-visao/` com `spec.md`, `design.md` e `tasks.md`.
+- `STATE.md` atualizado para refletir Gate 0 em elaboracao documental.
+- Proximo marco: aprovacao explicita do usuario para fechamento do Gate 0.
+
+## Atualizacao de sessao (2026-03-11) - pre-Gate0 contratos/anexos
+
+- Solicitacao aprovada pelo usuario para mudanca operacional antes da trilha de Gate 0:
+  - anexar termo geral em todos os contratos;
+  - anexar termo rating em templates especificos de rating.
+- BUG registrado antes da correcao: `BUG-134` em `docs/BUGSREPORT.md`.
+- Execucao institucional prevista nesta rodada:
+  - baseline de rollback no COFRE;
+  - implementacao em render de contratos (frontend + backend);
+  - auditoria e patch de rollback;
+  - commit e push da entrega.
+
+## Fechamento tecnico (2026-03-11) - contratos/anexos
+
+- Implementacao concluida com anexos fixos em contratos:
+  - anexo geral em todos os templates;
+  - anexo rating em `aumento_score`, `rating_convencional`, `rating_express_pj`, `rating_full_pj`.
+- Regra de preenchimento aplicada apenas no cabecalho dos anexos (dados do cliente/contrato).
+- Layout institucional preservado em:
+  - preview frontend;
+  - PDF frontend (print);
+  - PDF backend Playwright;
+  - fallback backend WeasyPrint.
+- Auditoria registrada em:
+  - `backend/COFRE/system/blindagem/audit/CONTRATOS_ANEXOS_FIXOS_2026-03-11.md`.
+- Rollback institucional registrado em:
+  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_anexos_fixos_20260311_111327_pre_fix_baseline.txt`
+  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_anexos_fixos_20260311_111327.patch`

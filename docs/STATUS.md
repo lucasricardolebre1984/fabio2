@@ -3,6 +3,15 @@
 Data: 2026-02-21
 Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA/Viviane funcionais e layout de contratos estabilizado para homologacao final; documentacao institucional normalizada (FOUNDATION + caminhos COFRE), drift operacional do Ubuntu limpo e persistindo como pendencia principal a intermitencia especifica no fluxo WhatsApp.
 
+## Planejamento estrutural pendente de aprovacao
+
+- Plano documental criado para neutralizacao e modularizacao do produto:
+  - `docs/PLANO_MODULARIZACAO_SAAS_NEUTRO_GATES.md`
+- Escopo do plano:
+  - separar core do SaaS, orquestracao interna, atendimento externo, configuracoes, financeiro, integracoes e auditoria;
+  - congelar contratos de API e eventos antes da fase de codigo;
+  - impedir drift de implementacao por gate nao aprovado.
+
 ## Fonte de verdade ativa
 
 - Persona canonica VIVA: `backend/COFRE/persona-skills/viva/AGENT.md`
@@ -154,10 +163,37 @@ Status geral: operacional em ambiente local e stack prod-like, com WhatsApp/VIVA
 - Fechamento do redesign de personas VIVA/VIVIANE:
   - `docs/AUDIT/VIVA_VIVIANE_AGENTS_REDESIGN_2026-02-21.md`
   - `docs/AUDIT/CONTEXT_SOURCE_OF_TRUTH_2026-02-21.md`
+- Planejamento de modularizacao neutra por gates:
+  - `docs/PLANO_MODULARIZACAO_SAAS_NEUTRO_GATES.md`
+  - plano reforcado com protocolo anti-drift, checklist obrigatorio, pacote minimo por gate e condicoes de parada.
+- Contexto base para specs:
+  - `.specs/project/CONTEXT.md`
+  - `.specs/project/PROJECT.md`
+  - `.specs/project/ROADMAP.md`
+  - `.specs/project/STATE.md`
+- Bootstrap de contexto refletido em:
+  - `AGENTS.md`
 
 ## Diretriz de deploy institucional
 
 - Alvo principal: Ubuntu AWS virgem (stack Docker)
 - Nao usar Vercel como alvo institucional desta operacao
 
-Atualizado em: 2026-02-21
+Atualizado em: 2026-03-09
+
+## Atualizacao 2026-03-09 (Gate 0)
+
+- Gate 0 iniciado em modo documental (sem execucao de codigo).
+- Pacote de especificacao criado em `.specs/features/gate-0-linguagem-visao/`.
+- Estado do projeto segue restrito a leitura/auditoria/documentacao ate aprovacao explicita de gate.
+
+## Atualizacao 2026-03-11 (pre-Gate0 contratos/anexos)
+
+- Mudanca operacional aprovada pelo usuario para contratos antes da trilha de Gate 0.
+- Objetivo da rodada: anexar termos institucionais fixos no PDF/impressao sem alterar layout base.
+- BUG-134 registrado como rastreio da correcao.
+- Execucao concluida com protocolo institucional de rollback e auditoria no COFRE.
+- Auditoria: `backend/COFRE/system/blindagem/audit/CONTRATOS_ANEXOS_FIXOS_2026-03-11.md`.
+- Rollback:
+  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_anexos_fixos_20260311_111327_pre_fix_baseline.txt`
+  - `backend/COFRE/system/blindagem/rollback/rollback_contratos_anexos_fixos_20260311_111327.patch`
