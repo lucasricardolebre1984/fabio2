@@ -1,7 +1,8 @@
 export const APP_NAME = 'FC Soluções Financeiras'
 export const APP_VERSION = '1.0.0'
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1'
+const defaultApiUrl = process.env.NODE_ENV === 'production' ? '/api/v1' : 'http://127.0.0.1:8000/api/v1'
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || defaultApiUrl
 
 export const MENU_ITEMS = [
   {
