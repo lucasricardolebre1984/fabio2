@@ -197,3 +197,11 @@ Atualizado em: 2026-03-09
 - Rollback:
   - `backend/COFRE/system/blindagem/rollback/rollback_contratos_anexos_fixos_20260311_111327_pre_fix_baseline.txt`
   - `backend/COFRE/system/blindagem/rollback/rollback_contratos_anexos_fixos_20260311_111327.patch`
+
+
+## Atualizacao 2026-03-11 (deploy AWS anti-502)
+
+- Publicado roteiro obrigatorio de deploy e validacao real em EC2:
+  - `docs/DEPLOY_AWS_VALIDACAO_REAL_ANTI_502_2026-03-11.md`
+- Roteiro cobre diagnostico e prevencao de conflito de porta 80 (host nginx x compose nginx).
+- Bug operacional correlato registrado como `BUG-135` em `docs/BUGSREPORT.md`.

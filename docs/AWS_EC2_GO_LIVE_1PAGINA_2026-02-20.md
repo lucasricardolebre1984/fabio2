@@ -95,3 +95,13 @@ Uso rapido:
 ```bash
 git apply --reverse backend/COFRE/system/blindagem/rollback/rollback_aws_prod_hardening_20260220_153717.patch
 ```
+
+## 8) Validacao real anti-502 (obrigatorio)
+
+Para deploy em EC2 sem inferencia e com checklist de prova real, usar:
+
+- `docs/DEPLOY_AWS_VALIDACAO_REAL_ANTI_502_2026-03-11.md`
+
+Ponto critico:
+
+- nunca misturar owner da porta `80` entre nginx do host Ubuntu e nginx do compose.

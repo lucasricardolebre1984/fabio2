@@ -2706,3 +2706,20 @@ Obs operacional: o MiniMax pode retornar `insufficient balance` se a conta/grupo
 - py_compile dos arquivos backend alterados OK;
 - teste novo de regra de anexos (`2 passed`).
 
+### BUG-135: Deploy AWS com 502 por conflito de bind na porta 80
+**Data:** 2026-03-11
+**Severidade:** Critica
+**Descricao:** Durante deploy real em EC2, o `docker compose` falhou ao recriar `fabio2-nginx` por conflito em `0.0.0.0:80`, deixando o dominio com `502 Bad Gateway`.
+**Sintoma observado:**
+- browser em `https://fabio.automaniaai.com.br` exibindo 502;
+- erro de deploy: `failed to bind host port 0.0.0.0:80/tcp: address already in use`;
+- container `fabio2-nginx` ausente apos `up -d --build`.
+**Causa raiz:**
+- conflito entre estrategia de nginx do host Ubuntu (porta 80) e nginx do compose tambem em `80:80`.
+**Correcao/padrao operacional:**
+- formalizar runbook de deploy real AWS com validacao obrigatoria de owner da porta 80 antes de recriar stack;
+- padronizar estrategia:
+  - host nginx em `:80/:443` + compose nginx em `127.0.0.1:8088:80`; ou
+  - compose nginx como owner unico de `:80` com host nginx desativado.
+**Status:** Em validacao
+

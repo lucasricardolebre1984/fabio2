@@ -203,3 +203,14 @@ Atualizado em: 2026-03-09
 - Rollback institucional registrado em:
   - `backend/COFRE/system/blindagem/rollback/rollback_contratos_anexos_fixos_20260311_111327_pre_fix_baseline.txt`
   - `backend/COFRE/system/blindagem/rollback/rollback_contratos_anexos_fixos_20260311_111327.patch`
+
+
+## Atualizacao de sessao (2026-03-11) - roteiro anti-502 em AWS
+
+- Incidente observado em deploy real: `502 Bad Gateway` por conflito de bind na porta `80` do host.
+- Bug operacional registrado: `BUG-135` em `docs/BUGSREPORT.md`.
+- Novo roteiro institucional publicado:
+  - `docs/DEPLOY_AWS_VALIDACAO_REAL_ANTI_502_2026-03-11.md`
+- Referencias atualizadas em:
+  - `docs/RUNBOOK.md`
+  - `docs/AWS_EC2_GO_LIVE_1PAGINA_2026-02-20.md`

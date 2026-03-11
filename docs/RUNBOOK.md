@@ -67,6 +67,8 @@ Acesso:
 
 - Alvo principal: Ubuntu AWS com Docker
 - Guia principal: `docs/DEPLOY_UBUNTU_DOCKER.md`
+- Validacao real obrigatoria em producao: `docs/DEPLOY_AWS_VALIDACAO_REAL_ANTI_502_2026-03-11.md`
+- Regra operacional: deploy so fecha com evidencias reais (HEAD, `compose ps`, curl local/upstream, curl dominio e teste funcional no navegador)
 - Vercel nao e alvo institucional desta operacao
 
 ## Troubleshooting rapido
